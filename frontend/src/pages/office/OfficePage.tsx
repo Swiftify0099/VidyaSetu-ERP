@@ -4,19 +4,23 @@ import {
   Bell, Users, UserCheck, Calendar, MessageSquare,
   FileText, Plus, Eye, Edit2, Trash2, Search, RefreshCw,
   ChevronLeft, ChevronRight, X, Check, Clock, AlertTriangle,
-  Inbox, Send, ArrowRight, Pin, ExternalLink,
+  Inbox, Send, ArrowRight, Pin, ExternalLink, Award, Printer,
+  CheckCircle, XCircle, FileCheck
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import officeService, {
   Notice, Enquiry, Visitor, SchoolEvent, Complaint, OfficeStats,
+  BonafideApplication, BonafidePrintData
 } from '../../services/officeService';
+import { BonafideCertificatePrint } from '../../components/office/BonafideCertificatePrint';
 import PermissionGate from '../../components/ui/PermissionGate';
 import styles from './OfficePage.module.css';
 
-type ActiveSection = 'overview' | 'notices' | 'enquiries' | 'visitors' | 'events' | 'complaints' | 'register';
+type ActiveSection = 'overview' | 'notices' | 'enquiries' | 'visitors' | 'events' | 'complaints' | 'register' | 'bonafide';
 
 const SECTION_TABS = [
   { id: 'overview',   label: 'Overview',       icon: <FileText size={15}/> },
+  { id: 'bonafide',   label: 'Bonafide Certificates', icon: <Award size={15}/> },
   { id: 'notices',    label: 'Notice Board',   icon: <Bell size={15}/> },
   { id: 'enquiries',  label: 'Enquiries',      icon: <Users size={15}/> },
   { id: 'visitors',   label: 'Visitor Log',    icon: <UserCheck size={15}/> },
@@ -90,6 +94,16 @@ export default function OfficePage() {
     reference_number: '', document_type: '', remarks: '',
   });
 
+  // Bonafide Applications
+  const [bonafideApps, setBonafideApps] = useState<BonafideApplication[]>([]);
+  const [bonafideStatusFilter, setBonafideStatusFilter] = useState('');
+  const [bonafideSearch, setBonafideSearch] = useState('');
+  const [showRejectModal, setShowRejectModal] = useState<BonafideApplication | null>(null);
+  const [rejectionReasonInput, setRejectionReasonInput] = useState('');
+  const [printCertData, setPrintCertData] = useState<BonafidePrintData | null>(null);
+  const [showDirectBonafideModal, setShowDirectBonafideModal] = useState(false);
+  const [directBonafide, setDirectBonafide] = useState({ student_id: '', purpose: 'General Purpose', fee_amount: 20 });
+
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -101,6 +115,12 @@ export default function OfficePage() {
     setLoading(true);
     try {
       switch (section) {
+        case 'bonafide':
+          const bd = await officeService.getBonafideApplications({
+            status: bonafideStatusFilter || undefined,
+            search: bonafideSearch || undefined,
+          });
+          setBonafideApps(bd.items); break;
         case 'notices':
           const nd = await officeService.getNotices({ search: noticeSearch || undefined, notice_type: noticeType || undefined });
           setNotices(nd.items); break;
@@ -122,10 +142,73 @@ export default function OfficePage() {
       }
     } catch { }
     finally { setLoading(false); }
-  }, [section, noticeSearch, noticeType, enqSearch, enqStatus, regType]);
+  }, [section, bonafideStatusFilter, bonafideSearch, noticeSearch, noticeType, enqSearch, enqStatus, regType]);
 
   useEffect(() => { loadStats(); }, [loadStats]);
   useEffect(() => { if (section !== 'overview') loadSection(); }, [loadSection]);
+
+  // ── Bonafide Certificate Handlers ──────────────────────────
+  const handleApproveBonafide = async (id: number) => {
+    try {
+      await officeService.approveBonafide(id);
+      toast.success('Bonafide application accepted & approved!');
+      loadSection();
+      loadStats();
+    } catch {
+      toast.error('Failed to approve application.');
+    }
+  };
+
+  const handleRejectBonafide = async () => {
+    if (!showRejectModal) return;
+    if (!rejectionReasonInput.trim()) {
+      toast.error('Please enter a rejection reason.');
+      return;
+    }
+    try {
+      await officeService.rejectBonafide(showRejectModal.id, rejectionReasonInput);
+      toast.success('Bonafide application rejected.');
+      setShowRejectModal(null);
+      setRejectionReasonInput('');
+      loadSection();
+      loadStats();
+    } catch {
+      toast.error('Failed to reject application.');
+    }
+  };
+
+  const handlePrintBonafide = async (id: number) => {
+    try {
+      const data = await officeService.getBonafidePrintData(id);
+      setPrintCertData(data);
+    } catch {
+      toast.error('Failed to load printable certificate.');
+    }
+  };
+
+  const handleCreateDirectBonafide = async () => {
+    if (!directBonafide.student_id || !directBonafide.purpose) {
+      toast.error('Student ID and Purpose are required.');
+      return;
+    }
+    setSaving(true);
+    try {
+      await officeService.createDirectBonafide({
+        student_id: parseInt(directBonafide.student_id),
+        purpose: directBonafide.purpose,
+        fee_amount: Number(directBonafide.fee_amount),
+      });
+      toast.success('Bonafide certificate issued directly!');
+      setShowDirectBonafideModal(false);
+      setDirectBonafide({ student_id: '', purpose: 'General Purpose', fee_amount: 20 });
+      loadSection();
+      loadStats();
+    } catch {
+      toast.error('Failed to issue direct certificate.');
+    } finally {
+      setSaving(false);
+    }
+  };
 
   // ── Notice CRUD ───────────────────────────────────────────
   const saveNotice = async () => {
@@ -285,6 +368,7 @@ export default function OfficePage() {
       {section === 'overview' && stats && (
         <div className={styles.overviewGrid}>
           {[
+            { label: 'Bonafide Requests', value: (stats as any).pending_bonafides || 0, total: null, icon: <Award size={20}/>, color: '#8b5cf6', action: () => setSection('bonafide') },
             { label: 'Active Notices', value: stats.active_notices, total: stats.total_notices, icon: <Bell size={20}/>, color: 'var(--color-primary)', action: () => setSection('notices') },
             { label: 'Pending Enquiries', value: stats.pending_enquiries, total: stats.total_enquiries, icon: <Users size={20}/>, color: 'var(--color-warning)', action: () => setSection('enquiries') },
             { label: "Today's Visitors", value: stats.today_visitors, total: null, icon: <UserCheck size={20}/>, color: 'var(--color-success)', action: () => setSection('visitors') },
@@ -299,6 +383,112 @@ export default function OfficePage() {
               <ArrowRight size={14} className={styles.overviewArrow}/>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* ── Bonafide Certificates Section ───────────────── */}
+      {section === 'bonafide' && (
+        <div className={styles.sectionContent}>
+          <div className={styles.sectionToolbar}>
+            <div className={styles.searchWrap}>
+              <Search size={14} className={styles.searchIcon}/>
+              <input className={styles.searchInput} placeholder="Search by student name, GR no, purpose..." value={bonafideSearch} onChange={e => setBonafideSearch(e.target.value)}/>
+            </div>
+            <select className={styles.filterSelect} value={bonafideStatusFilter} onChange={e => setBonafideStatusFilter(e.target.value)}>
+              <option value="">All Statuses</option>
+              <option value="PENDING">Pending Approval</option>
+              <option value="APPROVED">Approved / Issued</option>
+              <option value="REJECTED">Rejected</option>
+            </select>
+            <button className={styles.iconBtn} onClick={loadSection}><RefreshCw size={14}/></button>
+            <PermissionGate permission="office.create">
+              <button className={styles.addBtn} onClick={() => setShowDirectBonafideModal(true)}>
+                <Plus size={15}/> Direct Issue
+              </button>
+            </PermissionGate>
+          </div>
+
+          <div className={styles.tableWrap}>
+            <table className={styles.table}>
+              <thead>
+                <tr>
+                  <th>App #</th>
+                  <th>Student Name</th>
+                  <th>Class</th>
+                  <th>Purpose</th>
+                  <th>Fee Charge</th>
+                  <th>Applied Date</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {loading ? (
+                  <tr><td colSpan={8} style={{ textAlign: 'center', padding: 24 }}>Loading applications...</td></tr>
+                ) : bonafideApps.length === 0 ? (
+                  <tr><td colSpan={8} style={{ textAlign: 'center', padding: 36, color: 'var(--color-text-muted)' }}><Award size={36} style={{ display: 'block', margin: '0 auto 8px', opacity: 0.5 }} />No bonafide applications found.</td></tr>
+                ) : (
+                  bonafideApps.map(app => (
+                    <tr key={app.id}>
+                      <td><strong>{app.application_number}</strong></td>
+                      <td>
+                        <div style={{ fontWeight: 600 }}>{app.student_name}</div>
+                        <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>GR: {app.student_gr_number}</div>
+                      </td>
+                      <td>Std {app.student_standard}{app.student_division ? `-${app.student_division}` : ''}</td>
+                      <td><span className={`${styles.tag} ${styles.tagPrimary}`}>{app.purpose}</span></td>
+                      <td>
+                        <span className={`${styles.tag} ${app.payment_status === 'PAID' ? styles.tagSuccess : styles.tagWarning}`}>
+                          ₹{app.fee_amount} ({app.payment_status})
+                        </span>
+                      </td>
+                      <td>{app.applied_date}</td>
+                      <td>
+                        <span className={`${styles.tag} ${app.status === 'APPROVED' ? styles.tagSuccess : app.status === 'REJECTED' ? styles.tagDanger : styles.tagWarning}`}>
+                          {app.status}
+                        </span>
+                        {app.rejection_reason && (
+                          <div style={{ fontSize: '0.7rem', color: 'var(--color-danger)', marginTop: 2 }}>{app.rejection_reason}</div>
+                        )}
+                      </td>
+                      <td>
+                        <div style={{ display: 'flex', gap: 6 }}>
+                          {app.status === 'PENDING' && (
+                            <>
+                              <button
+                                className={styles.miniBtn}
+                                style={{ backgroundColor: 'var(--color-success)', color: '#fff', padding: '4px 8px', borderRadius: 4, display: 'flex', alignItems: 'center', gap: 4 }}
+                                onClick={() => handleApproveBonafide(app.id)}
+                                title="Accept & Approve Application"
+                              >
+                                <CheckCircle size={13} /> Accept
+                              </button>
+                              <button
+                                className={`${styles.miniBtn} ${styles.miniBtnDanger}`}
+                                style={{ padding: '4px 8px', borderRadius: 4, display: 'flex', alignItems: 'center', gap: 4 }}
+                                onClick={() => setShowRejectModal(app)}
+                                title="Reject Application"
+                              >
+                                <XCircle size={13} /> Reject
+                              </button>
+                            </>
+                          )}
+                          <button
+                            className={styles.miniBtn}
+                            style={{ backgroundColor: '#2563eb', color: '#fff', padding: '4px 10px', borderRadius: 4, display: 'flex', alignItems: 'center', gap: 4 }}
+                            onClick={() => handlePrintBonafide(app.id)}
+                            title="Print Marathi Bonafide Certificate"
+                          >
+                            <Printer size={13} /> Print
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
@@ -830,6 +1020,90 @@ export default function OfficePage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Reject Bonafide Modal */}
+      {showRejectModal && (
+        <div className={styles.overlay} onClick={() => setShowRejectModal(null)}>
+          <div className={styles.modal} onClick={e => e.stopPropagation()}>
+            <div className={styles.modalHeader}>
+              <h3 className={styles.modalTitle}>Reject Bonafide Application</h3>
+              <button className={styles.modalClose} onClick={() => setShowRejectModal(null)}><X size={16}/></button>
+            </div>
+            <div className={styles.modalBody}>
+              <p style={{ marginBottom: 12 }}>
+                Rejecting application <strong>{showRejectModal.application_number}</strong> for student <strong>{showRejectModal.student_name}</strong>.
+              </p>
+              <div className={styles.mf}>
+                <label className={styles.ml}>Reason for Rejection *</label>
+                <textarea
+                  className={styles.mi}
+                  rows={3}
+                  placeholder="Enter reason for rejecting this application..."
+                  value={rejectionReasonInput}
+                  onChange={e => setRejectionReasonInput(e.target.value)}
+                />
+              </div>
+            </div>
+            <div className={styles.modalFooter}>
+              <button className={styles.cancelBtn} onClick={() => setShowRejectModal(null)}>Cancel</button>
+              <button className={styles.submitBtn} style={{ backgroundColor: 'var(--color-danger)' }} onClick={handleRejectBonafide}>Confirm Rejection</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Direct Issue Bonafide Modal */}
+      {showDirectBonafideModal && (
+        <div className={styles.overlay} onClick={() => setShowDirectBonafideModal(false)}>
+          <div className={styles.modal} onClick={e => e.stopPropagation()}>
+            <div className={styles.modalHeader}>
+              <h3 className={styles.modalTitle}>Issue Bonafide Certificate Directly</h3>
+              <button className={styles.modalClose} onClick={() => setShowDirectBonafideModal(false)}><X size={16}/></button>
+            </div>
+            <div className={styles.modalBody}>
+              <div className={styles.mf}>
+                <label className={styles.ml}>Student Database ID *</label>
+                <input
+                  type="number"
+                  className={styles.mi}
+                  placeholder="Enter student ID (e.g. 1)"
+                  value={directBonafide.student_id}
+                  onChange={e => setDirectBonafide(p => ({ ...p, student_id: e.target.value }))}
+                />
+              </div>
+              <div className={styles.mf}>
+                <label className={styles.ml}>Purpose *</label>
+                <input
+                  className={styles.mi}
+                  placeholder="e.g. Bank Account / Bus Pass / Scholarship"
+                  value={directBonafide.purpose}
+                  onChange={e => setDirectBonafide(p => ({ ...p, purpose: e.target.value }))}
+                />
+              </div>
+              <div className={styles.mf}>
+                <label className={styles.ml}>Fee Amount (₹)</label>
+                <input
+                  type="number"
+                  className={styles.mi}
+                  value={directBonafide.fee_amount}
+                  onChange={e => setDirectBonafide(p => ({ ...p, fee_amount: Number(e.target.value) }))}
+                />
+              </div>
+            </div>
+            <div className={styles.modalFooter}>
+              <button className={styles.cancelBtn} onClick={() => setShowDirectBonafideModal(false)}>Cancel</button>
+              <button className={styles.submitBtn} onClick={handleCreateDirectBonafide} disabled={saving}>
+                {saving ? <span className={styles.spin}/> : <Check size={14}/>} Issue Certificate
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Printable Bonafide Modal */}
+      {printCertData && (
+        <BonafideCertificatePrint data={printCertData} onClose={() => setPrintCertData(null)} />
       )}
     </div>
   );

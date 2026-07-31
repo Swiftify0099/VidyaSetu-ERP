@@ -65,6 +65,7 @@ class Settings(BaseSettings):
     ALLOWED_ORIGINS: str = "*,http://localhost:3000,http://localhost:5173,http://127.0.0.1:5173,http://127.0.0.1:3000,http://10.198.198.223:5173,http://10.198.198.223:8000,http://10.198.198.223:8081,http://10.70.162.223:5173,http://10.70.162.223:8000"
 
     # ── School Configuration ──────────────────────────────────
+    SCHOOL_CODE: str = "HMMV"
     SCHOOL_NAME: str = "VidyaSetu School"
     SCHOOL_ADDRESS: str = ""
     SCHOOL_PHONE: str = ""

@@ -11,15 +11,17 @@ from fastapi import HTTPException, UploadFile
 
 from app.core.config import settings
 from app.modules.office.models import (
-    Notice, AdmissionEnquiry, Visitor, SchoolEvent, Complaint, InwardRegister
+    Notice, AdmissionEnquiry, Visitor, SchoolEvent, Complaint, InwardRegister, BonafideApplication
 )
+from app.modules.student.models import Student
 from app.modules.office.schemas import (
     NoticeCreateRequest, NoticeUpdateRequest,
     EnquiryCreateRequest, EnquiryUpdateRequest,
     VisitorCreateRequest, VisitorCheckOutRequest,
     EventCreateRequest, ComplaintCreateRequest,
     ComplaintUpdateRequest, RegisterCreateRequest,
-    OfficeStatsResponse,
+    OfficeStatsResponse, BonafideApplyRequest, BonafideClerkCreateRequest,
+    BonafidePrintDataResponse,
 )
 from app.shared.audit import AuditService
 from app.shared.storage import StorageService
@@ -336,4 +338,215 @@ class OfficeStatsService:
             open_complaints=db.scalar(select(func.count()).select_from(
                 select(Complaint).where(Complaint.is_deleted == False,
                                         Complaint.status.in_(["open", "in_progress"])).subquery())) or 0,
+            pending_bonafides=db.scalar(select(func.count()).select_from(
+                select(BonafideApplication).where(BonafideApplication.is_deleted == False,
+                                                  BonafideApplication.status == "PENDING").subquery())) or 0,
         )
+
+
+MARATHI_MONTHS = ["", "जानेवारी", "फेब्रुवारी", "मार्च", "एप्रिल", "मे", "जून", "जुलै", "ऑगस्ट", "सप्टेंबर", "ऑक्टोबर", "नोव्हेंबर", "डिसेंबर"]
+
+def date_to_marathi_words(d: date | None) -> str:
+    if not d:
+        return "—"
+    day = d.day
+    month_str = MARATHI_MONTHS[d.month] if 1 <= d.month <= 12 else str(d.month)
+    year = d.year
+    return f"{day} {month_str} {year}"
+
+
+class BonafideService:
+    @staticmethod
+    def apply_student(db: Session, student_id: int, data: BonafideApplyRequest, created_by: int | None = None) -> BonafideApplication:
+        student = db.scalar(select(Student).where(Student.id == student_id, Student.is_deleted == False))
+        if not student:
+            raise HTTPException(status_code=404, detail="Student record not found.")
+
+        app_num = _auto_number(db, BonafideApplication, "application_number", "BON")
+        app = BonafideApplication(
+            application_number=app_num,
+            student_id=student_id,
+            purpose=data.purpose,
+            fee_amount=data.fee_amount,
+            payment_status="PAID",
+            payment_reference=data.payment_reference or f"PAY-{datetime.now().strftime('%Y%m%d%H%M%S')}",
+            status="PENDING",
+            applied_date=date.today(),
+            academic_year=f"{date.today().year - 1}-{date.today().year}" if date.today().month < 6 else f"{date.today().year}-{date.today().year + 1}",
+            remarks=data.remarks,
+            created_by=created_by,
+        )
+        db.add(app)
+        AuditService.log(db, action="BONAFIDE_APPLIED", module="office", user_id=created_by,
+                          description=f"Bonafide certificate requested for student {student.full_name} ({student.gr_number})")
+        db.commit()
+        db.refresh(app)
+        return app
+
+    @staticmethod
+    def clerk_create(db: Session, data: BonafideClerkCreateRequest, created_by: int) -> BonafideApplication:
+        student = db.scalar(select(Student).where(Student.id == data.student_id, Student.is_deleted == False))
+        if not student:
+            raise HTTPException(status_code=404, detail="Student record not found.")
+
+        app_num = _auto_number(db, BonafideApplication, "application_number", "BON")
+        app = BonafideApplication(
+            application_number=app_num,
+            student_id=data.student_id,
+            purpose=data.purpose,
+            fee_amount=data.fee_amount,
+            payment_status=data.payment_status,
+            payment_reference=f"CLERK-DIRECT-{datetime.now().strftime('%Y%m%d%H%M%S')}",
+            status="APPROVED",
+            processed_by=created_by,
+            processed_date=date.today(),
+            issued_certificate_number=f"BON-CERT-{app_num.split('-')[-1]}",
+            applied_date=date.today(),
+            academic_year=f"{date.today().year - 1}-{date.today().year}" if date.today().month < 6 else f"{date.today().year}-{date.today().year + 1}",
+            remarks=data.remarks,
+            created_by=created_by,
+        )
+        db.add(app)
+        AuditService.log(db, action="BONAFIDE_ISSUED_BY_CLERK", module="office", user_id=created_by,
+                          description=f"Bonafide issued directly for {student.full_name}")
+        db.commit()
+        db.refresh(app)
+        return app
+
+    @staticmethod
+    def get_applications(
+        db: Session,
+        status: str | None = None,
+        student_id: int | None = None,
+        search: str | None = None,
+        page: int = 1,
+        per_page: int = 20,
+    ) -> tuple[list[dict], int]:
+        q = select(BonafideApplication).where(BonafideApplication.is_deleted == False)
+        if status:
+            q = q.where(BonafideApplication.status == status.upper())
+        if student_id:
+            q = q.where(BonafideApplication.student_id == student_id)
+        if search:
+            q = q.join(Student).where(
+                or_(
+                    BonafideApplication.application_number.ilike(f"%{search}%"),
+                    BonafideApplication.purpose.ilike(f"%{search}%"),
+                    Student.full_name.ilike(f"%{search}%"),
+                    Student.gr_number.ilike(f"%{search}%"),
+                )
+            )
+
+        total = db.scalar(select(func.count()).select_from(q.subquery())) or 0
+        apps = db.scalars(
+            q.order_by(BonafideApplication.created_at.desc())
+            .offset((page - 1) * per_page)
+            .limit(per_page)
+        ).all()
+
+        result = []
+        for a in apps:
+            st = a.student
+            result.append({
+                "id": a.id,
+                "uuid": a.uuid,
+                "application_number": a.application_number,
+                "student_id": a.student_id,
+                "student_name": st.full_name if st else "N/A",
+                "student_gr_number": st.gr_number if st else "N/A",
+                "student_standard": st.standard if st else "N/A",
+                "student_division": st.division if st else "",
+                "purpose": a.purpose,
+                "fee_amount": float(a.fee_amount) if a.fee_amount else 20.0,
+                "payment_status": a.payment_status,
+                "payment_reference": a.payment_reference,
+                "status": a.status,
+                "rejection_reason": a.rejection_reason,
+                "applied_date": a.applied_date,
+                "processed_date": a.processed_date,
+                "issued_certificate_number": a.issued_certificate_number,
+                "academic_year": a.academic_year,
+                "created_at": a.created_at,
+            })
+        return result, total
+
+    @staticmethod
+    def approve_application(db: Session, app_id: int, processed_by: int, remarks: str | None = None) -> BonafideApplication:
+        app = db.scalar(select(BonafideApplication).where(BonafideApplication.id == app_id, BonafideApplication.is_deleted == False))
+        if not app:
+            raise HTTPException(status_code=404, detail="Bonafide application not found.")
+
+        app.status = "APPROVED"
+        app.processed_by = processed_by
+        app.processed_date = date.today()
+        app.issued_certificate_number = f"BON-CERT-{app.application_number.split('-')[-1]}"
+        if remarks:
+            app.remarks = remarks
+
+        student = app.student
+        AuditService.log(db, action="BONAFIDE_APPROVED", module="office", user_id=processed_by,
+                          description=f"Bonafide application {app.application_number} approved for student {student.full_name if student else 'N/A'}")
+        db.commit()
+        db.refresh(app)
+        return app
+
+    @staticmethod
+    def reject_application(db: Session, app_id: int, processed_by: int, rejection_reason: str, remarks: str | None = None) -> BonafideApplication:
+        app = db.scalar(select(BonafideApplication).where(BonafideApplication.id == app_id, BonafideApplication.is_deleted == False))
+        if not app:
+            raise HTTPException(status_code=404, detail="Bonafide application not found.")
+
+        app.status = "REJECTED"
+        app.rejection_reason = rejection_reason
+        app.processed_by = processed_by
+        app.processed_date = date.today()
+        if remarks:
+            app.remarks = remarks
+
+        student = app.student
+        AuditService.log(db, action="BONAFIDE_REJECTED", module="office", user_id=processed_by,
+                          description=f"Bonafide application {app.application_number} rejected. Reason: {rejection_reason}")
+        db.commit()
+        db.refresh(app)
+        return app
+
+    @staticmethod
+    def get_print_data(db: Session, app_id: int) -> BonafidePrintDataResponse:
+        app = db.scalar(select(BonafideApplication).where(BonafideApplication.id == app_id, BonafideApplication.is_deleted == False))
+        if not app:
+            raise HTTPException(status_code=404, detail="Bonafide application not found.")
+
+        student = app.student
+        if not student:
+            raise HTTPException(status_code=404, detail="Student associated with application not found.")
+
+        # Academic range logic
+        current_year = date.today().year
+        academic_from = f"15-06-{current_year - 1}"
+        academic_to = f"30-04-{current_year}"
+        in_year = f"{current_year - 1}-{current_year}"
+
+        dob_num = student.dob.strftime("%d-%m-%Y") if student.dob else "—"
+        dob_word = student.dob_in_words or date_to_marathi_words(student.dob)
+
+        return BonafidePrintDataResponse(
+            school_name="हिंदकेसरी मारुती माने विद्यालय, कवठेपिरान",
+            cert_title="बोना फाईड सर्टिफिकेट",
+            student_id=student.student_id_saral or student.gr_number or "N/A",
+            aadhaar_number=student.aadhaar_number or "—",
+            full_name=student.full_name_marathi or student.full_name,
+            from_date=academic_from,
+            to_date=academic_to,
+            in_year=in_year,
+            std=str(student.standard),
+            dob_in_number=dob_num,
+            dob_in_word=dob_word,
+            birth_place=student.place_of_birth or "कवठेपिरान",
+            reg_no=student.gr_number,
+            caste=student.caste or student.category or "मराठा",
+            issue_date=date.today().strftime("%d-%m-%Y"),
+            application_number=app.application_number,
+            issued_certificate_number=app.issued_certificate_number or f"BON-CERT-{app.id}",
+            purpose=app.purpose,
+        )
+

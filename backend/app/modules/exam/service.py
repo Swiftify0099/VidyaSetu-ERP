@@ -214,18 +214,35 @@ class ExamTypeService:
 class ExamService:
     @staticmethod
     def create(db: Session, data: ExamRequest, created_by: int) -> Exam:
+        existing = db.scalar(
+            select(Exam).where(
+                Exam.exam_type_id == data.exam_type_id,
+                Exam.standard == data.standard,
+                Exam.academic_year_id == data.academic_year_id,
+                Exam.is_deleted == False,
+            )
+        )
+        if existing:
+            raise HTTPException(
+                status_code=400,
+                detail=f"An exam of this type already exists for Standard {data.standard}."
+            )
+
         payload = data.model_dump(exclude={"subjects"})
         exam = Exam(**payload, created_by=created_by)
         db.add(exam); db.flush()
 
         for i, s in enumerate(data.subjects):
-            subj = ExamSubject(**s.model_dump(), exam_id=exam.id,
-                               sort_order=s.sort_order or i, created_by=created_by)
+            s_dict = s.model_dump()
+            if "sort_order" not in s_dict or s_dict["sort_order"] is None:
+                s_dict["sort_order"] = i
+            subj = ExamSubject(**s_dict, exam_id=exam.id, created_by=created_by)
             db.add(subj)
 
         AuditService.log(db, action="EXAM_CREATED", module="exam", user_id=created_by,
                          description=f"Exam created: Std {data.standard}")
         db.commit(); db.refresh(exam); return exam
+
 
     @staticmethod
     def get_by_standard(db: Session, academic_year_id: int, standard: str) -> list[Exam]:

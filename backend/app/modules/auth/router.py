@@ -3,7 +3,8 @@ VidyaSetu ERP — Auth API Routes
 ==================================
 All authentication endpoints.
 """
-from fastapi import APIRouter, Depends, Request, status
+from typing import Optional
+from fastapi import APIRouter, Depends, Request, status, Query, HTTPException
 from sqlalchemy.orm import Session
 
 from app.core.dependencies import AuthUser, DBSession, get_current_user
@@ -412,6 +413,29 @@ async def list_permissions(current_user: AuthUser, db: DBSession):
     return APIResponse.ok(data={"by_module": by_module, "total": len(perms)})
 
 
+@router.get("/roles/{role_id}/permissions", response_model=APIResponse)
+async def get_role_permissions(role_id: int, current_user: AuthUser, db: DBSession):
+    """Get assigned permissions for a role."""
+    from fastapi import HTTPException
+    from sqlalchemy import select
+    from sqlalchemy.orm import selectinload
+    from app.modules.auth.models import Role, RolePermission, Permission
+
+    role = db.scalar(
+        select(Role)
+        .where(Role.id == role_id, Role.is_deleted == False)
+        .options(selectinload(Role.role_permissions).selectinload(RolePermission.permission))
+    )
+    if not role:
+        raise HTTPException(404, "Role not found.")
+
+    permissions = [
+        {"id": rp.permission.id, "code": rp.permission.code, "module": rp.permission.module, "name": rp.permission.code}
+        for rp in role.role_permissions if rp.permission
+    ]
+    return APIResponse.ok(data={"permissions": permissions, "role_id": role_id, "role_name": role.name})
+
+
 @router.put("/roles/{role_id}/permissions", response_model=APIResponse)
 async def set_role_permissions(
     role_id: int,
@@ -432,7 +456,14 @@ async def set_role_permissions(
     if not role or role.is_deleted:
         raise HTTPException(404, "Role not found.")
 
-    permission_ids = body.get("permission_ids", [])
+    permission_ids = body.get("permission_ids")
+    permission_codes = body.get("permission_codes")
+
+    if permission_ids is None and permission_codes is not None:
+        perms = db.scalars(select(Permission).where(Permission.code.in_(permission_codes))).all()
+        permission_ids = [p.id for p in perms]
+    elif permission_ids is None:
+        permission_ids = []
 
     # Delete existing
     db.execute(delete(RolePermission).where(RolePermission.role_id == role_id))
@@ -448,6 +479,7 @@ async def set_role_permissions(
                      description=f"Updated permissions for role {role.name}")
     db.commit()
     return APIResponse.ok(message=f"Permissions updated for role '{role.name}'.")
+
 
 
 @router.get("/my-permissions", response_model=APIResponse)
@@ -473,4 +505,84 @@ async def my_permissions(current_user: AuthUser, db: DBSession):
     from app.modules.auth.service import AuthService
     permissions = AuthService._build_user_permissions(user)
     return APIResponse.ok(data={"permissions": list(permissions)})
+
+
+# ════════════════════════════════════════════════════════════════
+# ADMIN — System Audit Logs & Admin Endpoints
+# ════════════════════════════════════════════════════════════════
+
+admin_router = APIRouter(prefix="/admin", tags=["Admin System"])
+
+
+@admin_router.get("/audit-logs", response_model=APIResponse)
+async def list_audit_logs(
+    current_user: AuthUser,
+    db: DBSession,
+    page: int = Query(1, ge=1),
+    per_page: int = Query(30, ge=1, le=100),
+    search: Optional[str] = None,
+    action: Optional[str] = None,
+    module: Optional[str] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+):
+    """List system audit logs."""
+    from sqlalchemy import select, func, or_
+    from app.shared.audit import AuditLog
+    from datetime import datetime, date
+
+    q = select(AuditLog)
+    if search:
+        term = f"%{search}%"
+        q = q.where(or_(
+            AuditLog.description.ilike(term),
+            AuditLog.user_name.ilike(term),
+            AuditLog.module.ilike(term),
+            AuditLog.action.ilike(term),
+        ))
+    if action:
+        q = q.where(AuditLog.action == action.upper())
+    if module:
+        q = q.where(AuditLog.module == module.lower())
+
+    total = db.scalar(select(func.count()).select_from(q.subquery())) or 0
+    logs = db.scalars(q.order_by(AuditLog.created_at.desc()).offset((page - 1) * per_page).limit(per_page)).all()
+
+    items = [
+        {
+            "id": l.id,
+            "action": l.action,
+            "module": l.module,
+            "entity_type": l.entity_type or "",
+            "entity_id": l.entity_id,
+            "description": l.description or "",
+            "user_id": l.user_id,
+            "user_name": l.user_name or "System",
+            "ip_address": l.ip_address,
+            "created_at": l.created_at.isoformat() if l.created_at else "",
+            "status": "success" if getattr(l, "status_code", 200) < 400 else "failed",
+        }
+        for l in logs
+    ]
+
+    now_date = date.today()
+    total_today = db.scalar(select(func.count(AuditLog.id)).where(func.date(AuditLog.created_at) == now_date)) or 0
+    logins_today = db.scalar(select(func.count(AuditLog.id)).where(func.date(AuditLog.created_at) == now_date, AuditLog.action == "LOGIN")) or 0
+
+    stats = {
+        "total_today": total_today,
+        "logins_today": logins_today,
+        "critical_actions": 0,
+        "failed_actions": 0,
+    }
+
+    return APIResponse.ok(data={"logs": items, "total": total, "stats": stats})
+
+
+# Alias routes under /admin for frontend backward compatibility
+admin_router.add_api_route("/roles", list_roles, methods=["GET"], response_model=APIResponse)
+admin_router.add_api_route("/permissions", list_permissions, methods=["GET"], response_model=APIResponse)
+admin_router.add_api_route("/roles/{role_id}/permissions", get_role_permissions, methods=["GET"], response_model=APIResponse)
+admin_router.add_api_route("/roles/{role_id}/permissions", set_role_permissions, methods=["PUT"], response_model=APIResponse)
+
 

@@ -47,10 +47,13 @@ export default function LoginPage() {
     }
   };
 
+  const currentLang = (i18n.language || 'mr').startsWith('mr') ? 'mr' : 'en';
+
   const toggleLanguage = () => {
-    const newLang = i18n.language === 'mr' ? 'en' : 'mr';
+    const newLang = currentLang === 'mr' ? 'en' : 'mr';
     i18n.changeLanguage(newLang);
     localStorage.setItem('vidyasetu_lang', newLang);
+    document.documentElement.lang = newLang;
   };
 
   const stats = [
@@ -116,9 +119,9 @@ export default function LoginPage() {
           <button
             className={styles.controlBtn}
             onClick={toggleLanguage}
-            title="Toggle Language"
+            title="Toggle Language / भाषा बदला"
           >
-            {i18n.language === 'mr' ? 'EN' : 'मर'}
+            {currentLang === 'mr' ? '🌐 मराठी' : '🌐 EN'}
           </button>
           <button
             className={styles.controlBtn}

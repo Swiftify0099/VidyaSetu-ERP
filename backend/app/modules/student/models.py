@@ -38,6 +38,7 @@ class Student(BaseModel):
 
     # ── Photo ─────────────────────────────────────────────────
     photo_path: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    fcm_token: Mapped[str | None] = mapped_column(String(500), nullable=True, index=True)
 
     # ── Academic Placement ────────────────────────────────────
     academic_year_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("academic_years.id"), nullable=True, index=True)

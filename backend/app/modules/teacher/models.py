@@ -13,6 +13,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database.base import BaseModel
+from app.modules.auth.models import User  # noqa: F401
 
 
 class Teacher(BaseModel):
@@ -40,6 +41,7 @@ class Teacher(BaseModel):
 
     # ── Photo ─────────────────────────────────────────────────
     photo_path: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    fcm_token: Mapped[str | None] = mapped_column(String(500), nullable=True, index=True)
 
     # ── Employment ────────────────────────────────────────────
     employee_type: Mapped[str] = mapped_column(String(50), nullable=False, default="teaching")
@@ -139,10 +141,7 @@ class Teacher(BaseModel):
     leave_requests: Mapped[list["TeacherLeave"]] = relationship(
         "TeacherLeave", back_populates="teacher", cascade="all, delete-orphan"
     )
-    # Attendance records — canonical definition in attendance.models.TeacherAttendance
-    attendance_records: Mapped[list] = relationship(
-        "TeacherAttendance", lazy="select", viewonly=True,
-    )
+    # ── Relationships ─────────────────────────────────────────
 
     @property
     def years_of_service(self) -> int | None:

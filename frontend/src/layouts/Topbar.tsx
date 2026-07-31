@@ -1,10 +1,11 @@
-import { Bell, Search, Sun, Moon, Globe, ChevronDown, User, Settings, LogOut, Key } from 'lucide-react';
+import { Bell, Search, Sun, Moon, Globe, ChevronDown, User, Settings, LogOut, Key, Menu, CheckCheck } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import api from '../services/api';
+import communicationService, { CommLog } from '../services/communicationService';
 import styles from './Topbar.module.css';
 
 interface SearchResult {
@@ -25,27 +26,60 @@ const TYPE_ICONS: Record<string, string> = {
   receipt: '🧾', default: '🔍',
 };
 
-export default function Topbar({ sidebarCollapsed }: { sidebarCollapsed: boolean }) {
+export default function Topbar({
+  sidebarCollapsed,
+  onToggleMobileMenu,
+}: {
+  sidebarCollapsed: boolean;
+  onToggleMobileMenu?: () => void;
+}) {
   const { t, i18n } = useTranslation();
   const { user, logout } = useAuth();
   const { resolvedTheme, toggleTheme } = useTheme();
   const navigate = useNavigate();
 
   const [profileOpen, setProfileOpen] = useState(false);
+  const [notifOpen, setNotifOpen] = useState(false);
+  const [langOpen, setLangOpen] = useState(false);
+  const [notifications, setNotifications] = useState<CommLog[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<SearchResults | null>(null);
   const [searchLoading, setSearchLoading] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
 
   const profileRef = useRef<HTMLDivElement>(null);
+  const notifRef = useRef<HTMLDivElement>(null);
+  const langRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLDivElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Close profile dropdown on outside click
+  // Load user notifications
+  const loadNotifications = useCallback(async () => {
+    try {
+      const logs = await communicationService.getMyNotifications();
+      setNotifications(logs);
+    } catch {
+      setNotifications([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadNotifications();
+    const interval = setInterval(loadNotifications, 15000); // refresh every 15s
+    return () => clearInterval(interval);
+  }, [loadNotifications]);
+
+  // Close dropdowns on outside click
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (profileRef.current && !profileRef.current.contains(e.target as Node)) {
         setProfileOpen(false);
+      }
+      if (notifRef.current && !notifRef.current.contains(e.target as Node)) {
+        setNotifOpen(false);
+      }
+      if (langRef.current && !langRef.current.contains(e.target as Node)) {
+        setLangOpen(false);
       }
       if (searchRef.current && !searchRef.current.contains(e.target as Node)) {
         setSearchOpen(false);
@@ -54,6 +88,22 @@ export default function Topbar({ sidebarCollapsed }: { sidebarCollapsed: boolean
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, []);
+
+  const handleMarkRead = async (id: number) => {
+    try {
+      await communicationService.markNotificationRead(id);
+      setNotifications(prev => prev.map(n => n.id === id ? { ...n, is_read: true } : n));
+    } catch {}
+  };
+
+  const handleMarkAllRead = async () => {
+    try {
+      await communicationService.markAllNotificationsRead();
+      setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
+    } catch {}
+  };
+
+  const unreadCount = notifications.filter(n => !n.is_read).length;
 
   const runSearch = useCallback(async (q: string) => {
     if (q.trim().length < 2) {
@@ -87,10 +137,13 @@ export default function Topbar({ sidebarCollapsed }: { sidebarCollapsed: boolean
     navigate(url);
   };
 
-  const toggleLanguage = () => {
-    const newLang = i18n.language === 'mr' ? 'en' : 'mr';
-    i18n.changeLanguage(newLang);
-    localStorage.setItem('vidyasetu_lang', newLang);
+  const currentLang = (i18n.language || 'mr').startsWith('mr') ? 'mr' : 'en';
+
+  const selectLanguage = (lang: string) => {
+    i18n.changeLanguage(lang);
+    localStorage.setItem('vidyasetu_lang', lang);
+    document.documentElement.lang = lang;
+    setLangOpen(false);
   };
 
   const allResults = searchResults
@@ -102,6 +155,15 @@ export default function Topbar({ sidebarCollapsed }: { sidebarCollapsed: boolean
       className={styles.topbar}
       style={{ left: sidebarCollapsed ? 'var(--sidebar-collapsed-width)' : 'var(--sidebar-width)' }}
     >
+      {/* Mobile Drawer Trigger Button */}
+      <button
+        className={styles.mobileMenuBtn}
+        onClick={onToggleMobileMenu}
+        aria-label="Open navigation menu"
+      >
+        <Menu size={18} />
+      </button>
+
       {/* Global Search */}
       <div className={styles.searchWrap} ref={searchRef}>
         <Search size={15} className={styles.searchIcon} />
@@ -161,18 +223,42 @@ export default function Topbar({ sidebarCollapsed }: { sidebarCollapsed: boolean
 
       {/* Right Controls */}
       <div className={styles.controls}>
-        {/* Language Toggle */}
-        <button
-          className={styles.iconBtn}
-          onClick={toggleLanguage}
-          title="Toggle Language"
-          id="lang-toggle-btn"
-        >
-          <Globe size={17} />
-          <span className={styles.iconBtnLabel}>
-            {i18n.language === 'mr' ? 'EN' : 'मर'}
-          </span>
-        </button>
+        {/* Language Selection Dropdown */}
+        <div className={styles.langWrap} ref={langRef}>
+          <button
+            className={styles.iconBtn}
+            onClick={() => setLangOpen(v => !v)}
+            title="Select Language / भाषा निवडा"
+            id="lang-toggle-btn"
+          >
+            <Globe size={17} />
+            <span className={styles.iconBtnLabel}>
+              {currentLang === 'mr' ? 'मराठी' : 'EN'}
+            </span>
+            <ChevronDown size={12} style={{ opacity: 0.7 }} />
+          </button>
+
+          {langOpen && (
+            <div className={styles.langDropdown}>
+              <button
+                className={`${styles.langOption} ${currentLang === 'mr' ? styles.langOptionActive : ''}`}
+                onClick={() => selectLanguage('mr')}
+              >
+                <span className={styles.langFlag}>🇮🇳</span>
+                <span>मराठी (Marathi)</span>
+                {currentLang === 'mr' && <CheckCheck size={14} className={styles.checkIcon} />}
+              </button>
+              <button
+                className={`${styles.langOption} ${currentLang === 'en' ? styles.langOptionActive : ''}`}
+                onClick={() => selectLanguage('en')}
+              >
+                <span className={styles.langFlag}>🇬🇧</span>
+                <span>English</span>
+                {currentLang === 'en' && <CheckCheck size={14} className={styles.checkIcon} />}
+              </button>
+            </div>
+          )}
+        </div>
 
         {/* Theme Toggle */}
         <button
@@ -184,11 +270,59 @@ export default function Topbar({ sidebarCollapsed }: { sidebarCollapsed: boolean
           {resolvedTheme === 'light' ? <Moon size={17} /> : <Sun size={17} />}
         </button>
 
-        {/* Notifications */}
-        <button className={styles.iconBtn} title="Notifications" id="notifications-btn">
-          <Bell size={17} />
-          <span className={styles.badge}>3</span>
-        </button>
+        {/* Notifications Center */}
+        <div className={styles.notifWrap} ref={notifRef}>
+          <button
+            className={styles.iconBtn}
+            onClick={() => setNotifOpen(v => !v)}
+            title="Notifications Center"
+            id="notifications-btn"
+          >
+            <Bell size={17} />
+            {unreadCount > 0 && <span className={styles.badge}>{unreadCount > 99 ? '99+' : unreadCount}</span>}
+          </button>
+
+          {notifOpen && (
+            <div className={styles.notifDropdown}>
+              <div className={styles.notifHeader}>
+                <span className={styles.notifTitle}>
+                  🔔 Notifications {unreadCount > 0 && `(${unreadCount})`}
+                </span>
+                {unreadCount > 0 && (
+                  <button className={styles.markAllBtn} onClick={handleMarkAllRead}>
+                    <CheckCheck size={14} style={{ verticalAlign: 'middle', marginRight: 4 }} />
+                    Mark all read
+                  </button>
+                )}
+              </div>
+
+              <div className={styles.notifList}>
+                {notifications.length === 0 ? (
+                  <div className={styles.notifEmpty}>
+                    No notifications yet. You are all caught up! ✨
+                  </div>
+                ) : (
+                  notifications.map(n => (
+                    <button
+                      key={n.id}
+                      className={`${styles.notifItem} ${!n.is_read ? styles.notifUnread : ''}`}
+                      onClick={() => handleMarkRead(n.id)}
+                    >
+                      <div className={styles.notifMeta}>
+                        <span className={`${styles.notifBadge} ${n.channel === 'firebase_fcm' ? styles.notifBadgeFCM : n.channel === 'sms' ? styles.notifBadgeSMS : styles.notifBadgeNotice}`}>
+                          {n.channel === 'firebase_fcm' ? '🔥 FCM PUSH' : n.channel?.toUpperCase()}
+                        </span>
+                        <span>{n.sent_at ? new Date(n.sent_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Just now'}</span>
+                      </div>
+                      <div className={styles.notifSubject}>{n.subject || n.recipient_name || 'System Notification'}</div>
+                      <div className={styles.notifBody}>{n.message_body}</div>
+                    </button>
+                  ))
+                )}
+              </div>
+            </div>
+          )}
+        </div>
 
         {/* Profile Dropdown */}
         <div className={styles.profileWrap} ref={profileRef}>

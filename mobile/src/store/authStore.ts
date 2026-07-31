@@ -59,8 +59,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         error: null,
       });
     } catch (err: unknown) {
-      const msg =
-        (err as { response?: { data?: { message?: string } } })?.response?.data?.message
+      const responseData = (err as { response?: { data?: { detail?: string; message?: string } } })?.response?.data;
+      const msg = responseData?.detail
+        ?? responseData?.message
+        ?? (err as { message?: string })?.message
         ?? 'Login failed. Please check your credentials.';
       set({ isLoading: false, error: msg, isAuthenticated: false });
     }

@@ -79,6 +79,8 @@ class CommunicationLog(BaseModel):
     message_body: Mapped[str] = mapped_column(Text, nullable=False)
     template_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
     notice_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    recipient_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    is_read: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="pending")
     # pending / sent / failed / delivered
     sent_by: Mapped[int | None] = mapped_column(BigInteger, nullable=True)

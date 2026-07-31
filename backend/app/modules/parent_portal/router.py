@@ -275,3 +275,122 @@ def get_notices(
             for n in notices
         ]
     })
+
+
+# ─────────────────────────────────────────────────────────────
+# FEES & PAYMENTS
+# ─────────────────────────────────────────────────────────────
+
+@router.get("/child/{child_id}/fees", response_model=APIResponse)
+def get_child_fees(child_id: int, current_user: AuthUser, db: DBSession):
+    child = _verify_child(db, current_user, child_id)
+    ac_year = _get_current_year(db)
+    ay_id = ac_year.id if ac_year else 1
+
+    try:
+        from app.modules.finance.service import StudentFeeService
+        summary = StudentFeeService.get_student_fee_summary(db, child.id, ay_id)
+        return APIResponse.ok(data=summary.model_dump())
+    except Exception:
+        return APIResponse.ok(data={
+            "student_id": child.id,
+            "student_name": child.full_name,
+            "gr_number": child.gr_number,
+            "standard": child.standard,
+            "total_due": 0.0,
+            "total_paid": 0.0,
+            "balance": 0.0,
+            "records": [],
+        })
+
+
+@router.get("/child/{child_id}/fee-payments", response_model=APIResponse)
+def get_child_fee_payments(child_id: int, current_user: AuthUser, db: DBSession):
+    child = _verify_child(db, current_user, child_id)
+    try:
+        from app.modules.finance.service import StudentFeeService
+        payments = StudentFeeService.get_payment_history(db, child.id)
+        return APIResponse.ok(data={"payments": [p.model_dump() for p in payments]})
+    except Exception:
+        return APIResponse.ok(data={"payments": []})
+
+
+# ─────────────────────────────────────────────────────────────
+# EXAMS & RESULTS
+# ─────────────────────────────────────────────────────────────
+
+@router.get("/child/{child_id}/exams", response_model=APIResponse)
+def get_child_exams(child_id: int, current_user: AuthUser, db: DBSession):
+    child = _verify_child(db, current_user, child_id)
+    ac_year = _get_current_year(db)
+    ay_id = ac_year.id if ac_year else 1
+    try:
+        from app.modules.exam.service import ExamService
+        exams = ExamService.get_by_standard(db, ay_id, child.standard)
+        data = [
+            {
+                "id": e.id,
+                "name": f"Std {e.standard} Exam",
+                "standard": e.standard,
+                "result_declared": e.result_declared,
+                "result_date": str(e.result_date) if e.result_date else None,
+            }
+            for e in exams
+        ]
+        return APIResponse.ok(data={"exams": data})
+    except Exception:
+        return APIResponse.ok(data={"exams": []})
+
+
+@router.get("/child/{child_id}/results/{exam_id}", response_model=APIResponse)
+def get_child_exam_result(child_id: int, exam_id: int, current_user: AuthUser, db: DBSession):
+    child = _verify_child(db, current_user, child_id)
+    try:
+        from app.modules.exam.models import StudentExamResult
+        res = db.query(StudentExamResult).filter(
+            StudentExamResult.student_id == child.id,
+            StudentExamResult.exam_id == exam_id,
+        ).first()
+        if not res:
+            return APIResponse.ok(data=None)
+        return APIResponse.ok(data={
+            "student_id": child.id,
+            "exam_id": exam_id,
+            "total_marks": res.total_marks_obtained,
+            "max_marks": res.total_max_marks,
+            "percentage": res.percentage,
+            "grade": res.overall_grade,
+            "result": res.result_status,
+            "rank": res.class_rank,
+            "subjects": res.subject_marks or [],
+        })
+    except Exception:
+        return APIResponse.ok(data=None)
+
+
+# ─────────────────────────────────────────────────────────────
+# CERTIFICATES & HEALTH
+# ─────────────────────────────────────────────────────────────
+
+@router.get("/child/{child_id}/certificates", response_model=APIResponse)
+def get_child_certificates(child_id: int, current_user: AuthUser, db: DBSession):
+    child = _verify_child(db, current_user, child_id)
+    certs = []
+    if child.tc_issued:
+        certs.append({"id": 1, "title": "Transfer Certificate (TC)", "type": "TC", "issue_date": str(child.tc_issued_date) if child.tc_issued_date else "N/A", "number": child.tc_number})
+    certs.append({"id": 2, "title": "Bonafide Certificate", "type": "Bonafide", "issue_date": str(date.today()), "number": f"BON-{child.gr_number}"})
+    return APIResponse.ok(data={"certificates": certs})
+
+
+@router.get("/child/{child_id}/health", response_model=APIResponse)
+def get_child_health(child_id: int, current_user: AuthUser, db: DBSession):
+    child = _verify_child(db, current_user, child_id)
+    return APIResponse.ok(data={
+        "blood_group": child.blood_group or "Not Recorded",
+        "height_cm": getattr(child, "height_cm", None) or "—",
+        "weight_kg": getattr(child, "weight_kg", None) or "—",
+        "allergies": getattr(child, "allergies", None) or "None",
+        "medical_conditions": getattr(child, "medical_conditions", None) or "None",
+        "emergency_contact": child.father_mobile or child.mother_mobile or child.guardian_mobile or "N/A",
+    })
+

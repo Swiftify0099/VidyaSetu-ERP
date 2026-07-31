@@ -37,6 +37,7 @@ from app.modules.auth.models import Permission, Role, RolePermission, User, User
 from app.modules.settings.models import AcademicYear, SystemSetting
 from app.modules.student.models import Student
 from app.modules.teacher.models import Teacher
+from app.modules.communication.models import Notice, MessageTemplate, Announcement, CommunicationLog
 
 # ── Roles ─────────────────────────────────────────────────────
 DEFAULT_ROLES = [
@@ -92,11 +93,14 @@ ROLE_PERMISSIONS = {
                        "communication.create","analytics.view_analytics","office.read"],
     "teacher":        ["student.read","attendance.create","attendance.read","attendance.update",
                        "examination.create","examination.update","examination.read",
-                       "communication.create","timetable.read","library.read"],
+                       "communication.create","timetable.read","library.read",
+                       "leave.read","leave.create","lesson_plan.create","lesson_plan.read","lesson_plan.update",
+                       "behaviour.create","behaviour.read"],
     "class_teacher":  ["student.read","attendance.create","attendance.read","attendance.update",
                        "examination.create","examination.update","examination.read",
                        "communication.create","timetable.read","library.read",
-                       "admission.read"],
+                       "leave.read","leave.create","lesson_plan.create","lesson_plan.read","lesson_plan.update",
+                       "behaviour.create","behaviour.read","behaviour.update"],
     "clerk":          ["student.read","student.create","student.update","admission.create",
                        "admission.read","admission.update","office.create","office.read",
                        "office.update","communication.create","library.read"],
@@ -471,12 +475,135 @@ def seed_database(db: Session) -> None:
                 mobile="9999000005",
                 email="ramesh.jadhav@hmmv.edu.in",
                 designation="Assistant Teacher",
+                classes_assigned="9,10",
                 subjects='["Mathematics","Science"]',
                 date_of_joining=date(2010, 6, 15),
                 employee_type="permanent",
             ))
             db.flush()
             print("        [OK] Sample teacher: EMP005 --- Ramesh Jadhav")
+
+    # ── Communication Hub Seed Data ──────────────────────────────
+    existing_tmpl = db.query(MessageTemplate).first()
+    if not existing_tmpl:
+        templates_data = [
+            {
+                "name": "Fee Due Reminder (फीस स्मरणपत्र)",
+                "template_type": "sms",
+                "category": "fee",
+                "subject": "School Fee Reminder / फी भरणा स्मरणपत्र",
+                "body_english": "Dear Parent, total outstanding fee for {student_name} is Rs.{amount}. Please pay before {due_date} to avoid late charges.",
+                "body_marathi": "आदरणीय पालक, {student_name} यांची शिल्लक फी रु.{amount} आहे. कृपया {due_date} पूर्वी फी जमा करावी.",
+                "variables": '["student_name","amount","due_date"]',
+            },
+            {
+                "name": "Student Absence Notification (विद्यार्थी अनुपस्थिती)",
+                "template_type": "whatsapp",
+                "category": "attendance",
+                "subject": "Absence Alert / अनुपस्थिती सूचना",
+                "body_english": "Dear Parent, {student_name} of Class {class_name} was marked ABSENT today ({date}). Please inform the school if on leave.",
+                "body_marathi": "आदरणीय पालक, {student_name} (इयत्ता {class_name}) आज दिनांक {date} रोजी गैरहजर आहे.",
+                "variables": '["student_name","class_name","date"]',
+            },
+            {
+                "name": "Exam Timetable Notice (परीक्षा वेळापत्रक)",
+                "template_type": "whatsapp",
+                "category": "exam",
+                "subject": "Semester Exam Schedule Announcement",
+                "body_english": "Dear Parent/Student, Semester Examinations start on {date}. Detailed timetable has been published on VidyaSetu ERP portal.",
+                "body_marathi": "आदरणीय विद्यार्थी व पालक, सत्रांत परीक्षा {date} पासून सुरू होत आहेत. सविस्तर वेळापत्रक पोर्टलवर उपलब्ध आहे.",
+                "variables": '["date"]',
+            },
+            {
+                "name": "School Holiday Announcement (शाळा सुट्टी जाहीर)",
+                "template_type": "sms",
+                "category": "notice",
+                "subject": "Holiday Announcement / शाळा सुट्टी जाहीर",
+                "body_english": "School will remain CLOSED on {date} on account of {event}. Classes will resume as normal on the following working day.",
+                "body_marathi": "{event} निमित्त दिनांक {date} रोजी शाळेस सुट्टी राहील. पुढील कामाच्या दिवशी शाळा नियमित वेळेत भरेल.",
+                "variables": '["date","event"]',
+            },
+            {
+                "name": "Emergency Closure Alert (तातडीची सुट्टी सूचना)",
+                "template_type": "sms",
+                "category": "notice",
+                "subject": "EMERGENCY ALERT: School Closure",
+                "body_english": "URGENT: School will remain CLOSED today ({date}) due to heavy rainfall/unforeseen circumstances. Buses will return students safely.",
+                "body_marathi": "तातडीची सूचना: मुसळधार पावसामुळे आज दिनांक {date} रोजी शाळा बंद राहील.",
+                "variables": '["date"]',
+            },
+            {
+                "name": "Parent Teacher Meeting (पालक-शिक्षक सभा)",
+                "template_type": "whatsapp",
+                "category": "general",
+                "subject": "Parent Teacher Meeting (PTM) Invitation",
+                "body_english": "Dear Parent, Parent-Teacher Meeting (PTM) is scheduled on {date} at {time}. You are requested to discuss progress of {student_name}.",
+                "body_marathi": "आदरणीय पालक, पालक-शिक्षक सभा दिनांक {date} रोजी वेळ {time} वाजता आयोजित केली आहे. {student_name} च्या प्रगतीबाबत चर्चा करण्यास उपस्थित राहावे.",
+                "variables": '["student_name","date","time"]',
+            },
+        ]
+        for t in templates_data:
+            db.add(MessageTemplate(**t))
+        db.flush()
+        print("        [OK] Seeded 6 default reusable SMS/WhatsApp message templates.")
+
+    existing_notice = db.query(Notice).first()
+    if not existing_notice:
+        notices_data = [
+            {
+                "title": "Annual Academic Sports Meet 2026",
+                "title_marathi": "वार्षिक क्रीडा महोत्सव २०२६",
+                "content": "The Annual Sports Competition will take place from August 10 to August 12. All students must register their names with the sports instructor by August 5.",
+                "content_marathi": "वार्षिक क्रीडा स्पर्धा १० ऑगस्ट ते १२ ऑगस्ट दरम्यान आयोजित करण्यात आली आहे. विद्यार्थ्यांनी ५ ऑगस्टपर्यंत नावे नोंदवावीत.",
+                "notice_type": "event",
+                "audience": "all",
+                "is_urgent": False,
+                "is_published": True,
+                "publish_date": date(2026, 7, 20),
+                "expiry_date": date(2026, 8, 15),
+            },
+            {
+                "title": "First Term Examination Fee Submission",
+                "title_marathi": "प्रथम सत्रांत परीक्षा फी जमा करणेबाबत",
+                "content": "Parents are requested to clear all pending term fees before July 31, 2026. Online payment facility is enabled on VidyaSetu portal.",
+                "content_marathi": "सर्व पालकांनी ३१ जुलै २०२६ पूर्वी सत्रांत परीक्षा फी जमा करावी. ऑनलाईन फी भरणा सुविधा पोर्टलवर उपलब्ध आहे.",
+                "notice_type": "fee",
+                "audience": "parents",
+                "is_urgent": True,
+                "is_published": True,
+                "publish_date": date(2026, 7, 15),
+                "expiry_date": date(2026, 8, 1),
+            },
+        ]
+        for n in notices_data:
+            db.add(Notice(**n))
+        db.flush()
+        print("        [OK] Seeded sample official notices.")
+
+    existing_ann = db.query(Announcement).first()
+    if not existing_ann:
+        anns_data = [
+            {
+                "title": "Independence Day Cultural Performance Rehearsal",
+                "body": "Rehearsal starts at 8:00 AM in Assembly Hall. Participants must wear white uniform.",
+                "announcement_type": "info",
+                "target_roles": "all",
+                "is_pinned": True,
+                "expiry_date": date(2026, 8, 16),
+            },
+            {
+                "title": "System Maintenance Notice: VidyaSetu Portal Update",
+                "body": "ERP system will be under maintenance on Sunday between 2:00 AM and 5:00 AM.",
+                "announcement_type": "warning",
+                "target_roles": "all",
+                "is_pinned": False,
+                "expiry_date": date(2026, 8, 2),
+            },
+        ]
+        for a in anns_data:
+            db.add(Announcement(**a))
+        db.flush()
+        print("        [OK] Seeded sample active announcements.")
 
     db.commit()
 

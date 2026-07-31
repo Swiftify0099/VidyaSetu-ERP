@@ -1,91 +1,147 @@
 /**
- * VidyaSetu Mobile — Shared Notifications Screen
- * ================================================
- * All roles can see notices/announcements filtered by their permissions
+ * EduShakti One ERP — Premium Notifications Screen
  */
 import React, { useEffect, useState, useCallback } from 'react';
 import {
-  View, Text, StyleSheet, FlatList, RefreshControl, TouchableOpacity, ActivityIndicator,
+  View, Text, StyleSheet, FlatList, TouchableOpacity,
+  RefreshControl, Platform,
 } from 'react-native';
-import { api } from '../../services/api';
+import Icon from 'react-native-vector-icons/FontAwesome5';
+import { useTheme } from '../../theme/ThemeContext';
+import { communicationAPI } from '../../services/api';
+import PremiumCard from '../../components/ui/PremiumCard';
+import Badge from '../../components/ui/Badge';
+import SkeletonLoader from '../../components/ui/SkeletonLoader';
+import { spacing, radius, typography, shadows } from '../../theme';
 
-interface Notice { id: number; title: string; body: string; type: string; priority: string; created_at: string; is_read?: boolean; }
-
-const TYPE_CONFIG: Record<string, { icon: string; color: string }> = {
-  announcement: { icon: '📢', color: '#4f46e5' },
-  circular:     { icon: '📋', color: '#0891b2' },
-  event:        { icon: '🎉', color: '#059669' },
-  exam:         { icon: '📝', color: '#7c3aed' },
-  holiday:      { icon: '🎊', color: '#d97706' },
-  urgent:       { icon: '🚨', color: '#dc2626' },
-};
+interface Notification { id: number; title: string; content: string; created_at: string; type?: string; }
 
 export default function NotificationsScreen() {
-  const [notices, setNotices] = useState<Notice[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { colors, roleAccent } = useTheme();
+  const [items, setItems]      = useState<Notification[]>([]);
+  const [loading, setLoading]  = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  const load = useCallback(async () => {
+  const fetchData = useCallback(async () => {
     try {
-      const res = await api.get('/communication/notices', { params: { page: 1, per_page: 30 } });
-      setNotices(res.data?.data?.items ?? []);
-    } catch { setNotices([]); }
+      const res = await communicationAPI.getAnnouncements({ limit: 30 });
+      setItems(res.data?.data?.items ?? []);
+    } catch { /* ignore */ }
     finally { setLoading(false); setRefreshing(false); }
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { fetchData(); }, [fetchData]);
+  const onRefresh = () => { setRefreshing(true); fetchData(); };
 
-  const markRead = async (id: number) => {
-    try {
-      await api.patch(`/communication/notices/${id}/read`);
-      setNotices(prev => prev.map(n => n.id === id ? { ...n, is_read: true } : n));
-    } catch { /* ignore */ }
+  const renderItem = ({ item, index }: { item: Notification; index: number }) => {
+    const isNew = index < 3;
+    return (
+      <TouchableOpacity activeOpacity={0.8} style={styles.itemWrap}>
+        <PremiumCard variant={isNew ? 'default' : 'flat'} padding={12} style={styles.itemCard}>
+          <View style={styles.itemRow}>
+            {/* Left dot + icon */}
+            <View style={styles.itemLeft}>
+              {isNew && <View style={[styles.unreadDot, { backgroundColor: roleAccent.primary }]} />}
+              <View style={[styles.itemIcon, { backgroundColor: isNew ? colors.primaryBg : colors.surfaceAlt }]}>
+                <Icon name="bullhorn" size={14} color={isNew ? roleAccent.primary : colors.textSecondary} solid />
+              </View>
+            </View>
+            {/* Content */}
+            <View style={{ flex: 1, gap: 3 }}>
+              <View style={styles.itemTitleRow}>
+                <Text style={[styles.itemTitle, { color: colors.text, fontWeight: isNew ? typography.weight.bold : typography.weight.semibold }]} numberOfLines={1}>
+                  {item.title}
+                </Text>
+                {isNew && <Badge label="New" variant="primary" size="sm" rounded />}
+              </View>
+              <Text style={[styles.itemBody, { color: colors.textSecondary }]} numberOfLines={2}>
+                {item.content}
+              </Text>
+              <View style={styles.itemMeta}>
+                <Icon name="clock" size={10} color={colors.textTertiary} solid />
+                <Text style={[styles.itemDate, { color: colors.textTertiary }]}>
+                  {new Date(item.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+                </Text>
+              </View>
+            </View>
+          </View>
+        </PremiumCard>
+      </TouchableOpacity>
+    );
   };
 
-  if (loading) return <View style={s.center}><ActivityIndicator color="#4f46e5" size="large" /></View>;
-
   return (
-    <View style={s.page}>
-      <FlatList
-        data={notices}
-        keyExtractor={i => String(i.id)}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor="#4f46e5" />}
-        contentContainerStyle={{ padding: 12 }}
-        ListEmptyComponent={<View style={s.center}><Text style={{ fontSize: 40 }}>🔔</Text><Text style={s.emptyText}>No notices yet</Text></View>}
-        renderItem={({ item }) => {
-          const cfg = TYPE_CONFIG[item.type] ?? TYPE_CONFIG.announcement;
-          return (
-            <TouchableOpacity style={[s.card, !item.is_read && s.unread]} onPress={() => markRead(item.id)}>
-              <View style={[s.iconBox, { backgroundColor: cfg.color + '18' }]}>
-                <Text style={{ fontSize: 20 }}>{cfg.icon}</Text>
-              </View>
-              <View style={s.cardBody}>
-                <View style={s.cardHeader}>
-                  <Text style={[s.noticeTitle, !item.is_read && { color: '#1e293b', fontWeight: '800' }]} numberOfLines={2}>{item.title}</Text>
-                  {!item.is_read && <View style={s.dot} />}
-                </View>
-                <Text style={s.noticeBody} numberOfLines={2}>{item.body}</Text>
-                <Text style={s.dateText}>{new Date(item.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</Text>
-              </View>
-            </TouchableOpacity>
-          );
-        }}
-      />
+    <View style={[styles.root, { backgroundColor: colors.background }]}>
+      {/* Header */}
+      <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.border, paddingTop: Platform.OS === 'ios' ? 56 : 24 }]}>
+        <Text style={[styles.headerTitle, { color: colors.text }]}>Notifications</Text>
+        {items.length > 0 && (
+          <View style={[styles.headerBadge, { backgroundColor: roleAccent.primary }]}>
+            <Text style={styles.headerBadgeText}>{items.length}</Text>
+          </View>
+        )}
+      </View>
+
+      {loading ? (
+        <View style={styles.loadingPad}>
+          <SkeletonLoader variant="list" count={6} />
+        </View>
+      ) : items.length === 0 ? (
+        /* Empty State */
+        <View style={styles.empty}>
+          <View style={[styles.emptyIcon, { backgroundColor: colors.surfaceAlt }]}>
+            <Icon name="bell-slash" size={32} color={colors.textTertiary} solid />
+          </View>
+          <Text style={[styles.emptyTitle, { color: colors.text }]}>All Clear!</Text>
+          <Text style={[styles.emptyBody, { color: colors.textSecondary }]}>No notifications at the moment.</Text>
+        </View>
+      ) : (
+        <FlatList
+          data={items}
+          keyExtractor={item => String(item.id)}
+          renderItem={renderItem}
+          contentContainerStyle={styles.list}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={roleAccent.primary} colors={[roleAccent.primary]} />
+          }
+          ItemSeparatorComponent={() => <View style={{ height: spacing.sm }} />}
+        />
+      )}
     </View>
   );
 }
 
-const s = StyleSheet.create({
-  page: { flex: 1, backgroundColor: '#f8fafc' },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 60 },
-  card: { flexDirection: 'row', gap: 12, backgroundColor: '#fff', borderRadius: 14, padding: 14, marginBottom: 8, shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 6, elevation: 1 },
-  unread: { borderLeftWidth: 4, borderLeftColor: '#4f46e5', backgroundColor: '#f0f4ff' },
-  iconBox: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
-  cardBody: { flex: 1 },
-  cardHeader: { flexDirection: 'row', alignItems: 'flex-start', gap: 6 },
-  noticeTitle: { flex: 1, fontSize: 13, color: '#374151', fontWeight: '600' },
-  dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#4f46e5', marginTop: 4 },
-  noticeBody: { fontSize: 12, color: '#6b7280', marginTop: 4 },
-  dateText: { fontSize: 10, color: '#9ca3af', marginTop: 6 },
-  emptyText: { fontSize: 13, color: '#6b7280', marginTop: 12 },
+const styles = StyleSheet.create({
+  root: { flex: 1 },
+  header: {
+    paddingHorizontal: spacing.base,
+    paddingBottom: spacing.base,
+    borderBottomWidth: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  headerTitle: { fontSize: typography.size['2xl'], fontWeight: typography.weight.extrabold, letterSpacing: -0.4 },
+  headerBadge: {
+    paddingHorizontal: 8, paddingVertical: 3, borderRadius: radius.full,
+  },
+  headerBadgeText: { color: '#fff', fontSize: typography.size.xs, fontWeight: typography.weight.bold },
+  loadingPad: { padding: spacing.base },
+  list: { padding: spacing.base },
+  itemWrap: {},
+  itemCard: { borderRadius: radius.xl },
+  itemRow: { flexDirection: 'row', gap: spacing.md },
+  itemLeft: { alignItems: 'center', gap: 4 },
+  unreadDot: { width: 7, height: 7, borderRadius: 4 },
+  itemIcon: { width: 40, height: 40, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center' },
+  itemTitleRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, flexWrap: 'wrap' },
+  itemTitle: { flex: 1, fontSize: typography.size.base },
+  itemBody: { fontSize: typography.size.sm, lineHeight: 16 },
+  itemMeta: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 },
+  itemDate: { fontSize: typography.size.xs },
+  empty: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.base, paddingHorizontal: spacing.xl },
+  emptyIcon: { width: 80, height: 80, borderRadius: 40, alignItems: 'center', justifyContent: 'center' },
+  emptyTitle: { fontSize: typography.size.xl, fontWeight: typography.weight.bold },
+  emptyBody: { fontSize: typography.size.base, textAlign: 'center' },
 });

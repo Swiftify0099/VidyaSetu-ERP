@@ -102,6 +102,35 @@ async def get_student_stats(
 
 
 @router.get(
+    "/admission-stats",
+    response_model=APIResponse,
+    dependencies=[Depends(require_permission("student.read"))],
+)
+async def get_admission_stats(current_user: AuthUser, db: DBSession):
+    """Get admission specific statistics."""
+    stats = StudentService.get_admission_stats(db)
+    return APIResponse.ok(data=stats)
+
+
+@router.post(
+    "/bulk-promote",
+    response_model=APIResponse,
+    dependencies=[Depends(require_permission("student.update"))],
+)
+async def bulk_promote_students(
+    body: dict,
+    current_user: AuthUser,
+    db: DBSession,
+):
+    """Bulk promote students to next standard/year."""
+    promotions = body.get("promotions", [])
+    to_year_id = body.get("academic_year_id", 2)
+    count = StudentService.bulk_promote(db, promotions, to_year_id, current_user.user_id)
+    return APIResponse.ok(data={"count": count}, message=f"{count} students promoted successfully.")
+
+
+
+@router.get(
     "/gr/{gr_number}",
     response_model=APIResponse,
     dependencies=[Depends(require_permission("student.read"))],

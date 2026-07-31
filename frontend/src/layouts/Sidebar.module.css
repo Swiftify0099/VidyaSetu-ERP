@@ -302,3 +302,19 @@
   background: rgba(239,68,68,0.15);
   color: var(--color-danger);
 }
+
+/* ── Mobile Drawer Modes (Screen ≤ 768px) ─────────────────── */
+@media (max-width: 768px) {
+  .sidebar {
+    width: var(--sidebar-width) !important;
+    transform: translateX(-100%);
+    transition: transform var(--transition-slow) cubic-bezier(0.16, 1, 0.3, 1);
+    box-shadow: var(--shadow-2xl, 0 25px 50px -12px rgba(0, 0, 0, 0.5));
+    z-index: calc(var(--z-fixed, 100) + 20);
+  }
+
+  .mobileOpen {
+    transform: translateX(0) !important;
+  }
+}
+

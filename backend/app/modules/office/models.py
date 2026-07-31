@@ -10,7 +10,7 @@ Covers all daily office operations:
 - Outward / Inward Registers
 """
 from datetime import date, datetime
-from sqlalchemy import BigInteger, Boolean, Date, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import BigInteger, Boolean, Date, DateTime, ForeignKey, Integer, Numeric, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database.base import BaseModel
@@ -191,3 +191,30 @@ class InwardRegister(BaseModel):
     action_taken: Mapped[str | None] = mapped_column(Text, nullable=True)
     action_by: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
     action_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+
+
+class BonafideApplication(BaseModel):
+    """
+    Bonafide Certificate Application (बोनाफाइड प्रमाणपत्र अर्ज).
+    Handles student applications, payment of charges, clerk approval/rejection,
+    and printable Marathi Bonafide certificate generation.
+    """
+    __tablename__ = "bonafide_applications"
+
+    application_number: Mapped[str] = mapped_column(String(50), unique=True, nullable=False, index=True)
+    student_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("students.id"), nullable=False, index=True)
+    purpose: Mapped[str] = mapped_column(String(255), nullable=False)
+    fee_amount: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False, default=20.0)
+    payment_status: Mapped[str] = mapped_column(String(20), nullable=False, default="PAID")  # UNPAID, PAID, EXEMPT
+    payment_reference: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="PENDING", index=True)  # PENDING, APPROVED, REJECTED
+    rejection_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    applied_date: Mapped[date] = mapped_column(Date, nullable=False, default=date.today)
+    processed_by: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    processed_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    issued_certificate_number: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    academic_year: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    remarks: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    student: Mapped["Student"] = relationship("Student", lazy="joined")  # type: ignore
+

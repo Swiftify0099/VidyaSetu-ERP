@@ -121,9 +121,11 @@
 
   /* ── Layout ──────────────────────────────────────────────── */
   --sidebar-width: 260px;
-  --sidebar-collapsed-width: 68px;
+  --sidebar-collapsed-width: 72px;
   --topbar-height: 64px;
-  --content-max-width: 1440px;
+  --bottom-nav-height: 64px;
+  --touch-target-min: 44px;
+  --content-max-width: 1400px;
 
   /* ── Transitions ─────────────────────────────────────────── */
   --transition-fast: 0.15s ease;
@@ -274,3 +276,25 @@ body {
   white-space: nowrap;
   border-width: 0;
 }
+
+/* ── Hide scrollbar utility for touch scrollbars ────────── */
+.hideScrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.hideScrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* ── Mobile Touch Target & iOS Auto-zoom Guard ───────────── */
+@media (max-width: 768px) {
+  input, select, textarea {
+    font-size: 16px !important; /* Prevents auto-zoom on iOS Safari */
+  }
+  
+  /* Ensure touch target height */
+  button, input[type="submit"], input[type="button"], .touch-target {
+    min-height: var(--touch-target-min, 44px);
+  }
+}
+

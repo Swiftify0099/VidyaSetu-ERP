@@ -31,6 +31,26 @@
   }
   .content {
     padding: var(--space-3);
+    padding-bottom: calc(var(--bottom-nav-height, 64px) + var(--space-4));
   }
 }
+
+/* Mobile backdrop overlay */
+.backdrop {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.6);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    z-index: calc(var(--z-fixed, 100) + 15);
+    animation: fadeIn 0.2s ease;
+  }
+}
+
 

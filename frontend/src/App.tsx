@@ -45,6 +45,11 @@ const SettingsPage      = lazy(() => import('./pages/settings/SettingsPage'));
 // ── Admin Pages (Phase 7) ─────────────────────────────────────
 const UserManagementPage = lazy(() => import('./pages/admin/UserManagementPage'));
 const RoleManagementPage = lazy(() => import('./pages/admin/RoleManagementPage'));
+const AuditLogPage       = lazy(() => import('./pages/admin/AuditLogPage'));
+const PermissionsPage    = lazy(() => import('./pages/admin/PermissionsPage'));
+
+// ── Admission Module (Phase 2) ────────────────────────────────
+const AdmissionPage = lazy(() => import('./pages/admission/AdmissionPage'));
 
 // ── Leave Management (Phase 3) ────────────────────────────────
 const LeavePage = lazy(() => import('./pages/leave/LeavePage'));
@@ -165,8 +170,15 @@ export default function App() {
                   {/* Settings — Super Admin only */}
                   <Route path="/settings"        element={<RoleGuard allowedRoles={['super_admin','admin']}><SettingsPage /></RoleGuard>} />
                   {/* Admin — Users & Roles — Super Admin only */}
-                  <Route path="/admin/users"     element={<RoleGuard allowedRoles={['super_admin','admin']}><UserManagementPage /></RoleGuard>} />
-                  <Route path="/admin/roles"     element={<RoleGuard allowedRoles={['super_admin']}><RoleManagementPage /></RoleGuard>} />
+                  <Route path="/admin/users"       element={<RoleGuard allowedRoles={['super_admin','admin']}><UserManagementPage /></RoleGuard>} />
+                  <Route path="/admin/roles"       element={<RoleGuard allowedRoles={['super_admin']}><RoleManagementPage /></RoleGuard>} />
+                  <Route path="/admin/permissions" element={<RoleGuard allowedRoles={['super_admin']}><PermissionsPage /></RoleGuard>} />
+                  <Route path="/admin/audit"       element={<RoleGuard allowedRoles={['super_admin','admin','principal']}><AuditLogPage /></RoleGuard>} />
+
+                  {/* Admission Module — Clerk / Admin / Principal */}
+                  <Route path="/admission/new"        element={<RoleGuard allowedRoles={['super_admin','admin','principal','clerk','receptionist']}><AdmissionPage /></RoleGuard>} />
+                  <Route path="/admission/gr"         element={<RoleGuard allowedRoles={['super_admin','admin','principal','vice_principal','clerk']}><AdmissionPage /></RoleGuard>} />
+                  <Route path="/admission/promotions" element={<RoleGuard allowedRoles={['super_admin','admin','principal','vice_principal']}><AdmissionPage /></RoleGuard>} />
                   {/* Leave — All staff roles */}
                   <Route path="/leave"           element={<RoleGuard allowedRoles={['super_admin','admin','principal','vice_principal','teacher','class_teacher','clerk','accountant','librarian','receptionist','office_staff']}><LeavePage /></RoleGuard>} />
                   {/* Lesson Plans — Teacher / Class Teacher */}

@@ -5,6 +5,7 @@
  */
 import axios, { AxiosError, AxiosInstance, AxiosRequestConfig } from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Platform } from 'react-native';
 
 // ── Keys ─────────────────────────────────────────────────────
 export const STORAGE_KEYS = {
@@ -16,8 +17,8 @@ export const STORAGE_KEYS = {
 };
 
 // ── Base URL — change for production ─────────────────────────
-// Tunneled via adb reverse tcp:8000 tcp:8000 & tcp:8081 tcp:8081
-const DEV_HOST = 'localhost'; 
+// Android emulator uses 10.0.2.2 to connect to host machine localhost
+const DEV_HOST = Platform.OS === 'android' ? '10.0.2.2' : 'localhost'; 
 const BASE_URL = __DEV__
   ? `http://${DEV_HOST}:8000/api/v1`
   : 'https://your-production-domain.com/api/v1';

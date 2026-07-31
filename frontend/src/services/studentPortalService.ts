@@ -272,7 +272,21 @@ const studentPortalService = {
     const res = await api.post('/student-portal/leaves/cancel');
     return res.data;
   },
+
+  async applyBonafide(data: { purpose: string; fee_amount?: number; payment_method?: string; payment_reference?: string; remarks?: string }) {
+    const res = await api.post('/student-portal/bonafide/apply', data);
+    return res.data;
+  },
+
+  async getMyBonafideApplications() {
+    const res = await api.get('/student-portal/bonafide/my-applications');
+    const data = res.data.data;
+    if (Array.isArray(data)) return data;
+    if (data && Array.isArray(data.items)) return data.items;
+    return [];
+  },
 };
 
 export default studentPortalService;
+
 

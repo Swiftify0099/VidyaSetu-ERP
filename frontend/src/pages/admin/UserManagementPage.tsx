@@ -89,7 +89,8 @@ export default function UserManagementPage() {
   const fetchRoles = async () => {
     try {
       const res = await api.get('/auth/roles');
-      setRoles(res.data?.data ?? []);
+      const data = res.data?.data;
+      setRoles(Array.isArray(data) ? data : data?.roles ?? []);
     } catch { /* ignore */ }
   };
 

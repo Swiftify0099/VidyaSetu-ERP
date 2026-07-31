@@ -1,4 +1,4 @@
-﻿"""
+"""
 VidyaSetu ERP — FastAPI Dependencies
 ======================================
 Reusable dependency injectors for routes.
@@ -39,15 +39,15 @@ class CurrentUser:
 
     def has_permission(self, permission: str) -> bool:
         """Check if user has a specific permission."""
-        return permission in self.permissions
+        return permission in self.permissions or "*" in self.permissions
 
     def has_role(self, role_code: str) -> bool:
         """Check if user has a specific role."""
         return role_code in self.role_codes
 
     def is_super_admin(self) -> bool:
-        """Check if user is Super Admin."""
-        return "super_admin" in self.role_codes
+        """Check if user is Super Admin or Admin."""
+        return "super_admin" in self.role_codes or "admin" in self.role_codes
 
 
 async def get_current_user(
@@ -112,20 +112,25 @@ async def get_optional_user(
     )
 
 
-def require_permission(permission: str):
+def require_permission(*permissions: str):
     """
-    Dependency factory — enforces a specific permission.
+    Dependency factory — enforces that the user has at least one of the specified permissions.
 
     Usage:
         @router.get("/", dependencies=[Depends(require_permission("student.read"))])
+        @router.post("/send", dependencies=[Depends(require_permission("communication.send", "communication.create"))])
     """
     async def permission_check(current_user: AuthUser) -> CurrentUser:
-        if not current_user.is_super_admin() and not current_user.has_permission(permission):
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"You don't have permission to perform this action. Required: {permission}",
-            )
-        return current_user
+        if current_user.is_super_admin():
+            return current_user
+        for p in permissions:
+            if current_user.has_permission(p):
+                return current_user
+        req_str = ", ".join(permissions)
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"You don't have permission to perform this action. Required: {req_str}",
+        )
 
     return permission_check
 

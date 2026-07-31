@@ -49,6 +49,7 @@ class User(BaseModel):
     # ── Preferences ───────────────────────────────────────────
     preferred_language: Mapped[str] = mapped_column(String(10), default="mr", nullable=False)
     preferred_theme: Mapped[str] = mapped_column(String(20), default="light", nullable=False)
+    fcm_token: Mapped[str | None] = mapped_column(String(500), nullable=True, index=True)
 
     # ── Relationships ─────────────────────────────────────────
     user_roles: Mapped[list["UserRole"]] = relationship("UserRole", back_populates="user", lazy="select")

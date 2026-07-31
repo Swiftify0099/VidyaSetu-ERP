@@ -229,6 +229,72 @@ const officeService = {
     const res = await api.post('/office/register', data);
     return res.data.data;
   },
+
+  // Bonafide Certificate Applications
+  async getBonafideApplications(params?: { status?: string; student_id?: number; search?: string; page?: number }): Promise<{ items: BonafideApplication[]; meta: any }> {
+    const res = await api.get('/office/bonafide/applications', { params });
+    return res.data.data;
+  },
+  async createDirectBonafide(data: { student_id: number; purpose: string; fee_amount?: number; payment_status?: string; remarks?: string }): Promise<{ id: number; application_number: string }> {
+    const res = await api.post('/office/bonafide/applications', data);
+    return res.data.data;
+  },
+  async approveBonafide(id: number, remarks?: string): Promise<any> {
+    const res = await api.put(`/office/bonafide/applications/${id}/approve`, null, { params: remarks ? { remarks } : {} });
+    return res.data.data;
+  },
+  async rejectBonafide(id: number, rejection_reason: string, remarks?: string): Promise<any> {
+    const res = await api.put(`/office/bonafide/applications/${id}/reject`, { rejection_reason, remarks });
+    return res.data.data;
+  },
+  async getBonafidePrintData(id: number): Promise<BonafidePrintData> {
+    const res = await api.get(`/office/bonafide/applications/${id}/print-data`);
+    return res.data.data;
+  },
 };
 
+export interface BonafideApplication {
+  id: number;
+  uuid: string;
+  application_number: string;
+  student_id: number;
+  student_name?: string;
+  student_gr_number?: string;
+  student_standard?: string;
+  student_division?: string;
+  purpose: string;
+  fee_amount: number;
+  payment_status: string;
+  payment_reference?: string;
+  status: string;
+  rejection_reason?: string;
+  applied_date: string;
+  processed_date?: string;
+  issued_certificate_number?: string;
+  academic_year?: string;
+  created_at?: string;
+}
+
+export interface BonafidePrintData {
+  school_name: string;
+  cert_title: string;
+  student_id: string;
+  aadhaar_number: string;
+  full_name: string;
+  from_date: string;
+  to_date: string;
+  in_year: string;
+  std: string;
+  dob_in_number: string;
+  dob_in_word: string;
+  birth_place: string;
+  reg_no: string;
+  caste: string;
+  issue_date: string;
+  application_number: string;
+  issued_certificate_number: string;
+  purpose: string;
+}
+
 export default officeService;
+

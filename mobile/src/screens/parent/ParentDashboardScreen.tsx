@@ -1,162 +1,255 @@
 /**
- * VidyaSetu Mobile — Parent Dashboard Screen
- * ============================================
- * Parent ONLY sees their child's data
+ * EduShakti One ERP — Parent Dashboard Screen (Premium Redesign)
  */
 import React, { useEffect, useState, useCallback } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, RefreshControl, ActivityIndicator,
+  View, Text, StyleSheet, ScrollView, TouchableOpacity,
+  RefreshControl, Platform,
 } from 'react-native';
-import { api } from '../../services/api';
+import LinearGradient from 'react-native-linear-gradient';
+import Icon from 'react-native-vector-icons/FontAwesome5';
 import { useAuthStore } from '../../store/authStore';
+import { useTheme } from '../../theme/ThemeContext';
+import { dashboardAPI, communicationAPI } from '../../services/api';
+import StatCard from '../../components/ui/StatCard';
+import SectionHeader from '../../components/ui/SectionHeader';
+import PremiumCard from '../../components/ui/PremiumCard';
+import Badge from '../../components/ui/Badge';
+import SkeletonLoader from '../../components/ui/SkeletonLoader';
+import PremiumButton from '../../components/ui/PremiumButton';
+import { spacing, radius, typography, shadows } from '../../theme';
 
-interface ChildData {
-  full_name: string;
-  gr_number: string;
-  standard: string;
-  division: string;
-  attendance_percentage: number;
-  pending_fees: number;
-  next_exam?: string;
-  latest_result?: { subject: string; marks: number; max: number };
-}
+const CUR_YEAR = '2025-2026';
 
-export default function ParentDashboardScreen() {
-  const [data, setData] = useState<ChildData | null>(null);
+export default function ParentDashboardScreen({ navigation }: { navigation: any }) {
+  const { user } = useAuthStore();
+  const { colors, roleAccent } = useTheme();
+  const [stats, setStats] = useState<Record<string, any>>({});
+  const [announcements, setAnnouncements] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const { user } = useAuthStore();
 
-  const load = useCallback(async () => {
+  const fetchData = useCallback(async () => {
     try {
-      const res = await api.get('/parent-portal/dashboard');
-      setData(res.data?.data);
-    } catch { /* offline */ }
+      const [sum, ann] = await Promise.allSettled([
+        dashboardAPI.getSummary(CUR_YEAR),
+        communicationAPI.getAnnouncements({ limit: 5 }),
+      ]);
+      if (sum.status === 'fulfilled') setStats(sum.value.data?.data ?? {});
+      if (ann.status === 'fulfilled') setAnnouncements(ann.value.data?.data?.items ?? []);
+    } catch { /* ignore */ }
     finally { setLoading(false); setRefreshing(false); }
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { fetchData(); }, [fetchData]);
+  const onRefresh = () => { setRefreshing(true); fetchData(); };
 
-  if (loading) return <View style={s.center}><ActivityIndicator color="#f59e0b" size="large" /></View>;
+  const firstName = user?.full_name?.split(' ')[0] ?? 'Parent';
+  const feesPending = stats.fee_pending ?? 0;
+  const attendance  = stats.child_attendance ?? 0;
 
   return (
-    <ScrollView
-      style={s.page}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor="#f59e0b" />}
-    >
-      {/* Header */}
-      <View style={s.header}>
-        <Text style={s.headerGreeting}>👨‍👩‍👧 Parent Portal</Text>
-        <Text style={s.parentName}>Welcome, {user?.full_name}</Text>
-      </View>
-
-      {/* Child Card */}
-      {data ? (
-        <View style={s.childCard}>
-          <View style={s.childAvatar}>
-            <Text style={s.childAvatarText}>{data.full_name.charAt(0)}</Text>
-          </View>
-          <View style={s.childInfo}>
-            <Text style={s.childName}>{data.full_name}</Text>
-            <Text style={s.childMeta}>GR: {data.gr_number}  |  Std {data.standard}-{data.division}</Text>
-          </View>
-        </View>
-      ) : (
-        <View style={s.noChildCard}>
-          <Text style={s.noChildText}>No child linked to this account</Text>
-        </View>
-      )}
-
-      {/* Stats */}
-      {data && (
-        <View style={s.statsRow}>
-          {[
-            { icon: '📅', label: 'Attendance', value: `${data.attendance_percentage}%`, color: data.attendance_percentage >= 75 ? '#059669' : '#dc2626' },
-            { icon: '💰', label: 'Pending Fees', value: `₹${data.pending_fees.toLocaleString('en-IN')}`, color: data.pending_fees > 0 ? '#dc2626' : '#059669' },
-          ].map((item, i) => (
-            <View key={i} style={[s.statCard, { borderTopColor: item.color }]}>
-              <Text style={s.statIcon}>{item.icon}</Text>
-              <Text style={[s.statValue, { color: item.color }]}>{item.value}</Text>
-              <Text style={s.statLabel}>{item.label}</Text>
+    <View style={[styles.root, { backgroundColor: colors.background }]}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={roleAccent.primary} colors={[roleAccent.primary]} />}
+      >
+        {/* ── Hero ───────────────────────────────────────────── */}
+        <LinearGradient
+          colors={roleAccent.gradient}
+          style={[styles.hero, { paddingTop: Platform.OS === 'ios' ? 56 : 40 }]}
+          start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+        >
+          <View style={[styles.heroCircle, { backgroundColor: 'rgba(255,255,255,0.07)' }]} />
+          <View style={styles.heroContent}>
+            <View style={{ flex: 1, gap: 4 }}>
+              <Text style={styles.greetingText}>Welcome back</Text>
+              <Text style={styles.heroName}>{firstName}</Text>
+              <View style={[styles.rolePill, { backgroundColor: 'rgba(255,255,255,0.18)' }]}>
+                <Icon name="users" size={10} color="rgba(255,255,255,0.9)" solid />
+                <Text style={styles.rolePillText}>Parent / Guardian</Text>
+              </View>
             </View>
-          ))}
-        </View>
-      )}
+            <View style={{ gap: 8, alignItems: 'flex-end' }}>
+              <TouchableOpacity
+                style={[styles.avatarWrap, { backgroundColor: 'rgba(255,255,255,0.2)', borderColor: 'rgba(255,255,255,0.4)' }]}
+                onPress={() => navigation.navigate('Profile')}
+              >
+                <Text style={styles.avatarText}>{firstName[0]}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.bellBtn, { backgroundColor: 'rgba(255,255,255,0.15)' }]}
+                onPress={() => navigation.navigate('Notices')}
+              >
+                <Icon name="bell" size={16} color="#fff" solid />
+              </TouchableOpacity>
+            </View>
+          </View>
+        </LinearGradient>
 
-      {/* Fee Alert */}
-      {data && data.pending_fees > 0 && (
-        <View style={s.feeAlert}>
-          <Text style={s.feeAlertIcon}>💰</Text>
-          <View style={{ flex: 1 }}>
-            <Text style={s.feeAlertTitle}>Fee Payment Due</Text>
-            <Text style={s.feeAlertAmt}>₹{data.pending_fees.toLocaleString('en-IN')} pending</Text>
+        {/* ── Fee Alert ──────────────────────────────────────── */}
+        {feesPending > 0 && (
+          <View style={styles.section}>
+            <PremiumCard variant="default" style={[styles.feeAlert, { borderLeftWidth: 4, borderLeftColor: colors.danger }]}>
+              <View style={styles.feeAlertRow}>
+                <View style={[styles.feeIcon, { backgroundColor: colors.dangerBg }]}>
+                  <Icon name="exclamation-triangle" size={18} color={colors.danger} solid />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.feeTitle, { color: colors.text }]}>Fee Due</Text>
+                  <Text style={[styles.feeAmount, { color: colors.danger }]}>₹{feesPending.toLocaleString('en-IN')} pending</Text>
+                  <Text style={[styles.feeSub, { color: colors.textSecondary }]}>Please clear dues to avoid late charges</Text>
+                </View>
+                <PremiumButton
+                  label="Pay"
+                  onPress={() => navigation.navigate('Fees')}
+                  variant="danger"
+                  size="sm"
+                />
+              </View>
+            </PremiumCard>
+          </View>
+        )}
+
+        {/* ── Stats ─────────────────────────────────────────── */}
+        <View style={styles.section}>
+          <SectionHeader title="Child's Overview" icon="child" />
+          {loading ? (
+            <View style={styles.statsGrid}><SkeletonLoader variant="stat" count={4} /></View>
+          ) : (
+            <View style={styles.statsGrid}>
+              <StatCard
+                label="Attendance"
+                value={attendance > 0 ? `${attendance}%` : '—'}
+                icon="clipboard-check"
+                color={attendance >= 75 ? colors.success : colors.danger}
+                trend={attendance >= 75 ? 'up' : 'down'}
+                trendValue={attendance >= 75 ? 'Good' : 'Low'}
+              />
+              <StatCard
+                label="Fee Pending"
+                value={feesPending > 0 ? `₹${(feesPending/1000).toFixed(1)}K` : '✓ Paid'}
+                icon="rupee-sign"
+                color={feesPending > 0 ? colors.danger : colors.success}
+              />
+              <StatCard
+                label="Class Rank"
+                value={stats.class_rank ? `#${stats.class_rank}` : '—'}
+                icon="trophy"
+                color={colors.warning}
+              />
+              <StatCard
+                label="Avg Score"
+                value={stats.average_score ? `${stats.average_score}%` : '—'}
+                icon="star"
+                color={colors.info}
+              />
+            </View>
+          )}
+        </View>
+
+        {/* ── Quick Actions ─────────────────────────────────── */}
+        <View style={styles.section}>
+          <SectionHeader title="Quick Access" icon="bolt" />
+          <View style={styles.actionsRow}>
+            {[
+              { icon: 'clipboard-check', label: 'Attendance', screen: 'Attendance', color: '#6366f1' },
+              { icon: 'rupee-sign',      label: 'Fees',       screen: 'Fees',       color: '#f59e0b' },
+              { icon: 'bullhorn',        label: 'Notices',    screen: 'Notices',    color: '#10b981' },
+              { icon: 'chart-bar',       label: 'Results',    screen: 'Profile',    color: '#3b82f6' },
+            ].map((item, i) => (
+              <TouchableOpacity
+                key={i}
+                style={[styles.actionBtn, { backgroundColor: colors.surface, ...shadows.sm }]}
+                onPress={() => navigation.navigate(item.screen)}
+                activeOpacity={0.75}
+              >
+                <View style={[styles.actionIconWrap, { backgroundColor: `${item.color}18` }]}>
+                  <Icon name={item.icon} size={20} color={item.color} solid />
+                </View>
+                <Text style={[styles.actionLabel, { color: colors.text }]}>{item.label}</Text>
+              </TouchableOpacity>
+            ))}
           </View>
         </View>
-      )}
 
-      {/* Low Attendance Alert */}
-      {data && data.attendance_percentage < 75 && (
-        <View style={s.attAlert}>
-          <Text style={s.alertIcon}>⚠️</Text>
-          <View style={{ flex: 1 }}>
-            <Text style={s.alertTitle}>Low Attendance Warning</Text>
-            <Text style={s.alertSub}>Current: {data.attendance_percentage}% (Min: 75% required)</Text>
+        {/* ── Recent Notices ────────────────────────────────── */}
+        {announcements.length > 0 && (
+          <View style={styles.section}>
+            <SectionHeader title="School Notices" icon="bullhorn" onViewAll={() => navigation.navigate('Notices')} />
+            {announcements.slice(0, 3).map((ann: any, i) => (
+              <PremiumCard key={ann.id ?? i} variant="bordered" style={styles.annCard} padding={12}>
+                <View style={styles.annRow}>
+                  <View style={[styles.annIcon, { backgroundColor: colors.primaryBg }]}>
+                    <Icon name="bullhorn" size={13} color={roleAccent.primary} solid />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.annTitle, { color: colors.text }]} numberOfLines={1}>{ann.title}</Text>
+                    <Text style={[styles.annBody, { color: colors.textSecondary }]} numberOfLines={2}>{ann.content}</Text>
+                    <Text style={[styles.annDate, { color: colors.textTertiary }]}>
+                      {new Date(ann.created_at).toLocaleDateString('en-IN')}
+                    </Text>
+                  </View>
+                </View>
+              </PremiumCard>
+            ))}
           </View>
-        </View>
-      )}
+        )}
 
-      {/* Latest Result */}
-      {data?.latest_result && (
-        <View style={s.resultCard}>
-          <Text style={s.resultTitle}>📝 Latest Result</Text>
-          <Text style={s.resultSubject}>{data.latest_result.subject}</Text>
-          <Text style={s.resultMarks}>{data.latest_result.marks} / {data.latest_result.max}</Text>
+        {/* ── Contact Teacher ───────────────────────────────── */}
+        <View style={styles.section}>
+          <PremiumCard variant="flat">
+            <View style={styles.contactRow}>
+              <View style={[styles.contactIcon, { backgroundColor: colors.successBg }]}>
+                <Icon name="phone" size={18} color={colors.success} solid />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.contactTitle, { color: colors.text }]}>Contact Class Teacher</Text>
+                <Text style={[styles.contactSub, { color: colors.textSecondary }]}>Reach out with any concerns</Text>
+              </View>
+              <Icon name="chevron-right" size={14} color={colors.textTertiary} solid />
+            </View>
+          </PremiumCard>
         </View>
-      )}
 
-      {/* School Info */}
-      <View style={s.schoolCard}>
-        <Text style={s.schoolName}>🏫 Hindkesri Maruti Mane Vidyalay</Text>
-        <Text style={s.schoolYear}>Academic Year: 2025–2026</Text>
-        <Text style={s.helpLine}>📞 Help: +91 99999 00000</Text>
-      </View>
-    </ScrollView>
+        <View style={{ height: spacing['3xl'] }} />
+      </ScrollView>
+    </View>
   );
 }
 
-const s = StyleSheet.create({
-  page: { flex: 1, backgroundColor: '#f8fafc' },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  header: { backgroundColor: '#f59e0b', padding: 20 },
-  headerGreeting: { color: 'rgba(255,255,255,0.8)', fontSize: 12, fontWeight: '700' },
-  parentName: { color: '#fff', fontSize: 20, fontWeight: '900', marginTop: 4 },
-  childCard: { margin: 14, backgroundColor: '#fff', borderRadius: 14, padding: 16, flexDirection: 'row', alignItems: 'center', gap: 14, shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 8, elevation: 2 },
-  childAvatar: { width: 52, height: 52, borderRadius: 26, backgroundColor: '#4f46e5', alignItems: 'center', justifyContent: 'center' },
-  childAvatarText: { color: '#fff', fontSize: 22, fontWeight: '900' },
-  childInfo: { flex: 1 },
-  childName: { fontSize: 16, fontWeight: '800', color: '#1e293b' },
-  childMeta: { fontSize: 12, color: '#6b7280', marginTop: 3 },
-  noChildCard: { margin: 14, backgroundColor: '#fff', borderRadius: 14, padding: 20, alignItems: 'center' },
-  noChildText: { color: '#6b7280', fontSize: 14 },
-  statsRow: { flexDirection: 'row', paddingHorizontal: 14, gap: 10, marginBottom: 10 },
-  statCard: { flex: 1, backgroundColor: '#fff', borderRadius: 14, padding: 14, borderTopWidth: 3, shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 4, elevation: 1 },
-  statIcon: { fontSize: 22 },
-  statValue: { fontSize: 20, fontWeight: '900', marginTop: 6 },
-  statLabel: { fontSize: 11, color: '#6b7280', fontWeight: '600', marginTop: 3 },
-  feeAlert: { margin: 14, backgroundColor: '#fef3c7', borderRadius: 14, padding: 16, flexDirection: 'row', alignItems: 'center', gap: 12, borderWidth: 1.5, borderColor: '#fcd34d' },
-  feeAlertIcon: { fontSize: 28 },
-  feeAlertTitle: { fontSize: 14, fontWeight: '800', color: '#92400e' },
-  feeAlertAmt: { fontSize: 12, color: '#78350f', marginTop: 2 },
-  attAlert: { margin: 14, marginTop: 0, backgroundColor: '#fee2e2', borderRadius: 14, padding: 16, flexDirection: 'row', alignItems: 'center', gap: 12, borderWidth: 1.5, borderColor: '#fca5a5' },
-  alertIcon: { fontSize: 28 },
-  alertTitle: { fontSize: 14, fontWeight: '800', color: '#991b1b' },
-  alertSub: { fontSize: 11, color: '#7f1d1d', marginTop: 2 },
-  resultCard: { margin: 14, marginTop: 0, backgroundColor: '#fff', borderRadius: 14, padding: 16, shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 6, elevation: 1 },
-  resultTitle: { fontSize: 13, fontWeight: '700', color: '#6b7280', marginBottom: 6 },
-  resultSubject: { fontSize: 15, fontWeight: '800', color: '#1e293b' },
-  resultMarks: { fontSize: 20, fontWeight: '900', color: '#4f46e5', marginTop: 4 },
-  schoolCard: { margin: 14, backgroundColor: '#1e293b', borderRadius: 14, padding: 16 },
-  schoolName: { fontSize: 14, fontWeight: '800', color: '#fff' },
-  schoolYear: { fontSize: 12, color: 'rgba(255,255,255,0.6)', marginTop: 4 },
-  helpLine: { fontSize: 12, color: '#60a5fa', marginTop: 6 },
+const styles = StyleSheet.create({
+  root: { flex: 1 },
+  hero: { paddingHorizontal: spacing.base, paddingBottom: spacing['2xl'], overflow: 'hidden' },
+  heroCircle: { position: 'absolute', width: 200, height: 200, borderRadius: 100, top: -70, right: -50 },
+  heroContent: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginTop: spacing.sm },
+  greetingText: { color: 'rgba(255,255,255,0.8)', fontSize: typography.size.sm, fontWeight: typography.weight.medium },
+  heroName: { color: '#fff', fontSize: typography.size['3xl'], fontWeight: typography.weight.extrabold, letterSpacing: -0.5 },
+  rolePill: { flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'flex-start', paddingHorizontal: 10, paddingVertical: 4, borderRadius: radius.full, marginTop: 2 },
+  rolePillText: { color: 'rgba(255,255,255,0.95)', fontSize: typography.size.xs, fontWeight: typography.weight.semibold },
+  avatarWrap: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', borderWidth: 2 },
+  avatarText: { color: '#fff', fontSize: typography.size.lg, fontWeight: typography.weight.black },
+  bellBtn: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
+  section: { paddingHorizontal: spacing.base, marginTop: spacing.xl },
+  statsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  feeAlert: { borderRadius: radius.xl },
+  feeAlertRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  feeIcon: { width: 44, height: 44, borderRadius: radius.lg, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  feeTitle: { fontSize: typography.size.base, fontWeight: typography.weight.bold },
+  feeAmount: { fontSize: typography.size.lg, fontWeight: typography.weight.extrabold },
+  feeSub: { fontSize: typography.size.xs, marginTop: 2 },
+  actionsRow: { flexDirection: 'row', gap: spacing.sm },
+  actionBtn: { flex: 1, borderRadius: radius.xl, padding: spacing.md, alignItems: 'center', gap: 6 },
+  actionIconWrap: { width: 44, height: 44, borderRadius: radius.lg, alignItems: 'center', justifyContent: 'center' },
+  actionLabel: { fontSize: typography.size.xs, fontWeight: typography.weight.semibold, textAlign: 'center' },
+  annCard: { marginBottom: spacing.sm },
+  annRow: { flexDirection: 'row', gap: spacing.sm },
+  annIcon: { width: 36, height: 36, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  annTitle: { fontSize: typography.size.base, fontWeight: typography.weight.bold },
+  annBody: { fontSize: typography.size.sm, marginTop: 2 },
+  annDate: { fontSize: typography.size.xs, marginTop: 4 },
+  contactRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  contactIcon: { width: 44, height: 44, borderRadius: radius.lg, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  contactTitle: { fontSize: typography.size.base, fontWeight: typography.weight.bold, marginBottom: 2 },
+  contactSub: { fontSize: typography.size.sm },
 });

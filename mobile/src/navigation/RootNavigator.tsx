@@ -1,202 +1,237 @@
 /**
- * VidyaSetu Mobile — Role-Based Navigation
- * ==========================================
- * Each role sees a different set of bottom tabs and screens.
- * Matches backend RBAC permissions exactly.
+ * EduShakti One ERP — Root Navigator (Premium Redesign)
+ * ======================================================
+ * Role-based navigation with premium tab bar, animated splash,
+ * FontAwesome5 icons, and theme-aware headers.
  */
 import React, { useEffect } from 'react';
-import { NavigationContainer } from '@react-navigation/native';
+import { View, Text, StyleSheet, Animated, StatusBar } from 'react-native';
+import { NavigationContainer, DefaultTheme, DarkTheme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { ActivityIndicator, View, Text } from 'react-native';
 import { useAuthStore } from '../store/authStore';
+import { useTheme } from '../theme/ThemeContext';
+import PremiumTabBar from '../components/navigation/PremiumTabBar';
 
-// ── Auth ──────────────────────────────────────────────────────
+// ── Auth ──────────────────────────────────────────────────────────────────────
 import LoginScreen from '../screens/auth/LoginScreen';
 
-// ── Shared Screens ────────────────────────────────────────────
-import ProfileScreen          from '../screens/profile/ProfileScreen';
-import NotificationsScreen    from '../screens/shared/NotificationsScreen';
-import SearchScreen           from '../screens/shared/SearchScreen';
+// ── Shared Screens ────────────────────────────────────────────────────────────
+import ProfileScreen       from '../screens/profile/ProfileScreen';
+import NotificationsScreen from '../screens/shared/NotificationsScreen';
+import SearchScreen        from '../screens/shared/SearchScreen';
+import TimetableScreen     from '../screens/shared/TimetableScreen';
 
-// ── Admin / Principal / VP Screens ────────────────────────────
-import AdminDashboardScreen   from '../screens/admin/AdminDashboardScreen';
-import StudentListScreen      from '../screens/admin/StudentListScreen';
-import ReportsScreen          from '../screens/admin/ReportsScreen';
+// ── Admin / Principal / VP ────────────────────────────────────────────────────
+import AdminDashboardScreen from '../screens/admin/AdminDashboardScreen';
+import StudentListScreen    from '../screens/admin/StudentListScreen';
+import ReportsScreen        from '../screens/admin/ReportsScreen';
 
-// ── Teacher / Class Teacher Screens ───────────────────────────
+// ── Teacher / Class Teacher ───────────────────────────────────────────────────
 import TeacherDashboardScreen from '../screens/teacher/TeacherDashboardScreen';
 import AttendanceScreen       from '../screens/attendance/AttendanceScreen';
 import MarksEntryScreen       from '../screens/teacher/MarksEntryScreen';
 import LessonPlanScreen       from '../screens/teacher/LessonPlanScreen';
 
-// ── Student Screens ───────────────────────────────────────────
+// ── Student ───────────────────────────────────────────────────────────────────
 import StudentDashboardScreen from '../screens/student/StudentDashboardScreen';
 import MyAttendanceScreen     from '../screens/student/MyAttendanceScreen';
 import MyResultsScreen        from '../screens/student/MyResultsScreen';
-import TimetableScreen        from '../screens/shared/TimetableScreen';
 
-// ── Parent Screens ────────────────────────────────────────────
-import ParentDashboardScreen  from '../screens/parent/ParentDashboardScreen';
-import FeeStatusScreen        from '../screens/parent/FeeStatusScreen';
-import ChildAttendanceScreen  from '../screens/parent/ChildAttendanceScreen';
+// ── Parent ────────────────────────────────────────────────────────────────────
+import ParentDashboardScreen from '../screens/parent/ParentDashboardScreen';
+import FeeStatusScreen       from '../screens/parent/FeeStatusScreen';
+import ChildAttendanceScreen from '../screens/parent/ChildAttendanceScreen';
 
-// ── Finance / Accountant Screens ──────────────────────────────
+// ── Finance ───────────────────────────────────────────────────────────────────
 import FinanceDashboardScreen from '../screens/finance/FinanceDashboardScreen';
 import FeesScreen             from '../screens/finance/FeesScreen';
 
-// ── Library Screens ───────────────────────────────────────────
+// ── Library ───────────────────────────────────────────────────────────────────
 import LibraryDashboardScreen from '../screens/library/LibraryDashboardScreen';
 
-// ── Office Screens ────────────────────────────────────────────
-import OfficeDashboardScreen  from '../screens/office/OfficeDashboardScreen';
+// ── Office ────────────────────────────────────────────────────────────────────
+import OfficeDashboardScreen from '../screens/office/OfficeDashboardScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab   = createBottomTabNavigator();
 
-const COLORS = {
-  primary: '#4f46e5',
-  surface: '#fff',
-  textSecondary: '#6b7280',
-};
+// ─────────────────────────────────────────────────────────────────────────────
+// Premium Splash Screen
+// ─────────────────────────────────────────────────────────────────────────────
+function SplashScreen() {
+  const { roleAccent, isDark } = useTheme();
+  const logoScale   = React.useRef(new Animated.Value(0.6)).current;
+  const logoOpacity = React.useRef(new Animated.Value(0)).current;
+  const textOpacity = React.useRef(new Animated.Value(0)).current;
 
-const HEADER_OPTS = {
-  headerStyle: { backgroundColor: COLORS.primary },
-  headerTintColor: '#fff',
-  headerTitleStyle: { fontWeight: '700' as const, fontSize: 17 },
-};
+  useEffect(() => {
+    Animated.sequence([
+      Animated.parallel([
+        Animated.spring(logoScale,   { toValue: 1, friction: 5, tension: 80, useNativeDriver: true }),
+        Animated.timing(logoOpacity, { toValue: 1, duration: 400, useNativeDriver: true }),
+      ]),
+      Animated.timing(textOpacity, { toValue: 1, duration: 300, delay: 100, useNativeDriver: true }),
+    ]).start();
+  }, []);
 
-function TabIcon({ icon, focused }: { icon: string; focused: boolean }) {
-  return <Text style={{ fontSize: 22, opacity: focused ? 1 : 0.5 }}>{icon}</Text>;
+  return (
+    <View style={[styles.splash, { backgroundColor: roleAccent.gradient[0] ?? '#4f46e5' }]}>
+      <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
+      <Animated.View style={[styles.splashLogo, { opacity: logoOpacity, transform: [{ scale: logoScale }] }]}>
+        <Text style={styles.splashLogoText}>ES</Text>
+      </Animated.View>
+      <Animated.View style={{ opacity: textOpacity, alignItems: 'center', marginTop: 20 }}>
+        <Text style={styles.splashTitle}>EduShakti One</Text>
+        <Text style={styles.splashSubtitle}>Enterprise ERP Platform</Text>
+      </Animated.View>
+    </View>
+  );
 }
 
-// ── Tab Screens ───────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// Header Options Factory
+// ─────────────────────────────────────────────────────────────────────────────
+function useHeaderOpts() {
+  const { colors, roleAccent } = useTheme();
+  return {
+    headerStyle: { backgroundColor: colors.header },
+    headerTintColor: colors.headerText,
+    headerTitleStyle: { fontWeight: '700' as const, fontSize: 17, color: colors.headerText },
+    headerShadowVisible: false,
+  };
+}
 
-/** ADMIN / PRINCIPAL / VICE PRINCIPAL */
+// ─────────────────────────────────────────────────────────────────────────────
+// Shared Tab Options
+// ─────────────────────────────────────────────────────────────────────────────
+const TAB_OPTS = {
+  tabBar: (props: any) => <PremiumTabBar {...props} />,
+  headerShown: false,
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Role Tab Navigators
+// ─────────────────────────────────────────────────────────────────────────────
 function AdminTabs() {
   return (
-    <Tab.Navigator screenOptions={{ ...HEADER_OPTS, tabBarActiveTintColor: COLORS.primary, tabBarInactiveTintColor: COLORS.textSecondary, tabBarStyle: { height: 62, paddingBottom: 6 }, tabBarLabelStyle: { fontSize: 11, fontWeight: '600' } }}>
-      <Tab.Screen name="Dashboard"     component={AdminDashboardScreen}   options={{ headerTitle: '🏫 VidyaSetu', tabBarIcon: ({ focused }) => <TabIcon icon="🏠" focused={focused} /> }} />
-      <Tab.Screen name="Students"      component={StudentListScreen}       options={{ headerTitle: '🎓 Students',  tabBarIcon: ({ focused }) => <TabIcon icon="🎓" focused={focused} /> }} />
-      <Tab.Screen name="Attendance"    component={AttendanceScreen}        options={{ headerTitle: '📅 Attendance',tabBarIcon: ({ focused }) => <TabIcon icon="📅" focused={focused} /> }} />
-      <Tab.Screen name="Notifications" component={NotificationsScreen}     options={{ headerTitle: '🔔 Notices',   tabBarIcon: ({ focused }) => <TabIcon icon="🔔" focused={focused} /> }} />
-      <Tab.Screen name="Profile"       component={ProfileScreen}           options={{ headerTitle: '👤 Profile',   tabBarIcon: ({ focused }) => <TabIcon icon="👤" focused={focused} /> }} />
+    <Tab.Navigator screenOptions={TAB_OPTS}>
+      <Tab.Screen name="Dashboard"     component={AdminDashboardScreen}   />
+      <Tab.Screen name="Students"      component={StudentListScreen}       />
+      <Tab.Screen name="Attendance"    component={AttendanceScreen}        />
+      <Tab.Screen name="Notifications" component={NotificationsScreen}     />
+      <Tab.Screen name="Profile"       component={ProfileScreen}           />
     </Tab.Navigator>
   );
 }
 
-/** TEACHER / CLASS TEACHER */
 function TeacherTabs() {
   return (
-    <Tab.Navigator screenOptions={{ ...HEADER_OPTS, tabBarActiveTintColor: COLORS.primary, tabBarInactiveTintColor: COLORS.textSecondary, tabBarStyle: { height: 62, paddingBottom: 6 }, tabBarLabelStyle: { fontSize: 11, fontWeight: '600' } }}>
-      <Tab.Screen name="Dashboard"  component={TeacherDashboardScreen} options={{ headerTitle: '🏫 Teacher Panel', tabBarIcon: ({ focused }) => <TabIcon icon="🏠" focused={focused} /> }} />
-      <Tab.Screen name="Attendance" component={AttendanceScreen}       options={{ headerTitle: '📅 Attendance',    tabBarIcon: ({ focused }) => <TabIcon icon="📅" focused={focused} /> }} />
-      <Tab.Screen name="Marks"      component={MarksEntryScreen}       options={{ headerTitle: '📝 Marks Entry',   tabBarIcon: ({ focused }) => <TabIcon icon="📝" focused={focused} /> }} />
-      <Tab.Screen name="Plans"      component={LessonPlanScreen}       options={{ headerTitle: '📖 Lesson Plans',  tabBarIcon: ({ focused }) => <TabIcon icon="📖" focused={focused} /> }} />
-      <Tab.Screen name="Profile"    component={ProfileScreen}          options={{ headerTitle: '👤 Profile',       tabBarIcon: ({ focused }) => <TabIcon icon="👤" focused={focused} /> }} />
+    <Tab.Navigator screenOptions={TAB_OPTS}>
+      <Tab.Screen name="Dashboard"  component={TeacherDashboardScreen} />
+      <Tab.Screen name="Attendance" component={AttendanceScreen}       />
+      <Tab.Screen name="Marks"      component={MarksEntryScreen}       />
+      <Tab.Screen name="Plans"      component={LessonPlanScreen}       />
+      <Tab.Screen name="Profile"    component={ProfileScreen}          />
     </Tab.Navigator>
   );
 }
 
-/** STUDENT */
 function StudentTabs() {
   return (
-    <Tab.Navigator screenOptions={{ ...HEADER_OPTS, tabBarActiveTintColor: '#059669', tabBarInactiveTintColor: COLORS.textSecondary, tabBarStyle: { height: 62, paddingBottom: 6 }, tabBarLabelStyle: { fontSize: 11, fontWeight: '600' } }}>
-      <Tab.Screen name="Dashboard"  component={StudentDashboardScreen} options={{ headerTitle: '🎓 Student Portal', tabBarIcon: ({ focused }) => <TabIcon icon="🏠" focused={focused} /> }} />
-      <Tab.Screen name="Attendance" component={MyAttendanceScreen}     options={{ headerTitle: '📅 My Attendance',  tabBarIcon: ({ focused }) => <TabIcon icon="📅" focused={focused} /> }} />
-      <Tab.Screen name="Timetable"  component={TimetableScreen}        options={{ headerTitle: '🕐 Timetable',      tabBarIcon: ({ focused }) => <TabIcon icon="🕐" focused={focused} /> }} />
-      <Tab.Screen name="Results"    component={MyResultsScreen}        options={{ headerTitle: '📊 My Results',     tabBarIcon: ({ focused }) => <TabIcon icon="📊" focused={focused} /> }} />
-      <Tab.Screen name="Profile"    component={ProfileScreen}          options={{ headerTitle: '👤 Profile',        tabBarIcon: ({ focused }) => <TabIcon icon="👤" focused={focused} /> }} />
+    <Tab.Navigator screenOptions={TAB_OPTS}>
+      <Tab.Screen name="Dashboard"  component={StudentDashboardScreen} />
+      <Tab.Screen name="Attendance" component={MyAttendanceScreen}     />
+      <Tab.Screen name="Timetable"  component={TimetableScreen}        />
+      <Tab.Screen name="Results"    component={MyResultsScreen}        />
+      <Tab.Screen name="Profile"    component={ProfileScreen}          />
     </Tab.Navigator>
   );
 }
 
-/** PARENT */
 function ParentTabs() {
   return (
-    <Tab.Navigator screenOptions={{ ...HEADER_OPTS, tabBarActiveTintColor: '#f59e0b', tabBarInactiveTintColor: COLORS.textSecondary, tabBarStyle: { height: 62, paddingBottom: 6 }, tabBarLabelStyle: { fontSize: 11, fontWeight: '600' } }}>
-      <Tab.Screen name="Dashboard"  component={ParentDashboardScreen}  options={{ headerTitle: '👨‍👩‍👧 Parent Portal', tabBarIcon: ({ focused }) => <TabIcon icon="🏠" focused={focused} /> }} />
-      <Tab.Screen name="Attendance" component={ChildAttendanceScreen}  options={{ headerTitle: '📅 Attendance',     tabBarIcon: ({ focused }) => <TabIcon icon="📅" focused={focused} /> }} />
-      <Tab.Screen name="Fees"       component={FeeStatusScreen}        options={{ headerTitle: '💰 Fee Status',     tabBarIcon: ({ focused }) => <TabIcon icon="💰" focused={focused} /> }} />
-      <Tab.Screen name="Notices"    component={NotificationsScreen}    options={{ headerTitle: '📢 Notices',        tabBarIcon: ({ focused }) => <TabIcon icon="📢" focused={focused} /> }} />
-      <Tab.Screen name="Profile"    component={ProfileScreen}          options={{ headerTitle: '👤 Profile',        tabBarIcon: ({ focused }) => <TabIcon icon="👤" focused={focused} /> }} />
+    <Tab.Navigator screenOptions={TAB_OPTS}>
+      <Tab.Screen name="Dashboard"  component={ParentDashboardScreen}  />
+      <Tab.Screen name="Attendance" component={ChildAttendanceScreen}  />
+      <Tab.Screen name="Fees"       component={FeeStatusScreen}        />
+      <Tab.Screen name="Notices"    component={NotificationsScreen}    />
+      <Tab.Screen name="Profile"    component={ProfileScreen}          />
     </Tab.Navigator>
   );
 }
 
-/** ACCOUNTANT */
 function AccountantTabs() {
   return (
-    <Tab.Navigator screenOptions={{ ...HEADER_OPTS, tabBarActiveTintColor: '#059669', tabBarInactiveTintColor: COLORS.textSecondary, tabBarStyle: { height: 62, paddingBottom: 6 }, tabBarLabelStyle: { fontSize: 11, fontWeight: '600' } }}>
-      <Tab.Screen name="Dashboard" component={FinanceDashboardScreen} options={{ headerTitle: '💰 Finance', tabBarIcon: ({ focused }) => <TabIcon icon="💰" focused={focused} /> }} />
-      <Tab.Screen name="Fees"      component={FeesScreen}             options={{ headerTitle: '🧾 Fee Collection', tabBarIcon: ({ focused }) => <TabIcon icon="🧾" focused={focused} /> }} />
-      <Tab.Screen name="Reports"   component={ReportsScreen}          options={{ headerTitle: '📊 Reports', tabBarIcon: ({ focused }) => <TabIcon icon="📊" focused={focused} /> }} />
-      <Tab.Screen name="Profile"   component={ProfileScreen}          options={{ headerTitle: '👤 Profile', tabBarIcon: ({ focused }) => <TabIcon icon="👤" focused={focused} /> }} />
+    <Tab.Navigator screenOptions={TAB_OPTS}>
+      <Tab.Screen name="Dashboard" component={FinanceDashboardScreen} />
+      <Tab.Screen name="Fees"      component={FeesScreen}             />
+      <Tab.Screen name="Reports"   component={ReportsScreen}          />
+      <Tab.Screen name="Profile"   component={ProfileScreen}          />
     </Tab.Navigator>
   );
 }
 
-/** LIBRARIAN */
 function LibrarianTabs() {
   return (
-    <Tab.Navigator screenOptions={{ ...HEADER_OPTS, tabBarActiveTintColor: '#d97706', tabBarInactiveTintColor: COLORS.textSecondary, tabBarStyle: { height: 62, paddingBottom: 6 }, tabBarLabelStyle: { fontSize: 11, fontWeight: '600' } }}>
-      <Tab.Screen name="Library" component={LibraryDashboardScreen} options={{ headerTitle: '📚 Library', tabBarIcon: ({ focused }) => <TabIcon icon="📚" focused={focused} /> }} />
-      <Tab.Screen name="Search"  component={SearchScreen}           options={{ headerTitle: '🔍 Search',  tabBarIcon: ({ focused }) => <TabIcon icon="🔍" focused={focused} /> }} />
-      <Tab.Screen name="Profile" component={ProfileScreen}          options={{ headerTitle: '👤 Profile', tabBarIcon: ({ focused }) => <TabIcon icon="👤" focused={focused} /> }} />
+    <Tab.Navigator screenOptions={TAB_OPTS}>
+      <Tab.Screen name="Library" component={LibraryDashboardScreen} />
+      <Tab.Screen name="Search"  component={SearchScreen}           />
+      <Tab.Screen name="Profile" component={ProfileScreen}          />
     </Tab.Navigator>
   );
 }
 
-/** CLERK / RECEPTIONIST / OFFICE STAFF */
 function OfficeTabs() {
   return (
-    <Tab.Navigator screenOptions={{ ...HEADER_OPTS, tabBarActiveTintColor: '#0891b2', tabBarInactiveTintColor: COLORS.textSecondary, tabBarStyle: { height: 62, paddingBottom: 6 }, tabBarLabelStyle: { fontSize: 11, fontWeight: '600' } }}>
-      <Tab.Screen name="Office"    component={OfficeDashboardScreen} options={{ headerTitle: '🏢 Office', tabBarIcon: ({ focused }) => <TabIcon icon="🏢" focused={focused} /> }} />
-      <Tab.Screen name="Students"  component={StudentListScreen}     options={{ headerTitle: '🎓 Students', tabBarIcon: ({ focused }) => <TabIcon icon="🎓" focused={focused} /> }} />
-      <Tab.Screen name="Notices"   component={NotificationsScreen}   options={{ headerTitle: '📢 Notices', tabBarIcon: ({ focused }) => <TabIcon icon="📢" focused={focused} /> }} />
-      <Tab.Screen name="Profile"   component={ProfileScreen}         options={{ headerTitle: '👤 Profile', tabBarIcon: ({ focused }) => <TabIcon icon="👤" focused={focused} /> }} />
+    <Tab.Navigator screenOptions={TAB_OPTS}>
+      <Tab.Screen name="Office"    component={OfficeDashboardScreen} />
+      <Tab.Screen name="Students"  component={StudentListScreen}     />
+      <Tab.Screen name="Notices"   component={NotificationsScreen}   />
+      <Tab.Screen name="Profile"   component={ProfileScreen}         />
     </Tab.Navigator>
   );
 }
 
-// ── Role → Tab Navigator resolver ────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// Role Resolver
+// ─────────────────────────────────────────────────────────────────────────────
 function MainNavigator() {
   const { user } = useAuthStore();
-  const primaryRole = user?.roles?.[0]?.code ?? '';
+  const { setRoleCode } = useTheme();
+  const role = user?.roles?.[0]?.code ?? 'admin';
 
-  // Strict role-based isolation
-  if (['teacher', 'class_teacher'].includes(primaryRole)) return <TeacherTabs />;
-  if (['student'].includes(primaryRole))                   return <StudentTabs />;
-  if (['parent'].includes(primaryRole))                    return <ParentTabs />;
-  if (['accountant'].includes(primaryRole))                return <AccountantTabs />;
-  if (['librarian'].includes(primaryRole))                 return <LibrarianTabs />;
-  if (['clerk','receptionist','office_staff','transport_incharge','support_staff'].includes(primaryRole)) return <OfficeTabs />;
+  useEffect(() => { setRoleCode(role); }, [role]);
 
-  // Default: admin / principal / vice_principal / super_admin / exam_coordinator
+  if (['teacher', 'class_teacher'].includes(role))           return <TeacherTabs />;
+  if (role === 'student')                                     return <StudentTabs />;
+  if (role === 'parent')                                      return <ParentTabs />;
+  if (role === 'accountant')                                  return <AccountantTabs />;
+  if (role === 'librarian')                                   return <LibrarianTabs />;
+  if (['clerk','receptionist','office_staff','transport_incharge','support_staff'].includes(role))
+                                                              return <OfficeTabs />;
   return <AdminTabs />;
 }
 
-// ── Root Navigator ────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// Root Navigator
+// ─────────────────────────────────────────────────────────────────────────────
 export default function RootNavigator() {
   const { isAuthenticated, isLoading, loadFromStorage } = useAuthStore();
+  const { isDark, colors } = useTheme();
 
   useEffect(() => { loadFromStorage(); }, []);
 
-  if (isLoading) {
-    return (
-      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#4f46e5' }}>
-        <Text style={{ fontSize: 36, color: '#fff', fontWeight: '900', marginBottom: 20 }}>VS</Text>
-        <ActivityIndicator color="#fff" size="large" />
-        <Text style={{ color: 'rgba(255,255,255,0.7)', marginTop: 12, fontSize: 13 }}>
-          VidyaSetu ERP...
-        </Text>
-      </View>
-    );
-  }
+  // Build navigation theme from our design system
+  const navTheme = isDark
+    ? { ...DarkTheme,    colors: { ...DarkTheme.colors,    background: colors.background, card: colors.surface, border: colors.border, text: colors.text } }
+    : { ...DefaultTheme, colors: { ...DefaultTheme.colors, background: colors.background, card: colors.surface, border: colors.border, text: colors.text } };
+
+  if (isLoading) return <SplashScreen />;
 
   return (
-    <NavigationContainer>
-      <Stack.Navigator screenOptions={{ headerShown: false }}>
+    <NavigationContainer theme={navTheme as any}>
+      <Stack.Navigator screenOptions={{ headerShown: false, animation: 'fade' }}>
         {!isAuthenticated ? (
           <Stack.Screen name="Login" component={LoginScreen} />
         ) : (
@@ -206,3 +241,39 @@ export default function RootNavigator() {
     </NavigationContainer>
   );
 }
+
+const styles = StyleSheet.create({
+  splash: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  splashLogo: {
+    width: 96,
+    height: 96,
+    borderRadius: 28,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.35)',
+  },
+  splashLogoText: {
+    color: '#fff',
+    fontSize: 40,
+    fontWeight: '900',
+    letterSpacing: -1,
+  },
+  splashTitle: {
+    color: '#fff',
+    fontSize: 26,
+    fontWeight: '800',
+    letterSpacing: -0.5,
+  },
+  splashSubtitle: {
+    color: 'rgba(255,255,255,0.7)',
+    fontSize: 13,
+    fontWeight: '500',
+    marginTop: 4,
+  },
+});

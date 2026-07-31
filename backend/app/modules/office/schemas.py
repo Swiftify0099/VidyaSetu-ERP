@@ -269,3 +269,73 @@ class OfficeStatsResponse(BaseModel):
     today_visitors: int
     upcoming_events: int
     open_complaints: int
+    pending_bonafides: int = 0
+
+
+# ── Bonafide Applications ─────────────────────────────────────
+
+class BonafideApplyRequest(BaseModel):
+    purpose: str
+    fee_amount: float = 20.0
+    payment_method: str = "ONLINE"  # ONLINE, CASH, EXEMPT
+    payment_reference: Optional[str] = None
+    remarks: Optional[str] = None
+
+
+class BonafideClerkCreateRequest(BaseModel):
+    student_id: int
+    purpose: str
+    fee_amount: float = 20.0
+    payment_status: str = "PAID"
+    remarks: Optional[str] = None
+
+
+class BonafideApproveRejectRequest(BaseModel):
+    status: str  # APPROVED, REJECTED
+    rejection_reason: Optional[str] = None
+    remarks: Optional[str] = None
+
+
+class BonafideApplicationResponse(BaseModel):
+    model_config = {"from_attributes": True}
+    id: int
+    uuid: str
+    application_number: str
+    student_id: int
+    student_name: Optional[str] = None
+    student_gr_number: Optional[str] = None
+    student_standard: Optional[str] = None
+    student_division: Optional[str] = None
+    purpose: str
+    fee_amount: float
+    payment_status: str
+    payment_reference: Optional[str] = None
+    status: str
+    rejection_reason: Optional[str] = None
+    applied_date: date
+    processed_date: Optional[date] = None
+    issued_certificate_number: Optional[str] = None
+    academic_year: Optional[str] = None
+    created_at: Optional[datetime] = None
+
+
+class BonafidePrintDataResponse(BaseModel):
+    school_name: str = "हिंदकेसरी मारुती माने विद्यालय, कवठेपिरान"
+    cert_title: str = "बोना फाईड सर्टिफिकेट"
+    student_id: str  # Std_ID
+    aadhaar_number: str  # Adhaar
+    full_name: str  # Full_Name
+    from_date: str  # From
+    to_date: str  # To
+    in_year: str  # In_Year
+    std: str  # Std
+    dob_in_number: str  # DOB_In_Number
+    dob_in_word: str  # DOB_in_Word
+    birth_place: str  # Birth_Place
+    reg_no: str  # Reg_No
+    caste: str  # Cast
+    issue_date: str  # Date
+    application_number: str
+    issued_certificate_number: str
+    purpose: str
+

@@ -129,6 +129,8 @@
   padding-bottom: 4px;
   scrollbar-width: none;
   -ms-overflow-style: none;
+  -webkit-overflow-scrolling: touch;
+  scroll-snap-type: x mandatory;
   border-bottom: 2px solid var(--color-border, #e2e8f0);
 }
 
@@ -140,7 +142,7 @@
   display: inline-flex;
   align-items: center;
   gap: var(--space-2, 0.5rem);
-  padding: 8px 16px;
+  padding: 10px 18px;
   border-radius: var(--radius-md, 10px) var(--radius-md, 10px) 0 0;
   border: none;
   background: transparent;
@@ -149,9 +151,11 @@
   font-weight: 600;
   cursor: pointer;
   white-space: nowrap;
+  scroll-snap-align: start;
   transition: all var(--transition-base, 0.2s ease);
   border-bottom: 2px solid transparent;
   margin-bottom: -2px;
+  min-height: var(--touch-target-min, 44px);
 }
 
 .tabBtn:hover {
@@ -486,3 +490,25 @@
 @media (max-width: 600px) {
   .overviewGrid { grid-template-columns: repeat(2, 1fr); }
 }
+
+/* ── New expanded portal elements ─────────────────────────── */
+
+/* navBtn: small icon button used in card headers */
+.navBtn {
+  width: 30px; height: 30px;
+  border-radius: var(--radius-md);
+  border: 1.5px solid var(--color-border);
+  background: var(--color-surface-2);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: all var(--transition-fast);
+}
+.navBtn:hover { border-color: var(--color-primary); color: var(--color-primary); background: var(--color-primary-light); }
+.navBtn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* heroStats in hero banner */
+.heroStats { display: flex; gap: var(--space-4); align-items: center; margin-left: auto; }
+.heroStat { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.heroStatVal { font-size: var(--font-size-xl); font-weight: var(--font-weight-bold); }
+.heroStatLabel { font-size: var(--font-size-xs); opacity: 0.8; }

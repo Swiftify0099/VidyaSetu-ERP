@@ -11,15 +11,21 @@ import {
   GraduationCap, CalendarDays, BookOpen, Award, FileText, Video,
   Bot, QrCode, Ticket, BarChart3, Library, CreditCard, Palmtree,
   HelpCircle, Download, UserCheck, Settings, Search, Plus, Check,
-  AlertCircle, Sparkles, Clock, ChevronRight, X, ArrowUpRight, ClipboardList
+  AlertCircle, Sparkles, Clock, ChevronRight, ChevronLeft, X, ArrowUpRight, ClipboardList,
+  CheckCircle2, XCircle, Calendar, Info
 } from 'lucide-react';
 import studentPortalService, {
   type StudentProfile, type AttendanceData,
   type ExamResult, type Notice,
 } from '../../services/studentPortalService';
+import officeService, { type BonafidePrintData } from '../../services/officeService';
+import { BonafideCertificatePrint } from '../../components/office/BonafideCertificatePrint';
 import api from '../../services/api';
 import styles from './StudentPortalPage.module.css';
 import toast from 'react-hot-toast';
+import { StudentIdCard } from '../../components/shared';
+import { StudentDashboardHero } from '../../components/student/dashboard/StudentDashboardHero';
+
 
 type Tab =
   | 'dashboard'
@@ -47,8 +53,8 @@ type Tab =
 
 const STUDENT_TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
   { id: 'dashboard',      label: 'Dashboard',       icon: <GraduationCap size={15} /> },
-  { id: 'profile',        label: 'My Profile',      icon: <UserCheck size={15} /> },
   { id: 'attendance',     label: 'Attendance',      icon: <CalendarDays size={15} /> },
+
   { id: 'timetable',      label: 'Timetable',       icon: <ClipboardList size={15} /> },
   { id: 'homework',       label: 'Homework',        icon: <BookOpen size={15} /> },
   { id: 'assignments',    label: 'Assignments',     icon: <FileText size={15} /> },
@@ -68,6 +74,16 @@ const STUDENT_TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
 ];
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+const MONTH_NAMES_EN = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December'
+];
+
+const MONTH_NAMES_MR = [
+  'जानेवारी', 'फेब्रुवारी', 'मार्च', 'एप्रिल', 'मे', 'जून',
+  'जुलै', 'ऑगस्ट', 'सप्टेंबर', 'ऑक्टोबर', 'नोव्हेंबर', 'डिसेंबर'
+];
 
 function formatDate(iso?: string) {
   if (!iso) return '—';
@@ -126,6 +142,14 @@ export default function StudentPortalPage() {
   const [qrCodeInput, setQrCodeInput]       = useState('');
   const [scannedResult, setScannedResult]   = useState<any>(null);
 
+  // Bonafide Certificate States
+  const [myBonafideApps, setMyBonafideApps]         = useState<any[]>([]);
+  const [showApplyBonafideModal, setShowApplyBonafideModal] = useState(false);
+  const [bonafidePurpose, setBonafidePurpose]       = useState('Passport / Government ID');
+  const [bonafidePaymentMethod, setBonafidePaymentMethod] = useState('UPI');
+  const [submittingBonafide, setSubmittingBonafide] = useState(false);
+  const [studentPrintData, setStudentPrintData]   = useState<BonafidePrintData | null>(null);
+
   // Leave Form
   const [leaves, setLeaves]                 = useState<any[]>([]);
   const [leaveForm, setLeaveForm]           = useState({ leave_type: 'casual', start_date: '', end_date: '', reason: '' });
@@ -140,10 +164,49 @@ export default function StudentPortalPage() {
   const [chatLang, setChatLang]             = useState<'en'|'mr'>('en');
   const chatEndRef                          = useRef<HTMLDivElement>(null);
 
-  // Calendar navigation
+  // Calendar navigation & inspection
   const today = new Date();
   const [calYear,  setCalYear]              = useState(today.getFullYear());
   const [calMonth, setCalMonth]             = useState(today.getMonth() + 1);
+  const [selectedDay, setSelectedDay]       = useState<number | null>(null);
+
+  const fetchAttendance = useCallback(async (year: number, month: number) => {
+    setTabLoading(true);
+    try {
+      const a = await studentPortalService.getAttendance(year, month);
+      setAttendance(a);
+    } catch {
+      toast.error('Failed to load attendance records.');
+    } finally {
+      setTabLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (activeTab === 'attendance') {
+      fetchAttendance(calYear, calMonth);
+    }
+  }, [activeTab, calYear, calMonth, fetchAttendance]);
+
+  const handlePrevMonth = () => {
+    if (calMonth === 1) {
+      setCalMonth(12);
+      setCalYear(y => y - 1);
+    } else {
+      setCalMonth(m => m - 1);
+    }
+    setSelectedDay(null);
+  };
+
+  const handleNextMonth = () => {
+    if (calMonth === 12) {
+      setCalMonth(1);
+      setCalYear(y => y + 1);
+    } else {
+      setCalMonth(m => m + 1);
+    }
+    setSelectedDay(null);
+  };
 
   // ── Initial Profile Fetch ───────────────────────────────────
   useEffect(() => {
@@ -161,10 +224,7 @@ export default function StudentPortalPage() {
     try {
       switch (tab) {
         case 'attendance':
-          if (!attendance) {
-            const a = await studentPortalService.getAttendance(calYear, calMonth);
-            setAttendance(a);
-          }
+          await fetchAttendance(calYear, calMonth);
           break;
         case 'results':
           if (!results.length) {
@@ -245,10 +305,13 @@ export default function StudentPortalPage() {
           }
           break;
         case 'certificates':
-          if (!certificates.length) {
-            const cert = await studentPortalService.getCertificates();
-            setCertificates(cert.certificates || []);
-          }
+          const [certRes, bdApps] = await Promise.all([
+            studentPortalService.getCertificates(),
+            studentPortalService.getMyBonafideApplications().catch(() => []),
+          ]);
+          setCertificates(certRes.certificates || []);
+          const bdList = Array.isArray(bdApps) ? bdApps : (bdApps?.items || []);
+          setMyBonafideApps(bdList);
           break;
         case 'portfolio':
           if (!portfolio) {
@@ -275,6 +338,39 @@ export default function StudentPortalPage() {
   useEffect(() => { loadTab(activeTab); }, [activeTab, loadTab]);
 
   // ── Action Handlers ─────────────────────────────────────────
+  const handleApplyBonafide = async () => {
+    if (!bonafidePurpose.trim()) {
+      toast.error('Please specify a purpose for the Bonafide certificate.');
+      return;
+    }
+    setSubmittingBonafide(true);
+    try {
+      await studentPortalService.applyBonafide({
+        purpose: bonafidePurpose,
+        fee_amount: 20,
+        payment_method: bonafidePaymentMethod,
+        payment_reference: `UPI-${Date.now()}`,
+      });
+      toast.success('₹20 fee paid & Bonafide application submitted to clerk!');
+      setShowApplyBonafideModal(false);
+      const bdApps = await studentPortalService.getMyBonafideApplications();
+      setMyBonafideApps(Array.isArray(bdApps) ? bdApps : (bdApps?.items || []));
+    } catch {
+      toast.error('Failed to submit Bonafide application.');
+    } finally {
+      setSubmittingBonafide(false);
+    }
+  };
+
+  const handleStudentPrintBonafide = async (appId: number) => {
+    try {
+      const data = await officeService.getBonafidePrintData(appId);
+      setStudentPrintData(data);
+    } catch {
+      toast.error('Failed to load certificate printable view.');
+    }
+  };
+
   const submitLeaveHandler = async (e: React.FormEvent) => {
     e.preventDefault();
     setTabLoading(true);
@@ -378,77 +474,6 @@ export default function StudentPortalPage() {
 
   return (
     <div className={styles.portal}>
-      {/* ── Page Header ────────────────────────────────────────── */}
-      <div className={styles.pageHeader}>
-        <div>
-          <h1 className={styles.pageTitle}>
-            <GraduationCap size={24} color="var(--color-primary)" />
-            Student Digital Workspace
-          </h1>
-          <p className={styles.pageSub}>
-            Welcome, {p.full_name} • Standard {p.standard}-{p.division || 'A'} • Academic Year {p.academic_year || '2025-2026'}
-          </p>
-        </div>
-        <button className={styles.primaryBtn} onClick={() => setActiveTab('aichat')}>
-          <Bot size={16} /> Ask AI Tutor
-        </button>
-      </div>
-
-      {/* ── Welcome Hero Card ──────────────────────────────────── */}
-      <div className={styles.hero}>
-        <div className={styles.avatar}>
-          {p.photo_path ? <img src={`/storage/${p.photo_path}`} alt={p.full_name} /> : initials}
-        </div>
-        <div className={styles.heroInfo}>
-          <h2 className={styles.heroName}>{p.full_name}</h2>
-          {p.full_name_marathi && <p className={styles.heroNameMr}>{p.full_name_marathi}</p>}
-          <div className={styles.heroBadges}>
-            <span className={styles.badge}>Std {p.standard}-{p.division || 'A'}</span>
-            <span className={styles.badge}>GR: {p.gr_number}</span>
-            {p.roll_number && <span className={styles.badge}>Roll #{p.roll_number}</span>}
-            <span className={styles.badge}>Pratap House</span>
-          </div>
-        </div>
-      </div>
-
-      {/* ── Metric Stats Overview Grid ─────────────────────────── */}
-      <div className={styles.overviewGrid}>
-        <div className={styles.overviewCard} style={{ '--c': 'var(--color-success)' } as any} onClick={() => setActiveTab('attendance')}>
-          <div className={styles.overviewIcon}><CalendarDays size={20} /></div>
-          <div className={styles.overviewVal}>{p.stats.attendance_percentage}%</div>
-          <div className={styles.overviewLabel}>Attendance Percentage</div>
-        </div>
-        <div className={styles.overviewCard} style={{ '--c': 'var(--color-danger)' } as any} onClick={() => setActiveTab('fees')}>
-          <div className={styles.overviewIcon}><CreditCard size={20} /></div>
-          <div className={styles.overviewVal}>₹{p.stats.pending_fees}</div>
-          <div className={styles.overviewLabel}>Pending Fees</div>
-        </div>
-        <div className={styles.overviewCard} style={{ '--c': 'var(--color-primary)' } as any} onClick={() => setActiveTab('library')}>
-          <div className={styles.overviewIcon}><Library size={20} /></div>
-          <div className={styles.overviewVal}>{p.stats.issued_books}</div>
-          <div className={styles.overviewLabel}>Issued Library Books</div>
-        </div>
-        <div className={styles.overviewCard} style={{ '--c': 'var(--color-warning)' } as any} onClick={() => setActiveTab('examination')}>
-          <div className={styles.overviewIcon}><Ticket size={20} /></div>
-          <div className={styles.overviewVal}>{p.stats.upcoming_exams}</div>
-          <div className={styles.overviewLabel}>Upcoming Exams</div>
-        </div>
-      </div>
-
-      {/* ── Tab Navigation Bar ──────────────────────────────────── */}
-      <nav className={styles.tabNav} aria-label="Student portal navigation">
-        {STUDENT_TABS.map(t => (
-          <button
-            key={t.id}
-            className={`${styles.tabBtn} ${activeTab === t.id ? styles.tabBtnActive : ''}`}
-            onClick={() => setActiveTab(t.id)}
-            aria-current={activeTab === t.id ? 'page' : undefined}
-          >
-            {t.icon} {t.label}
-          </button>
-        ))}
-      </nav>
-
       {/* ── ACTIVE FEATURE SECTION CONTENT ───────────────────────── */}
       {tabLoading ? (
         <div className={styles.loading}>
@@ -459,7 +484,15 @@ export default function StudentPortalPage() {
         <>
           {/* 1. DASHBOARD OVERVIEW */}
           {activeTab === 'dashboard' && (
-            <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 'var(--space-5)' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-5)' }}>
+              {/* Dashboard Hero Section (Title, Welcome Card & KPI Summary Cards) */}
+              <StudentDashboardHero
+                profile={p}
+                onNavigateTab={setActiveTab}
+              />
+
+              <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 'var(--space-5)' }}>
+
               <div className={styles.card}>
                 <div className={styles.cardHeader}>
                   <h3 className={styles.cardTitle}><CalendarDays size={18} color="var(--color-primary)" /> Today's Class Schedule</h3>
@@ -519,12 +552,13 @@ export default function StudentPortalPage() {
                     <button className={styles.secondaryBtn} onClick={() => setActiveTab('examination')}><Ticket size={14} /> Hall Ticket</button>
                     <button className={styles.secondaryBtn} onClick={() => setActiveTab('leave')}><Palmtree size={14} /> Apply Leave</button>
                     <button className={styles.secondaryBtn} onClick={() => setActiveTab('fees')}><CreditCard size={14} /> View Fees</button>
-                    <button className={styles.secondaryBtn} onClick={() => setActiveTab('results')}><BarChart3 size={14} /> Marksheet</button>
                   </div>
                 </div>
               </div>
             </div>
+          </div>
           )}
+
 
           {/* 2. PROFILE */}
           {activeTab === 'profile' && (
@@ -552,36 +586,346 @@ export default function StudentPortalPage() {
             </div>
           )}
 
+
+
           {/* 3. ATTENDANCE */}
           {activeTab === 'attendance' && (
-            <div className={styles.card}>
-              <div className={styles.cardHeader}>
-                <h3 className={styles.cardTitle}><CalendarDays size={20} color="var(--color-success)" /> Monthly Attendance Record</h3>
-                <button className={styles.primaryBtn} onClick={() => toast.success('Attendance Report Downloaded!')}><Download size={14} /> Download Report</button>
-              </div>
-              <div className={styles.attendanceLayout}>
-                <div>
-                  <div className={styles.monthNav}>
-                    <button className={styles.secondaryBtn} onClick={() => setCalMonth(m => m > 1 ? m-1 : 12)}>◀ Prev</button>
-                    <span className={styles.monthTitle}>{calYear} / Month {calMonth}</span>
-                    <button className={styles.secondaryBtn} onClick={() => setCalMonth(m => m < 12 ? m+1 : 1)}>Next ▶</button>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+              {/* Header card with month picker & summary download */}
+              <div className={styles.card}>
+                <div className={styles.cardHeader}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <div style={{ padding: 10, borderRadius: 'var(--radius-md)', background: 'color-mix(in srgb, var(--color-success) 15%, transparent)', color: 'var(--color-success-dark)' }}>
+                      <CalendarDays size={22} />
+                    </div>
+                    <div>
+                      <h3 className={styles.cardTitle}>Monthly Attendance Record</h3>
+                      <p style={{ margin: 0, fontSize: '0.825rem', color: 'var(--color-text-muted)' }}>
+                        Real-time daily attendance tracking & full academic year record for {p.full_name} (Std {p.standard}-{p.division})
+                      </p>
+                    </div>
                   </div>
-                  <div className={styles.calendarGrid}>
-                    {DAYS.map(d => <div key={d} className={styles.calDayHeader}>{d}</div>)}
-                    {Array.from({ length: 30 }, (_, i) => i + 1).map(day => (
-                      <div key={day} className={`${styles.calDay} ${day % 7 === 0 ? styles.calDayHoliday : styles.calDayPresent}`}>
-                        {day}
+                  <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                    <button className={styles.primaryBtn} onClick={() => toast.success(`Attendance Report generated for ${MONTH_NAMES_EN[calMonth - 1]} ${calYear}!`)}>
+                      <Download size={14} /> Download Monthly Report
+                    </button>
+                  </div>
+                </div>
+
+                {/* Calendar Layout */}
+                <div className={styles.attendanceLayout}>
+                  <div>
+                    {/* Month Navigator Header */}
+                    <div className={styles.monthNav}>
+                      <button className={styles.secondaryBtn} onClick={handlePrevMonth} style={{ gap: 6 }}>
+                        <ChevronLeft size={16} /> Previous Month
+                      </button>
+
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <select
+                          className={styles.inputField}
+                          style={{ padding: '6px 12px', fontWeight: 700, fontSize: '0.95rem' }}
+                          value={calMonth}
+                          onChange={e => { setCalMonth(Number(e.target.value)); setSelectedDay(null); }}
+                        >
+                          {MONTH_NAMES_EN.map((mName, idx) => (
+                            <option key={idx} value={idx + 1}>{mName} ({MONTH_NAMES_MR[idx]})</option>
+                          ))}
+                        </select>
+
+                        <select
+                          className={styles.inputField}
+                          style={{ padding: '6px 12px', fontWeight: 700, fontSize: '0.95rem' }}
+                          value={calYear}
+                          onChange={e => { setCalYear(Number(e.target.value)); setSelectedDay(null); }}
+                        >
+                          {[2024, 2025, 2026, 2027].map(y => (
+                            <option key={y} value={y}>{y}</option>
+                          ))}
+                        </select>
                       </div>
-                    ))}
+
+                      <button className={styles.secondaryBtn} onClick={handleNextMonth} style={{ gap: 6 }}>
+                        Next Month <ChevronRight size={16} />
+                      </button>
+                    </div>
+
+                    {/* Calendar Grid */}
+                    <div className={styles.calendarGrid}>
+                      {DAYS.map(d => (
+                        <div key={d} className={styles.calDayHeader} style={{ color: d === 'Sun' ? 'var(--color-danger)' : undefined }}>
+                          {d}
+                        </div>
+                      ))}
+
+                      {/* Leading Empty Blank Cells for Month Start Offset */}
+                      {Array.from({ length: new Date(calYear, calMonth - 1, 1).getDay() }).map((_, idx) => (
+                        <div key={`empty-${idx}`} className={`${styles.calDay} ${styles.calDayEmpty}`} />
+                      ))}
+
+                      {/* Days of Month */}
+                      {Array.from({ length: new Date(calYear, calMonth, 0).getDate() }, (_, i) => i + 1).map(day => {
+                        const dateObj = new Date(calYear, calMonth - 1, day);
+                        const isSunday = dateObj.getDay() === 0;
+                        const isTodayCell = day === today.getDate() && calMonth === (today.getMonth() + 1) && calYear === today.getFullYear();
+                        const isFutureCell = dateObj > today;
+
+                        const dayRecord = attendance?.daily?.[day];
+                        const holidayName = attendance?.holidays?.[day];
+
+                        let statusCls = styles.calDayUnmarked;
+                        let statusIcon = null;
+                        let statusTooltip = 'Not Marked';
+
+                        if (holidayName) {
+                          statusCls = styles.calDayHoliday;
+                          statusIcon = <Palmtree size={12} />;
+                          statusTooltip = `Holiday: ${holidayName}`;
+                        } else if (dayRecord) {
+                          if (dayRecord.status === 'present') {
+                            statusCls = styles.calDayPresent;
+                            statusIcon = <CheckCircle2 size={12} />;
+                            statusTooltip = 'Present';
+                          } else if (dayRecord.status === 'absent') {
+                            statusCls = styles.calDayAbsent;
+                            statusIcon = <XCircle size={12} />;
+                            statusTooltip = 'Absent';
+                          } else if (dayRecord.status === 'late') {
+                            statusCls = styles.calDayLate;
+                            statusIcon = <Clock size={12} />;
+                            statusTooltip = 'Late Entry';
+                          } else if (dayRecord.status === 'half_day') {
+                            statusCls = styles.calDayHalfDay;
+                            statusIcon = <Clock size={12} />;
+                            statusTooltip = 'Half Day';
+                          } else if (dayRecord.status === 'leave' || dayRecord.status === 'medical_leave') {
+                            statusCls = styles.calDayLeave;
+                            statusIcon = <UserCheck size={12} />;
+                            statusTooltip = 'Approved Leave';
+                          }
+                        } else if (isSunday) {
+                          statusCls = styles.calDaySunday;
+                          statusTooltip = 'Sunday / Off';
+                        } else if (isFutureCell) {
+                          statusCls = styles.calDayFuture;
+                          statusTooltip = 'Upcoming';
+                        }
+
+                        const isSelected = selectedDay === day;
+
+                        return (
+                          <div
+                            key={day}
+                            className={`
+                              ${styles.calDay}
+                              ${statusCls}
+                              ${isTodayCell ? styles.calDayToday : ''}
+                              ${isSelected ? styles.calDaySelected : ''}
+                            `}
+                            onClick={() => setSelectedDay(day)}
+                            title={`${day} ${MONTH_NAMES_EN[calMonth - 1]} ${calYear}: ${statusTooltip}`}
+                          >
+                            <span>{day}</span>
+                            {statusIcon && (
+                              <span style={{ fontSize: '0.65rem', marginTop: 2, display: 'flex', alignItems: 'center' }}>
+                                {statusIcon}
+                              </span>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {/* Color Legend Bar */}
+                    <div className={styles.legendBar}>
+                      <div className={styles.legendItem}>
+                        <div className={styles.legendDot} style={{ background: '#dcfce7', border: '1px solid #86efac' }} />
+                        <span>Present</span>
+                      </div>
+                      <div className={styles.legendItem}>
+                        <div className={styles.legendDot} style={{ background: '#fee2e2', border: '1px solid #fca5a5' }} />
+                        <span>Absent</span>
+                      </div>
+                      <div className={styles.legendItem}>
+                        <div className={styles.legendDot} style={{ background: '#fef3c7', border: '1px solid #fde047' }} />
+                        <span>Late / Half Day</span>
+                      </div>
+                      <div className={styles.legendItem}>
+                        <div className={styles.legendDot} style={{ background: '#e0e7ff', border: '1px solid #a5b4fc' }} />
+                        <span>Leave</span>
+                      </div>
+                      <div className={styles.legendItem}>
+                        <div className={styles.legendDot} style={{ background: '#fef9c3', border: '1px solid #fde047' }} />
+                        <span>Holiday</span>
+                      </div>
+                      <div className={styles.legendItem}>
+                        <div className={styles.legendDot} style={{ background: '#f1f5f9', border: '1px solid #e2e8f0' }} />
+                        <span>Sunday / Off</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Right Sidebar: Real-time Monthly Statistics & Day Inspector */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                    {/* Monthly KPI Overview Card */}
+                    <div style={{ background: 'var(--color-surface-2)', padding: 18, borderRadius: 'var(--radius-xl)', border: '1px solid var(--color-border)', display: 'flex', flexDirection: 'column', gap: 14 }}>
+                      <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 800, color: 'var(--color-text-primary)', borderBottom: '1px solid var(--color-border)', paddingBottom: 8 }}>
+                        {MONTH_NAMES_EN[calMonth - 1]} {calYear} Summary
+                      </h4>
+
+                      {/* Percentage Highlight Gauge */}
+                      <div style={{ padding: '14px', background: 'var(--color-surface)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--color-border)', textAlign: 'center' }}>
+                        <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Monthly Attendance</div>
+                        <div style={{
+                          fontSize: '2rem',
+                          fontWeight: 900,
+                          color: (attendance?.summary?.percentage ?? 0) >= 85 ? 'var(--color-success)' : (attendance?.summary?.percentage ?? 0) >= 75 ? 'var(--color-primary)' : 'var(--color-danger)',
+                          margin: '4px 0'
+                        }}>
+                          {attendance?.summary?.percentage ?? 0}%
+                        </div>
+
+                        {/* Visual Progress Bar */}
+                        <div style={{ width: '100%', height: 8, background: '#e2e8f0', borderRadius: 999, overflow: 'hidden', margin: '8px 0 6px' }}>
+                          <div style={{
+                            width: `${Math.min(100, Math.max(0, attendance?.summary?.percentage ?? 0))}%`,
+                            height: '100%',
+                            background: (attendance?.summary?.percentage ?? 0) >= 85 ? '#16a34a' : (attendance?.summary?.percentage ?? 0) >= 75 ? '#2563eb' : '#dc2626',
+                            transition: 'width 0.4s ease'
+                          }} />
+                        </div>
+
+                        <span className={`${styles.tag} ${(attendance?.summary?.percentage ?? 0) >= 85 ? styles.tagSuccess : (attendance?.summary?.percentage ?? 0) >= 75 ? styles.tagPrimary : styles.tagWarning}`}>
+                          {(attendance?.summary?.percentage ?? 0) >= 85 ? 'Excellent Attendance' : (attendance?.summary?.percentage ?? 0) >= 75 ? 'Satisfactory' : 'Low Attendance Alert'}
+                        </span>
+                      </div>
+
+                      {/* Summary Breakdown List */}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 10, fontSize: '0.875rem' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px dashed var(--color-border)' }}>
+                          <span style={{ color: 'var(--color-text-muted)' }}>Working Days:</span>
+                          <strong>{attendance?.summary?.working_days ?? 0} Days</strong>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px dashed var(--color-border)', color: 'var(--color-success-dark)' }}>
+                          <span>Present Days:</span>
+                          <strong>{attendance?.summary?.present_days ?? 0} Days</strong>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px dashed var(--color-border)', color: 'var(--color-danger)' }}>
+                          <span>Absent Days:</span>
+                          <strong>{attendance?.summary?.absent_days ?? 0} Days</strong>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px dashed var(--color-border)', color: 'var(--color-warning-dark)' }}>
+                          <span>Late / Half Days:</span>
+                          <strong>{attendance?.summary?.late_days ?? 0} Days</strong>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', color: 'var(--color-primary)' }}>
+                          <span>Approved Leave:</span>
+                          <strong>{attendance?.summary?.leave_days ?? 0} Days</strong>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Inspector Details for Selected Day */}
+                    {selectedDay && (
+                      <div style={{ background: 'var(--color-surface)', padding: 16, borderRadius: 'var(--radius-xl)', border: '2px solid var(--color-primary)', boxShadow: 'var(--shadow-sm)' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                          <strong style={{ fontSize: '0.9rem', color: 'var(--color-primary)' }}>
+                            {selectedDay} {MONTH_NAMES_EN[calMonth - 1]} {calYear}
+                          </strong>
+                          <button onClick={() => setSelectedDay(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text-muted)' }}>
+                            <X size={14} />
+                          </button>
+                        </div>
+                        {(() => {
+                          const dateObj = new Date(calYear, calMonth - 1, selectedDay);
+                          const dayOfWeekName = DAYS[dateObj.getDay()];
+                          const rec = attendance?.daily?.[selectedDay];
+                          const hol = attendance?.holidays?.[selectedDay];
+
+                          if (hol) {
+                            return (
+                              <div style={{ fontSize: '0.825rem' }}>
+                                <div style={{ color: '#854d0e', fontWeight: 700 }}>🎉 School Holiday</div>
+                                <div style={{ marginTop: 4, color: 'var(--color-text-secondary)' }}>{hol}</div>
+                              </div>
+                            );
+                          }
+                          if (rec) {
+                            return (
+                              <div style={{ fontSize: '0.825rem', display: 'flex', flexDirection: 'column', gap: 4 }}>
+                                <div>Day: <strong>{dayOfWeekName}</strong></div>
+                                <div>Status: <span style={{ textTransform: 'capitalize', fontWeight: 700 }}>{rec.status.replace('_', ' ')}</span></div>
+                                {rec.remarks && <div>Remarks: <span style={{ color: 'var(--color-text-muted)' }}>{rec.remarks}</span></div>}
+                                <div>Session: <span>{rec.period || 'Full Day'}</span></div>
+                              </div>
+                            );
+                          }
+                          if (dateObj.getDay() === 0) {
+                            return <div style={{ fontSize: '0.825rem', color: 'var(--color-text-muted)' }}>Sunday Weekly Off</div>;
+                          }
+                          return <div style={{ fontSize: '0.825rem', color: 'var(--color-text-muted)' }}>No attendance record marked for this date.</div>;
+                        })()}
+                      </div>
+                    )}
                   </div>
                 </div>
-                <div style={{ background: 'var(--color-surface-2)', padding: '16px', borderRadius: 'var(--radius-lg)', border: '1px solid var(--color-border)', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Present Days:</span><strong>24 Days</strong></div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--color-danger)' }}><span>Absent Days:</span><strong>1 Day</strong></div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--color-warning)' }}><span>Late Entries:</span><strong>2 Days</strong></div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Percentage:</span><strong style={{ color: 'var(--color-success)' }}>{p.stats.attendance_percentage}%</strong></div>
-                </div>
               </div>
+
+              {/* Academic Year Monthly Breakdown Table */}
+              {attendance?.yearly && attendance.yearly.length > 0 && (
+                <div className={styles.card}>
+                  <div className={styles.cardHeader}>
+                    <h3 className={styles.cardTitle}>
+                      <BarChart3 size={18} color="var(--color-primary)" /> Academic Year Monthly Breakdown
+                    </h3>
+                  </div>
+                  <div className={styles.tableWrap}>
+                    <table className={styles.table}>
+                      <thead>
+                        <tr>
+                          <th>Month & Year</th>
+                          <th>Working Days</th>
+                          <th>Present</th>
+                          <th>Absent</th>
+                          <th>Late / Leave</th>
+                          <th>Attendance %</th>
+                          <th>Status</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {attendance.yearly.map(ys => (
+                          <tr key={`${ys.year}-${ys.month}`}>
+                            <td>
+                              <strong>{ys.month_name_en} ({ys.month_name_mr}) {ys.year}</strong>
+                            </td>
+                            <td>{ys.working_days} Days</td>
+                            <td style={{ color: 'var(--color-success-dark)', fontWeight: 700 }}>{ys.present_days} Days</td>
+                            <td style={{ color: ys.absent_days > 0 ? 'var(--color-danger)' : undefined }}>{ys.absent_days} Days</td>
+                            <td>{ys.late_days + ys.leave_days} Days</td>
+                            <td>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                                <div style={{ flex: 1, height: 6, background: '#e2e8f0', borderRadius: 999, minWidth: 60, overflow: 'hidden' }}>
+                                  <div style={{
+                                    width: `${Math.min(100, Math.max(0, ys.percentage))}%`,
+                                    height: '100%',
+                                    background: ys.percentage >= 85 ? '#16a34a' : ys.percentage >= 75 ? '#2563eb' : '#dc2626'
+                                  }} />
+                                </div>
+                                <strong style={{ fontSize: '0.85rem' }}>{ys.percentage}%</strong>
+                              </div>
+                            </td>
+                            <td>
+                              <span className={`${styles.tag} ${ys.percentage >= 85 ? styles.tagSuccess : ys.percentage >= 75 ? styles.tagPrimary : styles.tagWarning}`}>
+                                {ys.percentage >= 85 ? 'Excellent' : ys.percentage >= 75 ? 'Satisfactory' : 'Low'}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -786,23 +1130,91 @@ export default function StudentPortalPage() {
             </div>
           )}
 
-          {/* 13. CERTIFICATES */}
+          {/* 13. CERTIFICATES & BONAFIDE */}
           {activeTab === 'certificates' && (
-            <div className={styles.card}>
-              <div className={styles.cardHeader}>
-                <h3 className={styles.cardTitle}><Award size={20} color="var(--color-primary)" /> Digital Certificates</h3>
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                {certificates.map(cert => (
-                  <div key={cert.id} style={{ padding: 16, background: 'var(--color-surface-2)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--color-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div>
-                      <span className={`${styles.tag} ${styles.tagPrimary}`}>{cert.type.toUpperCase()} • Verified</span>
-                      <h4 style={{ margin: '6px 0 2px', fontSize: '1rem' }}>{cert.title}</h4>
-                      <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>Issued: {cert.issued_date}</div>
-                    </div>
-                    <button className={styles.primaryBtn} onClick={() => toast.success(`Downloading ${cert.title}...`)}><Download size={14} /> Download</button>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              {/* Bonafide Certificate Section */}
+              <div className={styles.card}>
+                <div className={styles.cardHeader}>
+                  <h3 className={styles.cardTitle}>
+                    <Award size={20} color="var(--color-primary)" /> बोनाफाइड प्रमाणपत्र अर्ज (Bonafide Certificate Request)
+                  </h3>
+                  <button className={styles.primaryBtn} onClick={() => setShowApplyBonafideModal(true)}>
+                    <Plus size={14} /> Apply for Bonafide Certificate (₹20)
+                  </button>
+                </div>
+                {myBonafideApps.length === 0 ? (
+                  <div style={{ padding: 24, textAlign: 'center', color: 'var(--color-text-muted)', background: 'var(--color-surface-2)', borderRadius: 'var(--radius-md)' }}>
+                    <p style={{ margin: 0 }}>No active Bonafide applications. Click the button above to apply and pay fees online.</p>
                   </div>
-                ))}
+                ) : (
+                  <div className={styles.tableWrap}>
+                    <table className={styles.table}>
+                      <thead>
+                        <tr>
+                          <th>App #</th>
+                          <th>Purpose</th>
+                          <th>Fee Charged</th>
+                          <th>Applied Date</th>
+                          <th>Status</th>
+                          <th>Action / Certificate</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {(Array.isArray(myBonafideApps) ? myBonafideApps : []).map((app: any) => (
+                          <tr key={app.id}>
+                            <td><strong>{app.application_number}</strong></td>
+                            <td><span className={`${styles.tag} ${styles.tagPrimary}`}>{app.purpose}</span></td>
+                            <td>₹{app.fee_amount} ({app.payment_status})</td>
+                            <td>{app.applied_date}</td>
+                            <td>
+                              <span className={`${styles.tag} ${app.status === 'APPROVED' ? styles.tagSuccess : app.status === 'REJECTED' ? styles.tagDanger : styles.tagWarning}`}>
+                                {app.status}
+                              </span>
+                              {app.rejection_reason && (
+                                <div style={{ fontSize: '0.7rem', color: 'var(--color-danger)', marginTop: 2 }}>{app.rejection_reason}</div>
+                              )}
+                            </td>
+                            <td>
+                              {app.status === 'APPROVED' ? (
+                                <button
+                                  className={styles.primaryBtn}
+                                  style={{ padding: '4px 10px', fontSize: '0.8rem', display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                                  onClick={() => handleStudentPrintBonafide(app.id)}
+                                >
+                                  <Download size={13} /> View / Print Certificate
+                                </button>
+                              ) : app.status === 'PENDING' ? (
+                                <span style={{ fontSize: '0.8rem', color: 'var(--color-warning)', fontWeight: 600 }}>Pending Clerk Verification</span>
+                              ) : (
+                                <span style={{ fontSize: '0.8rem', color: 'var(--color-danger)', fontWeight: 600 }}>Rejected</span>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+
+              {/* Other Digital Certificates */}
+              <div className={styles.card}>
+                <div className={styles.cardHeader}>
+                  <h3 className={styles.cardTitle}><Award size={20} color="var(--color-primary)" /> Other School Certificates</h3>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  {certificates.map(cert => (
+                    <div key={cert.id} style={{ padding: 16, background: 'var(--color-surface-2)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--color-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div>
+                        <span className={`${styles.tag} ${styles.tagPrimary}`}>{cert.type.toUpperCase()} • Verified</span>
+                        <h4 style={{ margin: '6px 0 2px', fontSize: '1rem' }}>{cert.title}</h4>
+                        <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>Issued: {cert.issued_date}</div>
+                      </div>
+                      <button className={styles.primaryBtn} onClick={() => toast.success(`Downloading ${cert.title}...`)}><Download size={14} /> Download</button>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
           )}
@@ -952,23 +1364,9 @@ export default function StudentPortalPage() {
 
           {/* 21. ID CARD */}
           {activeTab === 'idcard' && (
-            <div className={styles.card}>
-              <div className={styles.cardHeader}>
-                <h3 className={styles.cardTitle}><UserCheck size={20} color="var(--color-primary)" /> Digital Identity Card</h3>
-                <button className={styles.primaryBtn} onClick={() => window.print()}><Download size={14} /> Print ID Card</button>
-              </div>
-              <div style={{ padding: 24, background: 'var(--gradient-primary)', borderRadius: 'var(--radius-xl)', color: 'white', maxWidth: 360, margin: '0 auto' }}>
-                <h3 style={{ margin: 0, fontSize: '1.25rem' }}>Hindkesri Maruti Mane Vidyalay</h3>
-                <p style={{ opacity: 0.8, fontSize: '0.8rem', margin: '2px 0 16px' }}>Student Identity Card 2025-26</p>
-                <div style={{ fontSize: '1.25rem', fontWeight: 800 }}>{p.full_name}</div>
-                <div style={{ fontSize: '0.875rem', marginTop: 4 }}>Standard: Std {p.standard}-{p.division} | Roll #{p.roll_number}</div>
-                <div style={{ fontSize: '0.875rem', marginTop: 12, borderTop: '1px solid rgba(255,255,255,0.3)', paddingTop: 8, display: 'flex', justifyContent: 'space-between' }}>
-                  <span>GR: {p.gr_number}</span>
-                  <span>Blood: {p.blood_group || 'O+'}</span>
-                </div>
-              </div>
-            </div>
+            <StudentIdCard idCardData={idCard} profileData={profile} />
           )}
+
 
           {/* 22. SETTINGS */}
           {activeTab === 'settings' && (
@@ -978,9 +1376,18 @@ export default function StudentPortalPage() {
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 16, maxWidth: 360 }}>
                 <label style={{ fontSize: '0.875rem', fontWeight: 600 }}>Language / भाषा preference</label>
-                <select className={styles.selectField} value={i18n.language} onChange={e => i18n.changeLanguage(e.target.value)}>
-                  <option value="en">English</option>
+                <select
+                  className={styles.selectField}
+                  value={(i18n.language || 'mr').startsWith('mr') ? 'mr' : 'en'}
+                  onChange={e => {
+                    const lang = e.target.value;
+                    i18n.changeLanguage(lang);
+                    localStorage.setItem('vidyasetu_lang', lang);
+                    document.documentElement.lang = lang;
+                  }}
+                >
                   <option value="mr">मराठी (Marathi)</option>
+                  <option value="en">English</option>
                 </select>
                 <button className={styles.primaryBtn} onClick={() => toast.success('Language setting updated!')}>Save Settings</button>
               </div>
@@ -1069,6 +1476,76 @@ export default function StudentPortalPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Student Apply Bonafide Modal */}
+      {showApplyBonafideModal && (
+        <div className={styles.modalOverlay}>
+          <div className={styles.modalContent}>
+            <div className={styles.modalTitle}>
+              <span>बोनाफाइड प्रमाणपत्रासाठी अर्ज (Apply Bonafide Certificate)</span>
+              <button className={styles.closeBtn} onClick={() => setShowApplyBonafideModal(false)}>✕</button>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--color-text-muted)', marginBottom: 4 }}>
+                  Purpose of Certificate / वापराचे कारण *
+                </label>
+                <select
+                  className={styles.selectField}
+                  value={bonafidePurpose}
+                  onChange={e => setBonafidePurpose(e.target.value)}
+                >
+                  <option value="Passport / Government ID">Passport / Government ID Application</option>
+                  <option value="Bus Pass / Transport Subsidy">Bus Pass / State Transport Concession</option>
+                  <option value="Bank Account Opening">Bank Account Opening</option>
+                  <option value="MahaDBT / Government Scholarship">MahaDBT / Government Scholarship</option>
+                  <option value="Sports / Competition Admission">Sports / Competition Admission</option>
+                  <option value="General Purpose">General Purpose (सर्वसाधारण)</option>
+                </select>
+              </div>
+
+              <div style={{ padding: 12, background: 'var(--color-surface-2)', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                  <span>Certificate Fee Charge:</span>
+                  <strong style={{ color: 'var(--color-primary)' }}>₹20.00</strong>
+                </div>
+                <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
+                  Standard nominal processing charge for official Marathi Bonafide Certificate.
+                </div>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--color-text-muted)', marginBottom: 4 }}>
+                  Payment Method / भरणा पद्धत
+                </label>
+                <select
+                  className={styles.selectField}
+                  value={bonafidePaymentMethod}
+                  onChange={e => setBonafidePaymentMethod(e.target.value)}
+                >
+                  <option value="UPI">UPI / GooglePay / PhonePe / Paytm</option>
+                  <option value="CARD">Debit / Credit Card</option>
+                  <option value="CASH">Pay at Cash Counter</option>
+                </select>
+              </div>
+
+              <button
+                className={styles.primaryBtn}
+                style={{ marginTop: 8 }}
+                onClick={handleApplyBonafide}
+                disabled={submittingBonafide}
+              >
+                {submittingBonafide ? 'Processing Payment...' : 'Pay ₹20 & Submit Application'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Student Printable Certificate View */}
+      {studentPrintData && (
+        <BonafideCertificatePrint data={studentPrintData} onClose={() => setStudentPrintData(null)} />
       )}
     </div>
   );

@@ -9,22 +9,28 @@ import { useSearchParams } from 'react-router-dom';
 import {
   Users, CalendarDays, ClipboardList, BookOpen,
   Bell, UserCheck, X, Search, Plus,
-  Palmtree, LayoutDashboard, CheckCircle2
+  Palmtree, LayoutDashboard, CheckCircle2, RefreshCw,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../../services/api';
 import styles from './TeacherPortalPage.module.css';
+import { TeacherDashboardHero } from '../../components/teacher/dashboard/TeacherDashboardHero';
 
-type Tab = 'dashboard' | 'timetable' | 'students' | 'attendance' | 'notices' | 'leaves' | 'profile';
+type Tab = 'dashboard' | 'timetable' | 'students' | 'attendance' | 'notices' | 'leaves' | 'profile' | 'homework' | 'materials' | 'videos' | 'marks' | 'ai_tools';
 
 const TEACHER_TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
-  { id: 'dashboard',  label: 'Dashboard',    icon: <LayoutDashboard size={16} /> },
-  { id: 'attendance', label: 'Attendance',   icon: <ClipboardList size={16} /> },
-  { id: 'timetable',  label: 'Timetable',    icon: <CalendarDays size={16} /> },
-  { id: 'students',   label: 'Students',     icon: <Users size={16} /> },
-  { id: 'notices',    label: 'Notices',      icon: <Bell size={16} /> },
-  { id: 'leaves',     label: 'Leave',        icon: <Palmtree size={16} /> },
-  { id: 'profile',    label: 'My Profile',   icon: <UserCheck size={16} /> },
+  { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard size={15} /> },
+  { id: 'attendance', label: 'Attendance', icon: <ClipboardList size={15} /> },
+  { id: 'timetable', label: 'Timetable', icon: <CalendarDays size={15} /> },
+  { id: 'students', label: 'Students', icon: <Users size={15} /> },
+  { id: 'homework', label: 'Homework', icon: <BookOpen size={15} /> },
+  { id: 'materials', label: 'Study Materials', icon: <Bell size={15} /> },
+  { id: 'videos', label: 'Video Lectures', icon: <UserCheck size={15} /> },
+  { id: 'marks', label: 'Marks Entry', icon: <CheckCircle2 size={15} /> },
+  { id: 'notices', label: 'Notices', icon: <Bell size={15} /> },
+  { id: 'leaves', label: 'Leave', icon: <Palmtree size={15} /> },
+  { id: 'ai_tools', label: 'AI Tools', icon: <X size={15} /> },
+  { id: 'profile', label: 'My Profile', icon: <UserCheck size={15} /> },
 ];
 
 interface TeacherProfile { teacher: any; stats: any; }
@@ -60,10 +66,35 @@ export default function TeacherPortalPage() {
   // Attendance
   const [attStudents, setAttStudents] = useState<any[]>([]);
   const [attMap, setAttMap] = useState<Record<number, string>>({});
+  const [attRemarksMap, setAttRemarksMap] = useState<Record<number, string>>({});
   const [attStd, setAttStd] = useState('');
   const [attDiv, setAttDiv] = useState('');
   const [attDate, setAttDate] = useState(new Date().toISOString().split('T')[0]);
   const [savingAtt, setSavingAtt] = useState(false);
+
+  // Homework
+  const [homeworkList, setHomeworkList] = useState<any[]>([]);
+  const [hwForm, setHwForm] = useState({ standard: '', division: '', subject: '', title: '', description: '', due_date: '', });
+  const [savingHw, setSavingHw] = useState(false);
+
+  // Materials
+  const [materials, setMaterials] = useState<any[]>([]);
+  const [matForm, setMatForm] = useState({ standard: '', subject: '', title: '', description: '', material_type: 'notes', });
+  const [savingMat, setSavingMat] = useState(false);
+
+  // Videos
+  const [videos, setVideos] = useState<any[]>([]);
+  const [vidForm, setVidForm] = useState({ standard: '', subject: '', title: '', video_url: '', description: '', });
+  const [savingVid, setSavingVid] = useState(false);
+
+  // Marks Entry
+  const [marksExams, setMarksExams] = useState<any[]>([]);
+  const [selectedMarksExam, setSelectedMarksExam] = useState<any>(null);
+  const [marksStudents, setMarksStudents] = useState<any[]>([]);
+  const [marksMap, setMarksMap] = useState<Record<number, string>>({});
+  const [savingMarks, setSavingMarks] = useState(false);
+  const [marksSubject, setMarksSubject] = useState('');
+
 
   // Notices
   const [notices, setNotices] = useState<any[]>([]);
@@ -80,11 +111,16 @@ export default function TeacherPortalPage() {
     try {
       const res = await api.get('/teacher-portal/me');
       setProfile(res.data.data);
-      const classes = res.data.data?.teacher?.classes_assigned || [];
-      if (classes.length > 0) {
-        setAttStd(classes[0]);
-        setStdFilter(classes[0]);
-      }
+      const rawClasses = res.data.data?.teacher?.classes_assigned;
+      const classArr = typeof rawClasses === 'string'
+        ? rawClasses.split(',').map((c: string) => c.trim()).filter(Boolean)
+        : Array.isArray(rawClasses)
+          ? rawClasses
+          : ['9', '10'];
+
+      const initialStd = classArr[0] || '9';
+      setAttStd(prev => prev || initialStd);
+      setStdFilter(prev => prev || initialStd);
     } catch (e: any) {
       toast.error(e?.response?.data?.detail || 'Failed to load profile');
     } finally { setLoading(false); }
@@ -108,9 +144,9 @@ export default function TeacherPortalPage() {
   }, [stdFilter, studentSearch]);
 
   const loadAttStudents = useCallback(async () => {
-    if (!attStd) return;
+    const targetStd = attStd || '9';
     try {
-      const params: Record<string, string> = { standard: attStd };
+      const params: Record<string, string> = { standard: targetStd };
       if (attDiv) params.division = attDiv;
       const res = await api.get('/teacher-portal/students', { params });
       const studs = res.data.data?.students || [];
@@ -143,26 +179,137 @@ export default function TeacherPortalPage() {
     else if (tab === 'attendance') loadAttStudents();
     else if (tab === 'notices') loadNotices();
     else if (tab === 'leaves') loadLeaves();
+    else if (tab === 'homework') loadHomework();
+    else if (tab === 'materials') loadMaterials();
+    else if (tab === 'videos') loadVideos();
+    else if (tab === 'marks') loadMarksExams();
   }, [tab, loadTimetable, loadStudents, loadAttStudents, loadNotices, loadLeaves]);
+
+  const loadHomework = async () => {
+    try {
+      const res = await api.get('/teacher-portal/homework');
+      setHomeworkList(res.data.data?.homework || res.data.data || []);
+    } catch { setHomeworkList([]); }
+  };
+
+  const loadMaterials = async () => {
+    try {
+      const res = await api.get('/teacher-portal/materials');
+      setMaterials(res.data.data?.materials || res.data.data || []);
+    } catch { setMaterials([]); }
+  };
+
+  const loadVideos = async () => {
+    try {
+      const res = await api.get('/teacher-portal/videos');
+      setVideos(res.data.data?.videos || res.data.data || []);
+    } catch { setVideos([]); }
+  };
+
+  const loadMarksExams = async () => {
+    try {
+      const res = await api.get('/teacher-portal/exams');
+      setMarksExams(res.data.data?.exams || res.data.data || []);
+    } catch { setMarksExams([]); }
+  };
+
+  const loadMarksStudents = async (examId: number, std: string, div?: string) => {
+    try {
+      const res = await api.get('/teacher-portal/students', { params: { standard: std, division: div || undefined } });
+      const studs = res.data.data?.students || [];
+      setMarksStudents(studs);
+      const map: Record<number, string> = {};
+      studs.forEach((s: any) => { map[s.id] = ''; });
+      setMarksMap(map);
+    } catch { setMarksStudents([]); }
+  };
+
+  const handleSaveMarks = async () => {
+    if (!selectedMarksExam || !marksSubject) { toast.error('Select exam and subject'); return; }
+    setSavingMarks(true);
+    try {
+      const entries = Object.entries(marksMap).map(([sid, marks]) => ({
+        student_id: Number(sid),
+        marks_obtained: parseFloat(marks) || 0,
+      }));
+      await api.post('/teacher-portal/marks', {
+        exam_id: selectedMarksExam.id,
+        subject_name: marksSubject,
+        entries,
+      });
+      toast.success('Marks saved successfully!');
+    } catch (err: any) {
+      toast.error(err?.response?.data?.detail || 'Save failed');
+    } finally { setSavingMarks(false); }
+  };
+
+  const handleAddHomework = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSavingHw(true);
+    try {
+      await api.post('/teacher-portal/homework', hwForm);
+      toast.success('Homework assigned!'); loadHomework();
+      setHwForm({ standard: '', division: '', subject: '', title: '', description: '', due_date: '' });
+    } catch (err: any) { toast.error(err?.response?.data?.detail || 'Failed'); }
+    finally { setSavingHw(false); }
+  };
+
+  const handleAddMaterial = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSavingMat(true);
+    try {
+      await api.post('/teacher-portal/materials', matForm);
+      toast.success('Material uploaded!'); loadMaterials();
+      setMatForm({ standard: '', subject: '', title: '', description: '', material_type: 'notes' });
+    } catch (err: any) { toast.error(err?.response?.data?.detail || 'Failed'); }
+    finally { setSavingMat(false); }
+  };
+
+  const handleAddVideo = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSavingVid(true);
+    try {
+      await api.post('/teacher-portal/videos', vidForm);
+      toast.success('Video lecture added!'); loadVideos();
+      setVidForm({ standard: '', subject: '', title: '', video_url: '', description: '' });
+    } catch (err: any) { toast.error(err?.response?.data?.detail || 'Failed'); }
+    finally { setSavingVid(false); }
+  };
 
   // Attendance Save
   const handleSaveAttendance = async () => {
+    const targetStd = attStd || '9';
+    if (!attStudents.length) {
+      toast.error('No students loaded to mark attendance.');
+      return;
+    }
     setSavingAtt(true);
     try {
-      const entries = Object.entries(attMap).map(([sid, st]) => ({
-        student_id: Number(sid),
-        status: st,
+      const entries = attStudents.map(stud => ({
+        student_id: stud.id,
+        status: attMap[stud.id] || 'present',
+        remarks: attRemarksMap[stud.id] || undefined,
       }));
       await api.post('/teacher-portal/attendance', {
-        standard: attStd,
-        division: attDiv || null,
+        standard: targetStd,
+        division: attDiv || undefined,
         date: attDate,
         records: entries,
+        entries: entries,
+        academic_year_id: 1,
       });
-      toast.success(`Attendance marked successfully for ${entries.length} students!`);
+      toast.success(`Attendance saved successfully for ${entries.length} students in Std ${targetStd}${attDiv ? '-' + attDiv : ''}!`);
     } catch (e: any) {
       toast.error(e?.response?.data?.detail || 'Failed to save attendance');
     } finally { setSavingAtt(false); }
+  };
+
+  const setAllAttendanceStatus = (status: 'present' | 'absent' | 'late' | 'leave') => {
+    setAttMap(prev => {
+      const next = { ...prev };
+      attStudents.forEach(s => { next[s.id] = status; });
+      return next;
+    });
   };
 
   // Leave Submit
@@ -196,82 +343,19 @@ export default function TeacherPortalPage() {
 
   return (
     <div className={styles.portal}>
-      {/* ── Page Header ────────────────────────────────────────── */}
-      <div className={styles.pageHeader}>
-        <div>
-          <h1 className={styles.pageTitle}>
-            <UserCheck size={24} color="var(--color-primary)" />
-            Teacher Digital Workspace
-          </h1>
-          <p className={styles.pageSub}>
-            Welcome, {teacher?.salutation || 'Prof.'} {teacher?.full_name} • EMP: {teacher?.employee_id || 'EMP-001'} • {teacher?.designation || 'Teacher'}
-          </p>
-        </div>
-        <button className={styles.primaryBtn} onClick={() => setTab('attendance')}>
-          <ClipboardList size={16} /> Mark Attendance
-        </button>
-      </div>
-
-      {/* ── Welcome Hero Banner ────────────────────────────────── */}
-      <div className={styles.hero}>
-        <div className={styles.avatar}>
-          {teacher?.photo_path
-            ? <img src={`/storage/${teacher.photo_path}`} alt={teacher.full_name} />
-            : (teacher?.full_name?.[0] || 'T')}
-        </div>
-        <div className={styles.heroInfo}>
-          <h2 className={styles.heroName}>{teacher?.salutation} {teacher?.full_name}</h2>
-          {teacher?.full_name_marathi && <p className={styles.heroNameMr}>{teacher.full_name_marathi}</p>}
-          <div className={styles.heroBadges}>
-            <span className={styles.badge}>EMP ID: {teacher?.employee_id}</span>
-            <span className={styles.badge}>{teacher?.designation || 'Teacher'}</span>
-            {classes.map((c: string) => <span key={c} className={styles.badge}>Std {c}</span>)}
-          </div>
-        </div>
-      </div>
-
-      {/* ── Tab Navigation Bar ──────────────────────────────────── */}
-      <nav className={styles.tabNav} aria-label="Teacher portal navigation">
-        {TEACHER_TABS.map(t => (
-          <button
-            key={t.id}
-            className={`${styles.tabBtn} ${tab === t.id ? styles.tabBtnActive : ''}`}
-            onClick={() => setTab(t.id)}
-            aria-current={tab === t.id ? 'page' : undefined}
-          >
-            {t.icon} {t.label}
-          </button>
-        ))}
-      </nav>
-
-      {/* ── Metric Overview Cards ──────────────────────────────── */}
-      <div className={styles.overviewGrid}>
-        <div className={styles.overviewCard} style={{ '--c': 'var(--color-primary)' } as any} onClick={() => setTab('students')}>
-          <div className={styles.overviewIcon}><BookOpen size={20} /></div>
-          <div className={styles.overviewVal}>{s?.assigned_classes ?? 0}</div>
-          <div className={styles.overviewLabel}>Assigned Classes</div>
-        </div>
-        <div className={styles.overviewCard} style={{ '--c': 'var(--color-success)' } as any} onClick={() => setTab('students')}>
-          <div className={styles.overviewIcon}><Users size={20} /></div>
-          <div className={styles.overviewVal}>{s?.total_students ?? 0}</div>
-          <div className={styles.overviewLabel}>Total Students</div>
-        </div>
-        <div className={styles.overviewCard} style={{ '--c': 'var(--color-warning)' } as any} onClick={() => setTab('timetable')}>
-          <div className={styles.overviewIcon}><CalendarDays size={20} /></div>
-          <div className={styles.overviewVal}>{s?.today_periods ?? 0}</div>
-          <div className={styles.overviewLabel}>Today's Periods</div>
-        </div>
-        <div className={styles.overviewCard} style={{ '--c': 'var(--color-danger)' } as any} onClick={() => setTab('attendance')}>
-          <div className={styles.overviewIcon}><ClipboardList size={20} /></div>
-          <div className={styles.overviewVal}>{s?.academic_year || '2025-26'}</div>
-          <div className={styles.overviewLabel}>Academic Year</div>
-        </div>
-      </div>
-
       {/* ── ACTIVE FEATURE SECTION CONTENT ─────────────────────── */}
       {/* 1. DASHBOARD */}
       {tab === 'dashboard' && (
-        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 'var(--space-5)' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-5)' }}>
+          {/* Dashboard Hero Section (Title, Welcome Banner & KPI Summary Cards) */}
+          <TeacherDashboardHero
+            teacher={teacher}
+            stats={s}
+            onMarkAttendance={() => setTab('attendance')}
+            onNavigateTab={setTab}
+          />
+
+          <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 'var(--space-5)' }}>
           <div className={styles.card}>
             <div className={styles.cardHeader}>
               <h3 className={styles.cardTitle}><CalendarDays size={18} color="var(--color-primary)" /> Today's Teaching Schedule</h3>
@@ -305,6 +389,7 @@ export default function TeacherPortalPage() {
             </div>
           </div>
         </div>
+      </div>
       )}
 
       {/* 2. ATTENDANCE MARKING */}
@@ -313,45 +398,136 @@ export default function TeacherPortalPage() {
           <div className={styles.cardHeader}>
             <h3 className={styles.cardTitle}><ClipboardList size={20} color="var(--color-primary)" /> Student Attendance Register</h3>
             <button className={styles.primaryBtn} onClick={handleSaveAttendance} disabled={savingAtt || !attStudents.length}>
-              <CheckCircle2 size={16} /> {savingAtt ? 'Saving...' : 'Submit Attendance'}
+              <CheckCircle2 size={16} /> {savingAtt ? 'Saving...' : `Submit Attendance (${attStudents.length})`}
             </button>
           </div>
 
-          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+          {/* Controls Header */}
+          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-end', background: 'var(--color-surface-2)', padding: 16, borderRadius: 'var(--radius-md)' }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-              <label style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>Select Class</label>
+              <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--color-text-primary)' }}>Select Class</label>
               <select className={styles.selectField} value={attStd} onChange={e => setAttStd(e.target.value)}>
-                {classes.map((c: string) => <option key={c} value={c}>Std {c}</option>)}
+                {Array.from(new Set([...classes, '1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12'])).sort((a, b) => Number(a) - Number(b)).map(c => (
+                  <option key={c} value={c}>Std {c} {classes.includes(c) ? '(Assigned)' : ''}</option>
+                ))}
               </select>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-              <label style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>Division</label>
+              <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--color-text-primary)' }}>Division</label>
               <input className={styles.inputField} style={{ width: 80 }} value={attDiv} onChange={e => setAttDiv(e.target.value.toUpperCase())} placeholder="A" />
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-              <label style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>Date</label>
+              <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--color-text-primary)' }}>Date</label>
               <input type="date" className={styles.inputField} value={attDate} onChange={e => setAttDate(e.target.value)} />
             </div>
-            <button className={styles.secondaryBtn} style={{ marginTop: 'auto' }} onClick={loadAttStudents}><Search size={14} /> Fetch Students</button>
+            <button className={styles.secondaryBtn} onClick={loadAttStudents}><Search size={14} /> Fetch Students</button>
           </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 12 }}>
-            {attStudents.map((stud, idx) => {
-              const currentSt = attMap[stud.id] || 'present';
-              return (
-                <div key={stud.id} className={styles.attRow}>
-                  <div>
-                    <div className={styles.attName}>{idx + 1}. {stud.full_name}</div>
-                    <div className={styles.attSub}>GR: {stud.gr_number} | Roll #{stud.roll_number || '—'}</div>
+          {/* KPI Summary Bar & Bulk Actions */}
+          {attStudents.length > 0 && (
+            <div style={{ marginTop: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
+              {/* Quick Bulk Action Buttons */}
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button className={styles.secondaryBtn} onClick={() => setAllAttendanceStatus('present')} style={{ borderColor: 'var(--color-success)', color: 'var(--color-success)' }}>
+                  Mark All Present
+                </button>
+                <button className={styles.secondaryBtn} onClick={() => setAllAttendanceStatus('absent')} style={{ borderColor: 'var(--color-danger)', color: 'var(--color-danger)' }}>
+                  Mark All Absent
+                </button>
+                <button className={styles.secondaryBtn} onClick={() => setAllAttendanceStatus('late')} style={{ borderColor: 'var(--color-warning)', color: 'var(--color-warning)' }}>
+                  Mark All Late
+                </button>
+              </div>
+
+              {/* Realtime Stats Pills */}
+              <div style={{ display: 'flex', gap: 12, fontSize: '0.85rem', fontWeight: 600 }}>
+                <span style={{ padding: '4px 10px', background: 'var(--color-surface-2)', borderRadius: 999 }}>Total: {attStudents.length}</span>
+                <span style={{ padding: '4px 10px', background: 'rgba(16, 185, 129, 0.15)', color: 'var(--color-success)', borderRadius: 999 }}>
+                  Present: {Object.values(attMap).filter(v => v === 'present').length}
+                </span>
+                <span style={{ padding: '4px 10px', background: 'rgba(239, 68, 68, 0.15)', color: 'var(--color-danger)', borderRadius: 999 }}>
+                  Absent: {Object.values(attMap).filter(v => v === 'absent').length}
+                </span>
+                <span style={{ padding: '4px 10px', background: 'rgba(245, 158, 11, 0.15)', color: 'var(--color-warning)', borderRadius: 999 }}>
+                  Late: {Object.values(attMap).filter(v => v === 'late').length}
+                </span>
+                <span style={{ padding: '4px 10px', background: 'rgba(59, 130, 246, 0.15)', color: '#3b82f6', borderRadius: 999 }}>
+                  Rate: {attStudents.length > 0 ? ((Object.values(attMap).filter(v => v === 'present').length / attStudents.length) * 100).toFixed(0) : 0}%
+                </span>
+              </div>
+            </div>
+          )}
+
+          {/* Student List */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 16 }}>
+            {attStudents.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: 40, color: 'var(--color-text-muted)', background: 'var(--color-surface-2)', borderRadius: 'var(--radius-md)' }}>
+                <Users size={32} style={{ opacity: 0.5, marginBottom: 8 }} />
+                <p style={{ margin: 0 }}>No students loaded for Std {attStd || '9'} {attDiv ? `-${attDiv}` : ''}. Click "Fetch Students" above.</p>
+              </div>
+            ) : (
+              attStudents.map((stud, idx) => {
+                const currentSt = attMap[stud.id] || 'present';
+                return (
+                  <div key={stud.id} className={styles.attRow} style={{ padding: '12px 16px', background: 'var(--color-surface-1)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                      <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'var(--color-primary-light)', color: 'var(--color-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: '0.875rem' }}>
+                        {stud.full_name?.[0] || 'S'}
+                      </div>
+                      <div>
+                        <div className={styles.attName} style={{ fontWeight: 600, color: 'var(--color-text-primary)' }}>{idx + 1}. {stud.full_name}</div>
+                        <div className={styles.attSub} style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>GR: {stud.gr_number} | Roll #{stud.roll_number || '—'} | Std {stud.standard}-{stud.division || 'A'}</div>
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                      <input
+                        type="text"
+                        className={styles.inputField}
+                        style={{ width: 150, height: 32, fontSize: '0.75rem' }}
+                        placeholder="Remarks / Reason..."
+                        value={attRemarksMap[stud.id] || ''}
+                        onChange={e => setAttRemarksMap(prev => ({ ...prev, [stud.id]: e.target.value }))}
+                      />
+                      <div className={styles.attBtnGroup} style={{ display: 'flex', gap: 4 }}>
+                        <button
+                          type="button"
+                          className={`${styles.attBtn} ${currentSt === 'present' ? styles.attBtnPresent : ''}`}
+                          style={currentSt === 'present' ? { background: 'var(--color-success)', color: '#fff' } : {}}
+                          onClick={() => setAttMap(m => ({ ...m, [stud.id]: 'present' }))}
+                        >
+                          Present
+                        </button>
+                        <button
+                          type="button"
+                          className={`${styles.attBtn} ${currentSt === 'absent' ? styles.attBtnAbsent : ''}`}
+                          style={currentSt === 'absent' ? { background: 'var(--color-danger)', color: '#fff' } : {}}
+                          onClick={() => setAttMap(m => ({ ...m, [stud.id]: 'absent' }))}
+                        >
+                          Absent
+                        </button>
+                        <button
+                          type="button"
+                          className={`${styles.attBtn}`}
+                          style={currentSt === 'late' ? { background: 'var(--color-warning)', color: '#fff' } : {}}
+                          onClick={() => setAttMap(m => ({ ...m, [stud.id]: 'late' }))}
+                        >
+                          Late
+                        </button>
+                        <button
+                          type="button"
+                          className={`${styles.attBtn} ${currentSt === 'leave' ? styles.attBtnLeave : ''}`}
+                          style={currentSt === 'leave' ? { background: '#3b82f6', color: '#fff' } : {}}
+                          onClick={() => setAttMap(m => ({ ...m, [stud.id]: 'leave' }))}
+                        >
+                          Leave
+                        </button>
+                      </div>
+                    </div>
                   </div>
-                  <div className={styles.attBtnGroup}>
-                    <button className={`${styles.attBtn} ${currentSt === 'present' ? styles.attBtnPresent : ''}`} onClick={() => setAttMap(m => ({ ...m, [stud.id]: 'present' }))}>Present</button>
-                    <button className={`${styles.attBtn} ${currentSt === 'absent' ? styles.attBtnAbsent : ''}`} onClick={() => setAttMap(m => ({ ...m, [stud.id]: 'absent' }))}>Absent</button>
-                    <button className={`${styles.attBtn} ${currentSt === 'leave' ? styles.attBtnLeave : ''}`} onClick={() => setAttMap(m => ({ ...m, [stud.id]: 'leave' }))}>Leave</button>
-                  </div>
-                </div>
-              );
-            })}
+                );
+              })
+            )}
           </div>
         </div>
       )}
@@ -359,23 +535,50 @@ export default function TeacherPortalPage() {
       {/* 3. TIMETABLE */}
       {tab === 'timetable' && (
         <div className={styles.card}>
-          <div className={styles.cardHeader}>
-            <h3 className={styles.cardTitle}><CalendarDays size={20} color="var(--color-primary)" /> Weekly Teaching Schedule</h3>
+          <div className={styles.cardHeader} style={{ flexWrap: 'wrap', gap: 8 }}>
+            <div>
+              <h3 className={styles.cardTitle}><CalendarDays size={20} color="var(--color-primary)" /> Weekly Teaching Schedule</h3>
+              <p style={{ margin: '4px 0 0', fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>
+                Scheduled by Office Clerk & Principal • Mon to Sat
+              </p>
+            </div>
+            <button className={styles.secondaryBtn} onClick={loadTimetable}><RefreshCw size={14} /> Refresh Schedule</button>
           </div>
-          <div className={styles.tableWrap}>
-            <table className={styles.table}>
-              <thead><tr><th>Day</th><th>Period 1</th><th>Period 2</th><th>Period 3</th><th>Period 4</th></tr></thead>
-              <tbody>
-                {timetable.full_week?.map((w: any) => (
-                  <tr key={w.day}>
-                    <td><strong>{w.day_en}</strong></td>
-                    {w.periods?.slice(0, 4).map((p: any, i: number) => (
-                      <td key={i}>{p.subject} (Std {p.standard}-{p.division})</td>
-                    ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16, marginTop: 16 }}>
+            {timetable?.full_week?.map((w: any) => (
+              <div key={w.day_en} style={{ background: 'var(--color-surface-2)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', padding: 14 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, borderBottom: '1px solid var(--color-border)', paddingBottom: 8 }}>
+                  <h4 style={{ margin: 0, fontSize: '0.95rem', color: 'var(--color-text-primary)' }}>{w.day_en} <span style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)', fontWeight: 400 }}>({w.day_mr})</span></h4>
+                  <span style={{ fontSize: '0.75rem', fontWeight: 600, padding: '2px 8px', background: w.periods?.length ? 'var(--color-primary-light)' : 'var(--color-surface-1)', color: w.periods?.length ? 'var(--color-primary)' : 'var(--color-text-muted)', borderRadius: 999 }}>
+                    {w.periods?.length ? `${w.periods.length} Periods` : 'No Classes'}
+                  </span>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {!w.periods || w.periods.length === 0 ? (
+                    <div style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)', fontStyle: 'italic', padding: '8px 0' }}>
+                      Free Period / Off
+                    </div>
+                  ) : (
+                    w.periods.map((p: any, idx: number) => (
+                      <div key={p.id || idx} style={{ padding: '8px 12px', background: 'var(--color-surface-1)', borderRadius: 'var(--radius-sm)', borderLeft: '3px solid var(--color-primary)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div>
+                          <div style={{ fontWeight: 600, fontSize: '0.85rem', color: 'var(--color-text-primary)' }}>{p.subject}</div>
+                          <div style={{ fontSize: '0.75rem', color: 'var(--color-text-secondary)' }}>Std {p.standard}-{p.division} • {p.room || 'Classroom'}</div>
+                        </div>
+                        <div style={{ textAlign: 'right' }}>
+                          <span style={{ fontSize: '0.7rem', fontWeight: 700, padding: '2px 6px', background: 'var(--color-surface-2)', borderRadius: 4, color: 'var(--color-text-muted)' }}>
+                            {p.period_name || `P${idx + 1}`}
+                          </span>
+                          {p.start_time && <div style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', marginTop: 2 }}>{p.start_time}-{p.end_time}</div>}
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       )}
@@ -469,7 +672,173 @@ export default function TeacherPortalPage() {
         </div>
       )}
 
-      {/* ── LEAVE MODAL ───────────────────────────────────────── */}
+      {/* 8. HOMEWORK */}
+      {tab === 'homework' && (
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-5)' }}>
+          <div className={styles.card}>
+            <div className={styles.cardHeader}>
+              <h3 className={styles.cardTitle}><BookOpen size={18} color="var(--color-primary)" /> Assign Homework</h3>
+            </div>
+            <form onSubmit={handleAddHomework} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+              {[['Standard', 'standard', 'number'], ['Division', 'division', 'text'], ['Subject', 'subject', 'text'], ['Title', 'title', 'text'], ['Due Date', 'due_date', 'date']].map(([lbl, key, type]) => (
+                <div key={key} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  <label style={{ fontSize: 'var(--font-size-xs)', fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>{lbl}</label>
+                  <input type={type} className={styles.inputField} value={(hwForm as any)[key]} onChange={e => setHwForm(f => ({ ...f, [key]: e.target.value }))} required />
+                </div>
+              ))}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <label style={{ fontSize: 'var(--font-size-xs)', fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>Description</label>
+                <textarea className={styles.inputField} style={{ minHeight: 80, resize: 'vertical' }} value={hwForm.description} onChange={e => setHwForm(f => ({ ...f, description: e.target.value }))} />
+              </div>
+              <button type="submit" className={styles.primaryBtn} disabled={savingHw}>{savingHw ? 'Assigning...' : 'Assign Homework'}</button>
+            </form>
+          </div>
+          <div className={styles.card}>
+            <div className={styles.cardHeader}><h3 className={styles.cardTitle}>Recent Homework</h3></div>
+            {homeworkList.length === 0 ? <p style={{ color: 'var(--color-text-muted)', textAlign: 'center', padding: 'var(--space-8)' }}>No homework assigned yet</p> : homeworkList.map((hw: any) => (
+              <div key={hw.id} style={{ padding: 'var(--space-3)', background: 'var(--color-surface-2)', borderRadius: 'var(--radius-md)', marginBottom: 'var(--space-2)', border: '1px solid var(--color-border)' }}>
+                <div style={{ fontWeight: 600, fontSize: 'var(--font-size-sm)' }}>{hw.title}</div>
+                <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)' }}>Std {hw.standard} • {hw.subject} • Due: {hw.due_date}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* 9. MATERIALS */}
+      {tab === 'materials' && (
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-5)' }}>
+          <div className={styles.card}>
+            <div className={styles.cardHeader}><h3 className={styles.cardTitle}><Bell size={18} color="var(--color-primary)" /> Upload Study Material</h3></div>
+            <form onSubmit={handleAddMaterial} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+              {[['Standard', 'standard', 'text'], ['Subject', 'subject', 'text'], ['Title', 'title', 'text']].map(([lbl, key, type]) => (
+                <div key={key} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  <label style={{ fontSize: 'var(--font-size-xs)', fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>{lbl}</label>
+                  <input type={type} className={styles.inputField} value={(matForm as any)[key]} onChange={e => setMatForm(f => ({ ...f, [key]: e.target.value }))} required />
+                </div>
+              ))}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <label style={{ fontSize: 'var(--font-size-xs)', fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>Material Type</label>
+                <select className={styles.selectField} value={matForm.material_type} onChange={e => setMatForm(f => ({ ...f, material_type: e.target.value }))}>
+                  {['notes', 'pdf', 'ppt', 'assignment', 'question_paper', 'syllabus'].map(t => <option key={t} value={t}>{t.replace('_', ' ').toUpperCase()}</option>)}
+                </select>
+              </div>
+              <button type="submit" className={styles.primaryBtn} disabled={savingMat}>{savingMat ? 'Uploading...' : 'Upload Material'}</button>
+            </form>
+          </div>
+          <div className={styles.card}>
+            <div className={styles.cardHeader}><h3 className={styles.cardTitle}>Uploaded Materials</h3></div>
+            {materials.length === 0 ? <p style={{ color: 'var(--color-text-muted)', textAlign: 'center', padding: 'var(--space-8)' }}>No materials uploaded</p> : materials.map((m: any) => (
+              <div key={m.id} style={{ padding: 'var(--space-3)', background: 'var(--color-surface-2)', borderRadius: 'var(--radius-md)', marginBottom: 'var(--space-2)', border: '1px solid var(--color-border)' }}>
+                <div style={{ fontWeight: 600, fontSize: 'var(--font-size-sm)' }}>{m.title}</div>
+                <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)' }}>Std {m.standard} • {m.subject} • {m.material_type?.replace('_', ' ').toUpperCase()}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* 10. VIDEOS */}
+      {tab === 'videos' && (
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-5)' }}>
+          <div className={styles.card}>
+            <div className={styles.cardHeader}><h3 className={styles.cardTitle}><UserCheck size={18} color="var(--color-primary)" /> Add Video Lecture</h3></div>
+            <form onSubmit={handleAddVideo} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+              {[['Standard', 'standard', 'text'], ['Subject', 'subject', 'text'], ['Title', 'title', 'text'], ['Video URL (YouTube)', 'video_url', 'url']].map(([lbl, key, type]) => (
+                <div key={key} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  <label style={{ fontSize: 'var(--font-size-xs)', fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>{lbl}</label>
+                  <input type={type} className={styles.inputField} value={(vidForm as any)[key]} onChange={e => setVidForm(f => ({ ...f, [key]: e.target.value }))} required />
+                </div>
+              ))}
+              <button type="submit" className={styles.primaryBtn} disabled={savingVid}>{savingVid ? 'Adding...' : 'Add Video'}</button>
+            </form>
+          </div>
+          <div className={styles.card}>
+            <div className={styles.cardHeader}><h3 className={styles.cardTitle}>Video Library</h3></div>
+            {videos.length === 0 ? <p style={{ color: 'var(--color-text-muted)', textAlign: 'center', padding: 'var(--space-8)' }}>No videos uploaded</p> : videos.map((v: any) => (
+              <div key={v.id} style={{ padding: 'var(--space-3)', background: 'var(--color-surface-2)', borderRadius: 'var(--radius-md)', marginBottom: 'var(--space-2)', border: '1px solid var(--color-border)' }}>
+                <div style={{ fontWeight: 600, fontSize: 'var(--font-size-sm)' }}>{v.title}</div>
+                <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)' }}>Std {v.standard} • {v.subject}</div>
+                {v.video_url && <a href={v.video_url} target="_blank" rel="noreferrer" style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-primary)' }}>▶ Watch</a>}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* 11. MARKS ENTRY */}
+      {tab === 'marks' && (
+        <div className={styles.card}>
+          <div className={styles.cardHeader}>
+            <h3 className={styles.cardTitle}><CheckCircle2 size={18} color="var(--color-primary)" /> Quick Marks Entry</h3>
+            {selectedMarksExam && (
+              <button className={styles.primaryBtn} onClick={handleSaveMarks} disabled={savingMarks}>{savingMarks ? 'Saving...' : 'Save Marks'}</button>
+            )}
+          </div>
+          <div style={{ display: 'flex', gap: 'var(--space-3)', flexWrap: 'wrap', marginBottom: 'var(--space-4)' }}>
+            <select className={styles.selectField} value={selectedMarksExam?.id || ''} onChange={e => {
+              const ex = marksExams.find((x: any) => x.id === parseInt(e.target.value));
+              setSelectedMarksExam(ex || null);
+              if (ex) loadMarksStudents(ex.id, ex.standard, ex.division);
+            }}>
+              <option value="">Select Exam</option>
+              {marksExams.map((ex: any) => <option key={ex.id} value={ex.id}>{ex.name || ex.exam_type_name} - Std {ex.standard}</option>)}
+            </select>
+            <input className={styles.inputField} placeholder="Subject Name" value={marksSubject} onChange={e => setMarksSubject(e.target.value)} style={{ width: 180 }} />
+          </div>
+          {marksStudents.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: 'var(--space-8)', color: 'var(--color-text-muted)' }}>Select an exam to load students</div>
+          ) : (
+            <div className={styles.tableWrap}>
+              <table className={styles.table}>
+                <thead><tr><th>#</th><th>GR No.</th><th>Student Name</th><th>Marks (out of 100)</th></tr></thead>
+                <tbody>
+                  {marksStudents.map((s: any, i: number) => (
+                    <tr key={s.id}>
+                      <td>{i + 1}</td>
+                      <td style={{ fontFamily: 'monospace', color: 'var(--color-primary)', fontWeight: 600 }}>{s.gr_number}</td>
+                      <td>{s.full_name}</td>
+                      <td><input type="number" min={0} max={100} className={styles.inputField} style={{ width: 80 }} value={marksMap[s.id] ?? ''} onChange={e => setMarksMap(m => ({ ...m, [s.id]: e.target.value }))} placeholder="—" /></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* 12. AI TOOLS */}
+      {tab === 'ai_tools' && (
+        <div className={styles.card}>
+          <div className={styles.cardHeader}><h3 className={styles.cardTitle}><X size={18} color="var(--color-primary)" /> AI Teaching Assistant</h3></div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 'var(--space-4)' }}>
+            {[
+              { label: 'Generate Lesson Plan', desc: 'AI creates structured lesson plan from topic', icon: '📋' },
+              { label: 'Create Question Paper', desc: 'Auto-generate MCQ/short answer questions', icon: '📝' },
+              { label: 'Summarize Chapter', desc: 'Get a concise summary of any textbook chapter', icon: '📖' },
+              { label: 'Homework Generator', desc: 'Generate age-appropriate homework tasks', icon: '✏️' },
+              { label: 'Rubric Creator', desc: 'Create grading rubrics for assignments', icon: '📊' },
+              { label: 'Parent Message Draft', desc: 'Draft professional parent communication', icon: '✉️' },
+            ].map(tool => (
+              <div key={tool.label} style={{ padding: 'var(--space-5)', background: 'var(--color-surface-2)', borderRadius: 'var(--radius-xl)', border: '1px solid var(--color-border)', cursor: 'pointer', transition: 'all 0.15s ease' }}
+                onClick={() => window.open('/ai-hub', '_blank')}
+                onMouseEnter={e => (e.currentTarget.style.borderColor = 'var(--color-primary)')}
+                onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--color-border)')}
+              >
+                <div style={{ fontSize: '2rem', marginBottom: 'var(--space-3)' }}>{tool.icon}</div>
+                <div style={{ fontSize: 'var(--font-size-sm)', fontWeight: 700, color: 'var(--color-text-primary)', marginBottom: 'var(--space-1)' }}>{tool.label}</div>
+                <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)' }}>{tool.desc}</div>
+              </div>
+            ))}
+          </div>
+          <div style={{ marginTop: 'var(--space-4)', padding: 'var(--space-4)', background: 'var(--color-primary-light)', borderRadius: 'var(--radius-lg)', fontSize: 'var(--font-size-sm)', color: 'var(--color-primary)' }}>
+            💡 These tools use the VidyaSetu AI Hub. Click any tool to open the AI assistant with the relevant prompt pre-loaded.
+          </div>
+        </div>
+      )}
+
+      {/* ── LEAVE MODAL */}
       {showLeaveForm && (
         <div className={styles.modalOverlay}>
           <div className={styles.modalContent}>

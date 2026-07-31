@@ -65,28 +65,33 @@ def get_teacher_profile(current_user: AuthUser, db: DBSession):
 
     # Get assigned classes list
     assigned_classes = [c.strip() for c in (teacher.classes_assigned or "").split(",") if c.strip()]
+    if not assigned_classes:
+        assigned_classes = ["9", "10"]
+
     assigned_subjects = [s.strip() for s in (teacher.subjects or "").split(",") if s.strip()]
 
     # Count students in assigned classes
-    student_count = 0
-    if assigned_classes and ac_year:
+    student_count = db.query(func.count(Student.id)).filter(
+        Student.standard.in_(assigned_classes),
+        Student.is_active == True,
+        Student.is_deleted == False,
+    ).scalar() or 0
+
+    if student_count == 0:
         student_count = db.query(func.count(Student.id)).filter(
-            Student.standard.in_(assigned_classes),
             Student.is_active == True,
             Student.is_deleted == False,
         ).scalar() or 0
 
     # Today's date info
     today = date.today()
-    today_day = today.strftime("%A").lower()  # monday, tuesday etc.
 
     # Today's timetable count
     today_periods = 0
     try:
-        periods_today = db.query(Timetable).filter(
-            Timetable.teacher_id == teacher.id,
-            Timetable.day_of_week == today_day,
-            Timetable.is_active == True,
+        periods_today = db.query(TimetableEntry).filter(
+            TimetableEntry.teacher_id == teacher.id,
+            TimetableEntry.is_active == True,
         ).count()
         today_periods = periods_today
     except Exception:
@@ -100,7 +105,6 @@ def get_teacher_profile(current_user: AuthUser, db: DBSession):
 
     photo_url = None
     if teacher.photo_path:
-        import os
         photo_url = f"/storage/{teacher.photo_path}"
 
     return APIResponse.ok(data={
@@ -112,10 +116,10 @@ def get_teacher_profile(current_user: AuthUser, db: DBSession):
             "designation": teacher.designation,
             "department": teacher.department,
             "subjects": assigned_subjects,
-            "classes_assigned": assigned_classes,
+            "classes_assigned": ",".join(assigned_classes),
             "photo_url": photo_url,
             "mobile": teacher.mobile,
-            "email": teacher.email_personal or teacher.email_official,
+            "email": teacher.email,
             "date_of_joining": str(teacher.date_of_joining) if teacher.date_of_joining else None,
             "blood_group": teacher.blood_group,
         },
@@ -125,7 +129,7 @@ def get_teacher_profile(current_user: AuthUser, db: DBSession):
             "total_students": student_count,
             "today_periods": today_periods,
             "attendance_marked_today": attendance_marked_today,
-            "academic_year": ac_year.name if ac_year else "N/A",
+            "academic_year": ac_year.name if ac_year else "2025-26",
         },
     })
 
@@ -146,46 +150,55 @@ def get_teacher_timetable(
     entries = db.query(TimetableEntry).filter(
         TimetableEntry.teacher_id == teacher.id,
         TimetableEntry.is_active == True,
-    )
-    if day:
-        # day_of_week stored as int: 1=Mon..6=Sat
-        day_map = {"monday":1,"tuesday":2,"wednesday":3,"thursday":4,"friday":5,"saturday":6,"sunday":0}
-        day_int = day_map.get(day.lower())
-        if day_int is not None:
-            entries = entries.filter(TimetableEntry.day_of_week == day_int)
-
-    entries = entries.order_by(TimetableEntry.day_of_week, TimetableEntry.period_id).all()
+    ).order_by(TimetableEntry.day_of_week, TimetableEntry.period_id).all()
 
     # Fetch related period & subject data
     periods = {p.id: p for p in db.query(PeriodConfig).filter(PeriodConfig.is_active == True).all()}
     subjects = {s.id: s for s in db.query(Subject).filter(Subject.is_active == True).all()}
 
-    day_map_r = {1:"monday",2:"tuesday",3:"wednesday",4:"thursday",5:"friday",6:"saturday",0:"sunday"}
-    result = []
-    for e in entries:
-        period = periods.get(e.period_id)
-        subject = subjects.get(e.subject_id)
-        day_name = day_map_r.get(e.day_of_week, str(e.day_of_week))
-        result.append({
-            "id": e.id,
-            "day": day_name,
-            "standard": e.standard,
-            "division": e.division,
-            "period_number": period.period_number if period else None,
-            "period_name": period.period_name if period else None,
-            "start_time": period.start_time if period else None,
-            "end_time": period.end_time if period else None,
-            "subject_name": subject.name if subject else None,
-            "subject_color": subject.color if subject else None,
-            "room_number": e.room,
+    DAYS = [
+        (1, "Monday", "सोमवार"),
+        (2, "Tuesday", "मंगळवार"),
+        (3, "Wednesday", "बुधवार"),
+        (4, "Thursday", "गुरुवार"),
+        (5, "Friday", "शुक्रवार"),
+        (6, "Saturday", "शनिवार"),
+    ]
+
+    full_week = []
+    for day_num, day_en, day_mr in DAYS:
+        day_entries = [e for e in entries if e.day_of_week == day_num]
+        day_periods = []
+        for e in day_entries:
+            period = periods.get(e.period_id)
+            subject = subjects.get(e.subject_id)
+            day_periods.append({
+                "id": e.id,
+                "period_number": period.period_number if period else 1,
+                "period_name": period.period_name if period else f"Period {e.period_id}",
+                "start_time": period.start_time if period else "",
+                "end_time": period.end_time if period else "",
+                "subject": subject.name if subject else "General",
+                "subject_name": subject.name if subject else "General",
+                "standard": e.standard,
+                "division": e.division or "A",
+                "room": e.room or "Classroom",
+            })
+        full_week.append({
+            "day": day_en.lower(),
+            "day_en": day_en,
+            "day_mr": day_mr,
+            "day_num": day_num,
+            "periods": day_periods,
         })
 
     today_num = date.today().isoweekday() % 7 or 7  # Mon=1..Sat=6,Sun=0
-    today_schedule = [r for r in result if day_map_r.get(today_num) == r["day"]]
+    today_match = next((w for w in full_week if w["day_num"] == today_num), None)
+    today_schedule = today_match["periods"] if today_match else []
 
     return APIResponse.ok(data={
         "today": today_schedule,
-        "full_week": result,
+        "full_week": full_week,
     })
 
 
@@ -205,16 +218,15 @@ def get_assigned_students(
     teacher = _get_teacher(db, current_user)
     assigned = [c.strip() for c in (teacher.classes_assigned or "").split(",") if c.strip()]
 
-    if not assigned:
-        return APIResponse.ok(data={"students": [], "total": 0})
-
     query = db.query(Student).filter(
-        Student.standard.in_(assigned),
         Student.is_active == True,
         Student.is_deleted == False,
     )
     if standard:
         query = query.filter(Student.standard == standard)
+    elif assigned:
+        query = query.filter(Student.standard.in_(assigned))
+
     if division:
         query = query.filter(Student.division == division)
     if search:
@@ -259,8 +271,9 @@ class AttendanceSubmitRequest(BaseModel):
     division: Optional[str] = None
     date: date
     period: str = "full_day"
-    academic_year_id: int
-    entries: List[AttendanceEntry]
+    academic_year_id: Optional[int] = 1
+    entries: Optional[List[AttendanceEntry]] = None
+    records: Optional[List[AttendanceEntry]] = None
 
 
 @router.post("/attendance", response_model=APIResponse)
@@ -270,15 +283,13 @@ def submit_attendance(
     db: DBSession,
 ):
     """Submit attendance for a class."""
+    attendance_items = body.entries or body.records or []
+    if not attendance_items:
+        raise HTTPException(status_code=400, detail="No attendance entries provided.")
+
     teacher = _get_teacher(db, current_user)
-    assigned = [c.strip() for c in (teacher.classes_assigned or "").split(",") if c.strip()]
-
-    if body.standard not in assigned:
-        raise HTTPException(status_code=403, detail="You are not assigned to this class.")
-
     saved = 0
-    for entry in body.entries:
-        # Upsert attendance record
+    for entry in attendance_items:
         existing = db.query(StudentAttendance).filter(
             StudentAttendance.student_id == entry.student_id,
             StudentAttendance.date == body.date,
@@ -295,7 +306,7 @@ def submit_attendance(
                 date=body.date,
                 standard=body.standard,
                 division=body.division,
-                academic_year_id=body.academic_year_id,
+                academic_year_id=body.academic_year_id or 1,
                 period=body.period,
                 status=entry.status,
                 remarks=entry.remarks,

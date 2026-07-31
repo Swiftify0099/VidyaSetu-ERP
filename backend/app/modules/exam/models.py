@@ -18,6 +18,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database.base import BaseModel
+from app.modules.student.models import Student  # noqa: F401
 
 
 class ExamType(BaseModel):

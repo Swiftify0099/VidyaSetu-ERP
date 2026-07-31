@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, Fragment } from 'react';
 import {
   CalendarDays, Plus, RefreshCw, Check, X, BookOpen,
   Clock, Pencil, Trash2, LayoutGrid, User, Tag,
@@ -249,7 +249,7 @@ export default function TimetablePage() {
 
                 {/* Data rows */}
                 {timetable.days.map(day => (
-                  <>
+                  <Fragment key={`day-row-${day.day_number}`}>
                     <div key={`d${day.day_number}`} className={styles.ttDayCell}>{day.day_name}</div>
                     {day.periods.map(cell => {
                       const isBreak = cell.period_type !== 'class';
@@ -275,7 +275,7 @@ export default function TimetablePage() {
                         </div>
                       );
                     })}
-                  </>
+                  </Fragment>
                 ))}
               </div>
 

@@ -13,9 +13,10 @@ from pydantic import BaseModel, field_validator, model_validator
 class StudentCreateRequest(BaseModel):
     """Create a new student record."""
     # Name
-    first_name: str
+    first_name: Optional[str] = None
     middle_name: Optional[str] = None
-    last_name: str
+    last_name: Optional[str] = None
+    full_name: Optional[str] = None
     full_name_marathi: Optional[str] = None
     mother_name: Optional[str] = None
 
@@ -29,6 +30,7 @@ class StudentCreateRequest(BaseModel):
 
     # Personal
     dob: Optional[date] = None
+    date_of_birth: Optional[date] = None
     dob_in_words: Optional[str] = None
     place_of_birth: Optional[str] = None
     gender: Optional[str] = None
@@ -62,9 +64,11 @@ class StudentCreateRequest(BaseModel):
     email: Optional[str] = None
 
     # Address
+    address: Optional[str] = None
     address_line1: Optional[str] = None
     address_line2: Optional[str] = None
     village: Optional[str] = None
+    city: Optional[str] = None
     taluka: Optional[str] = None
     district: Optional[str] = None
     state: str = "Maharashtra"
@@ -79,19 +83,65 @@ class StudentCreateRequest(BaseModel):
     pen_number: Optional[str] = None
     apaar_id: Optional[str] = None
 
-    # Medical
+    # Medical & Preferences
     medical_conditions: Optional[str] = None
     disability: Optional[str] = None
     is_differently_abled: bool = False
     uses_transport: bool = False
+    transport_required: Optional[bool] = None
+    hostel_required: Optional[bool] = None
+    transfer_certificate_no: Optional[str] = None
+    house: Optional[str] = None
 
     @field_validator("standard")
     @classmethod
     def validate_standard(cls, v: str) -> str:
         valid = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12"]
-        if v not in valid:
+        v_str = str(v)
+        if v_str not in valid:
             raise ValueError(f"Standard must be one of: {', '.join(valid)}")
-        return v
+        return v_str
+
+    @model_validator(mode="after")
+    def populate_aliases_and_names(self):
+        # 1. Alias date_of_birth -> dob
+        if not self.dob and self.date_of_birth:
+            self.dob = self.date_of_birth
+
+        # 2. Alias address -> address_line1
+        if not self.address_line1 and self.address:
+            self.address_line1 = self.address
+
+        # 3. Alias city -> village
+        if not self.village and self.city:
+            self.village = self.city
+
+        # 4. Alias transport_required -> uses_transport
+        if self.transport_required is not None:
+            self.uses_transport = self.transport_required
+
+        # 5. Populate first_name, middle_name, last_name if missing but full_name available
+        if not self.first_name:
+            if self.full_name:
+                parts = [p for p in self.full_name.strip().split() if p]
+                if len(parts) == 1:
+                    self.first_name = parts[0]
+                    self.last_name = self.last_name or "."
+                elif len(parts) == 2:
+                    self.first_name = parts[0]
+                    self.last_name = parts[1]
+                elif len(parts) >= 3:
+                    self.first_name = parts[0]
+                    if not self.middle_name:
+                        self.middle_name = " ".join(parts[1:-1])
+                    self.last_name = parts[-1]
+            else:
+                self.first_name = "Student"
+
+        if not self.last_name:
+            self.last_name = "."
+
+        return self
 
 
 class StudentUpdateRequest(BaseModel):

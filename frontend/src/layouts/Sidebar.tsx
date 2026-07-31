@@ -6,7 +6,7 @@ import {
   Package, Library, FileText, Building2, Bell,
   BarChart3, Settings, Shield, ChevronDown, ChevronRight,
   LogOut, Menu, X, CalendarDays, ClipboardList, Palmtree, NotebookPen, ScanLine, ShieldAlert,
-  Video, Bot, QrCode, Ticket, Award, Download, CreditCard, HelpCircle, UserCheck, CheckSquare, Sparkles, FolderOpen,
+  Video, Bot, QrCode, Ticket, Award, Download, CreditCard, HelpCircle, UserCheck, CheckSquare, Sparkles, FolderOpen, MessageSquare,
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import styles from './Sidebar.module.css';
@@ -23,9 +23,13 @@ interface NavItem {
 export default function Sidebar({
   collapsed,
   onToggle,
+  mobileOpen = false,
+  onCloseMobile,
 }: {
   collapsed: boolean;
   onToggle: () => void;
+  mobileOpen?: boolean;
+  onCloseMobile?: () => void;
 }) {
   const { t } = useTranslation();
   const { hasPermission, hasRole, isSuperAdmin, user, logout } = useAuth();
@@ -48,53 +52,62 @@ export default function Sidebar({
     return location.pathname === pathname && location.search === '?' + search;
   }, [location.pathname, location.search]);
 
-  const isStudent = hasRole('student') && !isSuperAdmin() && !hasRole('admin') && !hasRole('teacher') && !hasRole('clerk');
-  const isTeacher = (hasRole('teacher') || hasRole('class_teacher')) && !isSuperAdmin() && !hasRole('admin') && !hasRole('principal');
-  const isParent  = hasRole('parent') && !isSuperAdmin() && !hasRole('admin') && !hasRole('teacher');
+  const primaryRole = user?.roles?.[0]?.code;
+
+  const isStudent = primaryRole === 'student' || (hasRole('student') && !isSuperAdmin() && !hasRole('admin') && !hasRole('teacher') && !hasRole('clerk'));
+  const isTeacher = (primaryRole === 'teacher' || primaryRole === 'class_teacher') || ((hasRole('teacher') || hasRole('class_teacher')) && !isSuperAdmin() && !hasRole('admin') && !hasRole('principal'));
+  const isParent  = primaryRole === 'parent' || (hasRole('parent') && !isSuperAdmin() && !hasRole('admin') && !hasRole('teacher'));
 
   const studentNavItems: NavItem[] = [
-    { label: 'Dashboard', icon: <LayoutDashboard size={18} />, path: '/student-portal?tab=dashboard' },
-    { label: 'My Profile', icon: <Users size={18} />, path: '/student-portal?tab=profile' },
-    { label: 'Attendance', icon: <CalendarDays size={18} />, path: '/student-portal?tab=attendance' },
-    { label: 'Homework', icon: <BookOpen size={18} />, path: '/student-portal?tab=homework' },
-    { label: 'Assignments', icon: <ClipboardList size={18} />, path: '/student-portal?tab=assignments' },
-    { label: 'Notes & Study', icon: <FolderOpen size={18} />, path: '/student-portal?tab=study_materials' },
-    { label: 'Video Lectures', icon: <Video size={18} />, path: '/student-portal?tab=videos' },
-    { label: 'AI Tutor', icon: <Bot size={18} />, path: '/student-portal?tab=aichat' },
-    { label: 'QR Scanner', icon: <QrCode size={18} />, path: '/student-portal?tab=qr_learning' },
-    { label: 'Timetable', icon: <CalendarDays size={18} />, path: '/student-portal?tab=timetable' },
-    { label: 'Hall Ticket', icon: <Ticket size={18} />, path: '/student-portal?tab=examination' },
-    { label: 'Results', icon: <BarChart3 size={18} />, path: '/student-portal?tab=results' },
-    { label: 'Certificates', icon: <Award size={18} />, path: '/student-portal?tab=certificates' },
-    { label: 'Library', icon: <Library size={18} />, path: '/student-portal?tab=library' },
-    { label: 'Fees', icon: <CreditCard size={18} />, path: '/student-portal?tab=fees' },
-    { label: 'Leave Request', icon: <Palmtree size={18} />, path: '/student-portal?tab=leave' },
-    { label: 'Portfolio', icon: <Award size={18} />, path: '/student-portal?tab=portfolio' },
-    { label: 'Doubt & Notice', icon: <HelpCircle size={18} />, path: '/student-portal?tab=communication' },
-    { label: 'Downloads', icon: <Download size={18} />, path: '/student-portal?tab=downloads' },
-    { label: 'Analytics', icon: <BarChart3 size={18} />, path: '/student-portal?tab=analytics' },
-    { label: 'Digital ID Card', icon: <UserCheck size={18} />, path: '/student-portal?tab=idcard' },
-    { label: 'Settings', icon: <Settings size={18} />, path: '/student-portal?tab=settings' },
+    { label: t('nav.dashboard'), icon: <LayoutDashboard size={18} />, path: '/student-portal?tab=dashboard' },
+    { label: t('nav.attendance'), icon: <CalendarDays size={18} />, path: '/student-portal?tab=attendance' },
+    { label: t('nav.homework'), icon: <BookOpen size={18} />, path: '/student-portal?tab=homework' },
+    { label: t('nav.assignments'), icon: <ClipboardList size={18} />, path: '/student-portal?tab=assignments' },
+    { label: t('nav.notes_study'), icon: <FolderOpen size={18} />, path: '/student-portal?tab=study_materials' },
+    { label: t('nav.video_lectures'), icon: <Video size={18} />, path: '/student-portal?tab=videos' },
+    { label: t('nav.ai_tutor'), icon: <Bot size={18} />, path: '/student-portal?tab=aichat' },
+    { label: t('nav.qr_scanner'), icon: <QrCode size={18} />, path: '/student-portal?tab=qr_learning' },
+    { label: t('nav.timetable'), icon: <CalendarDays size={18} />, path: '/student-portal?tab=timetable' },
+    { label: t('nav.hall_ticket'), icon: <Ticket size={18} />, path: '/student-portal?tab=examination' },
+    { label: t('nav.results'), icon: <BarChart3 size={18} />, path: '/student-portal?tab=results' },
+    { label: t('nav.certificates'), icon: <Award size={18} />, path: '/student-portal?tab=certificates' },
+    { label: t('nav.library'), icon: <Library size={18} />, path: '/student-portal?tab=library' },
+    { label: t('nav.fees'), icon: <CreditCard size={18} />, path: '/student-portal?tab=fees' },
+    { label: t('nav.leave'), icon: <Palmtree size={18} />, path: '/student-portal?tab=leave' },
+    { label: t('nav.portfolio'), icon: <Award size={18} />, path: '/student-portal?tab=portfolio' },
+    { label: t('nav.notice_doubts'), icon: <HelpCircle size={18} />, path: '/student-portal?tab=communication' },
+    { label: t('nav.downloads'), icon: <Download size={18} />, path: '/student-portal?tab=downloads' },
+    { label: t('nav.analytics'), icon: <BarChart3 size={18} />, path: '/student-portal?tab=analytics' },
+    { label: t('nav.digital_id'), icon: <UserCheck size={18} />, path: '/student-portal?tab=idcard' },
+    { label: t('nav.settings'), icon: <Settings size={18} />, path: '/student-portal?tab=settings' },
   ];
 
   const teacherNavItems: NavItem[] = [
-    { label: 'Teacher Dashboard', icon: <LayoutDashboard size={18} />, path: '/teacher-portal?tab=dashboard' },
-    { label: 'Mark Attendance', icon: <ClipboardList size={18} />, path: '/teacher-portal?tab=attendance' },
-    { label: 'My Timetable', icon: <CalendarDays size={18} />, path: '/teacher-portal?tab=timetable' },
-    { label: 'Class Students', icon: <Users size={18} />, path: '/teacher-portal?tab=students' },
-    { label: 'Lesson Plans', icon: <NotebookPen size={18} />, path: '/lesson-plans' },
-    { label: 'Behaviour Log', icon: <ShieldAlert size={18} />, path: '/behaviour' },
-    { label: 'Apply Leave', icon: <Palmtree size={18} />, path: '/teacher-portal?tab=leaves' },
-    { label: 'Notice Board', icon: <Bell size={18} />, path: '/teacher-portal?tab=notices' },
-    { label: 'AI Studio', icon: <Bot size={18} />, path: '/ai-hub' },
-    { label: 'Teacher Profile', icon: <UserCheck size={18} />, path: '/teacher-portal?tab=profile' },
+    { label: t('nav.teacher_dashboard'), icon: <LayoutDashboard size={18} />, path: '/teacher-portal?tab=dashboard' },
+    { label: t('nav.mark_attendance'), icon: <ClipboardList size={18} />, path: '/teacher-portal?tab=attendance' },
+    { label: t('nav.my_timetable'), icon: <CalendarDays size={18} />, path: '/teacher-portal?tab=timetable' },
+    { label: t('nav.class_students'), icon: <Users size={18} />, path: '/teacher-portal?tab=students' },
+    { label: t('nav.homework'), icon: <BookOpen size={18} />, path: '/teacher-portal?tab=homework' },
+    { label: t('nav.study_materials'), icon: <FolderOpen size={18} />, path: '/teacher-portal?tab=materials' },
+    { label: t('nav.video_lectures'), icon: <Video size={18} />, path: '/teacher-portal?tab=videos' },
+    { label: t('nav.marks_entry'), icon: <CheckSquare size={18} />, path: '/teacher-portal?tab=marks' },
+    { label: t('nav.lesson_plans'), icon: <NotebookPen size={18} />, path: '/lesson-plans' },
+    { label: t('nav.behaviour_log'), icon: <ShieldAlert size={18} />, path: '/behaviour' },
+    { label: t('nav.leave'), icon: <Palmtree size={18} />, path: '/teacher-portal?tab=leaves' },
+    { label: t('nav.notice_board'), icon: <Bell size={18} />, path: '/teacher-portal?tab=notices' },
+    { label: t('nav.ai_hub'), icon: <Bot size={18} />, path: '/ai-hub' },
+    { label: t('nav.teacher_profile'), icon: <UserCheck size={18} />, path: '/teacher-portal?tab=profile' },
   ];
 
   const parentNavItems: NavItem[] = [
-    { label: 'My Children', icon: <Users size={18} />, path: '/parent-portal?tab=children' },
-    { label: 'Attendance Calendar', icon: <CalendarDays size={18} />, path: '/parent-portal?tab=attendance' },
-    { label: 'Class Timetable', icon: <CalendarDays size={18} />, path: '/parent-portal?tab=timetable' },
-    { label: 'School Notices', icon: <Bell size={18} />, path: '/parent-portal?tab=notices' },
+    { label: t('nav.my_children'), icon: <Users size={18} />, path: '/parent-portal?tab=children' },
+    { label: t('nav.attendance_calendar'), icon: <CalendarDays size={18} />, path: '/parent-portal?tab=attendance' },
+    { label: t('nav.class_timetable'), icon: <CalendarDays size={18} />, path: '/parent-portal?tab=timetable' },
+    { label: t('nav.fee_status'), icon: <CreditCard size={18} />, path: '/parent-portal?tab=fees' },
+    { label: t('nav.exam_results'), icon: <BarChart3 size={18} />, path: '/parent-portal?tab=results' },
+    { label: t('nav.certificates'), icon: <Award size={18} />, path: '/parent-portal?tab=certificates' },
+    { label: t('nav.health_profile'), icon: <UserCheck size={18} />, path: '/parent-portal?tab=health' },
+    { label: t('nav.school_notices'), icon: <Bell size={18} />, path: '/parent-portal?tab=notices' },
   ];
 
   const staffNavItems: NavItem[] = [
@@ -104,18 +117,13 @@ export default function Sidebar({
       path: '/dashboard',
     },
     {
-      label: 'Student Workspace',
-      icon: <GraduationCap size={18} />,
-      path: '/student-portal',
-    },
-    {
       label: t('nav.students'),
       icon: <GraduationCap size={18} />,
       permission: 'student.read',
       children: [
-        { label: 'All Students', icon: <Users size={16} />, path: '/students', permission: 'student.read' },
-        { label: 'Add Student', icon: <Users size={16} />, path: '/students/add', permission: 'student.create' },
-        { label: 'Attendance', icon: <FileText size={16} />, path: '/students/attendance', permission: 'student.read' },
+        { label: t('nav.all_students'), icon: <Users size={16} />, path: '/students', permission: 'student.read' },
+        { label: t('nav.add_student'), icon: <Users size={16} />, path: '/students/add', permission: 'student.create' },
+        { label: t('nav.attendance'), icon: <FileText size={16} />, path: '/students/attendance', permission: 'student.read' },
       ],
     },
     {
@@ -123,8 +131,9 @@ export default function Sidebar({
       icon: <Users size={18} />,
       permission: 'teacher.read',
       children: [
-        { label: 'All Teachers', icon: <Users size={16} />, path: '/teachers', permission: 'teacher.read' },
-        { label: 'Add Teacher', icon: <Users size={16} />, path: '/teachers/add', permission: 'teacher.create' },
+        { label: t('nav.all_teachers'), icon: <Users size={16} />, path: '/teachers', permission: 'teacher.read' },
+        { label: t('nav.add_teacher'), icon: <Users size={16} />, path: '/teachers/add', permission: 'teacher.create' },
+        { label: t('nav.teacher_workspace'), icon: <UserCheck size={16} />, path: '/teacher-portal', permission: 'teacher.read' },
       ],
     },
     {
@@ -132,9 +141,9 @@ export default function Sidebar({
       icon: <FileText size={18} />,
       permission: 'admission.read',
       children: [
-        { label: 'New Admission', icon: <FileText size={16} />, path: '/admission/new', permission: 'admission.create' },
-        { label: 'GR Register', icon: <BookOpen size={16} />, path: '/admission/gr', permission: 'clerk.read' },
-        { label: 'Promotions', icon: <GraduationCap size={16} />, path: '/admission/promotions', permission: 'clerk.update' },
+        { label: t('nav.new_admission'), icon: <FileText size={16} />, path: '/admission/new', permission: 'admission.create' },
+        { label: t('nav.gr_register'),   icon: <BookOpen size={16} />, path: '/admission/gr',  permission: 'clerk.read' },
+        { label: t('nav.promotions'),    icon: <GraduationCap size={16} />, path: '/admission/promotions', permission: 'clerk.update' },
       ],
     },
     {
@@ -144,48 +153,48 @@ export default function Sidebar({
       path: '/finance',
     },
     {
-      label: 'Attendance',
+      label: t('nav.attendance'),
       icon: <ClipboardList size={18} />,
       permission: 'attendance.read',
       path: '/attendance',
     },
     {
-      label: 'Timetable',
+      label: t('nav.timetable'),
       icon: <CalendarDays size={18} />,
       permission: 'timetable.read',
       path: '/timetable',
     },
     {
-      label: 'Leave',
+      label: t('nav.leave'),
       icon: <Palmtree size={18} />,
       permission: 'leave.read',
       path: '/leave',
     },
     {
-      label: 'Lesson Plans',
+      label: t('nav.lesson_plans'),
       icon: <NotebookPen size={18} />,
       permission: 'lesson_plan.read',
       path: '/lesson-plans',
     },
     {
-      label: 'Behaviour Log',
+      label: t('nav.behaviour_log'),
       icon: <ShieldAlert size={18} />,
       permission: 'behaviour.read',
       path: '/behaviour',
     },
     {
-      label: 'QR Scan Center',
+      label: t('nav.qr_center'),
       icon: <ScanLine size={18} />,
       permission: 'qr.read',
       path: '/qr-center',
     },
     {
-      label: 'AI Studio & Bot',
+      label: t('nav.ai_hub'),
       icon: <NotebookPen size={18} />,
       path: '/ai-hub',
     },
     {
-      label: 'Examinations',
+      label: t('nav.exams'),
       icon: <ClipboardList size={18} />,
       permission: 'examination.read',
       path: '/exams',
@@ -197,7 +206,7 @@ export default function Sidebar({
       path: '/library',
     },
     {
-      label: 'Inventory',
+      label: t('nav.inventory'),
       icon: <Package size={18} />,
       permission: 'inventory.read',
       path: '/inventory',
@@ -209,7 +218,7 @@ export default function Sidebar({
       path: '/office',
     },
     {
-      label: 'Communication',
+      label: t('nav.communication'),
       icon: <Bell size={18} />,
       permission: 'communication.read',
       path: '/communication',
@@ -225,11 +234,11 @@ export default function Sidebar({
       icon: <Shield size={18} />,
       role: 'super_admin',
       children: [
-        { label: 'Users',           icon: <Users size={16} />,    path: '/admin/users',       permission: 'admin.manage_users' },
-        { label: 'Roles',           icon: <Shield size={16} />,   path: '/admin/roles',       permission: 'admin.manage_users' },
-        { label: 'Permissions',     icon: <Shield size={16} />,   path: '/admin/permissions', permission: 'admin.manage_users' },
-        { label: 'System Settings', icon: <Settings size={16} />, path: '/admin/settings',    permission: 'admin.manage_settings' },
-        { label: 'Audit Logs',      icon: <FileText size={16} />, path: '/admin/audit',       permission: 'admin.read' },
+        { label: t('nav.users'),           icon: <Users size={16} />,    path: '/admin/users',       permission: 'admin.manage_users' },
+        { label: t('nav.roles'),           icon: <Shield size={16} />,   path: '/admin/roles',       permission: 'admin.manage_users' },
+        { label: t('nav.permissions'),     icon: <Shield size={16} />,   path: '/admin/permissions', permission: 'admin.manage_users' },
+        { label: t('nav.audit_logs'),      icon: <FileText size={16} />, path: '/admin/audit',       permission: 'admin.read' },
+        { label: t('nav.system_settings'), icon: <Settings size={16} />, path: '/settings',          permission: 'admin.manage_settings' },
       ],
     },
     {
@@ -266,7 +275,7 @@ export default function Sidebar({
     navItems.find(n => n.label === label)?.children?.some(c => c.path && location.pathname.startsWith(c.path));
 
   return (
-    <aside className={`${styles.sidebar} ${collapsed ? styles.collapsed : ''}`}>
+    <aside className={`${styles.sidebar} ${collapsed ? styles.collapsed : ''} ${mobileOpen ? styles.mobileOpen : ''}`}>
       {/* Header */}
       <div className={styles.header}>
         {!collapsed && (
@@ -285,23 +294,8 @@ export default function Sidebar({
         </button>
       </div>
 
-      {/* User Info */}
-      {!collapsed && user && (
-        <div className={styles.userInfo}>
-          <div className={styles.userAvatar}>
-            {user.photo_path
-              ? <img src={`${import.meta.env.VITE_STORAGE_URL}/${user.photo_path}`} alt={user.full_name} />
-              : <span>{user.full_name.charAt(0).toUpperCase()}</span>
-            }
-          </div>
-          <div className={styles.userMeta}>
-            <span className={styles.userName}>{user.full_name}</span>
-            <span className={styles.userRole}>
-              {user.roles[0]?.name || 'User'}
-            </span>
-          </div>
-        </div>
-      )}
+      {/* Navigation */}
+
 
       {/* Navigation */}
       <nav className={styles.nav}>

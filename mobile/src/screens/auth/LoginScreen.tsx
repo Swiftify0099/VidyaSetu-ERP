@@ -1,289 +1,368 @@
 /**
- * VidyaSetu Mobile — Login Screen
- * Professional school ERP login with bilingual support.
+ * EduShakti One ERP — Premium Login Screen
+ * ==========================================
+ * Glassmorphism card, animated floating orbs, floating label inputs,
+ * staggered entry animations, bilingual support (Marathi / English).
  */
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
-  View, Text, TextInput, TouchableOpacity, StyleSheet,
-  KeyboardAvoidingView, Platform, ScrollView, ActivityIndicator,
-  Alert, StatusBar, Dimensions,
+  View, Text, TouchableOpacity, StyleSheet,
+  KeyboardAvoidingView, Platform, ScrollView,
+  Alert, StatusBar, Dimensions, Animated,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
+import Icon from 'react-native-vector-icons/FontAwesome5';
 import { useAuthStore } from '../../store/authStore';
+import { useTheme } from '../../theme/ThemeContext';
+import PremiumInput from '../../components/ui/PremiumInput';
+import PremiumButton from '../../components/ui/PremiumButton';
+import { spacing, radius, typography, shadows } from '../../theme';
 
 const { width, height } = Dimensions.get('window');
 
-const COLORS = {
-  primary: '#4f46e5',
-  primaryDark: '#4338ca',
-  secondary: '#818cf8',
-  background: '#f5f5f5',
-  surface: '#ffffff',
-  text: '#111827',
-  textSecondary: '#6b7280',
-  error: '#ef4444',
-  border: '#d1d5db',
-  inputBg: '#f9fafb',
-};
+// ─────────────────────────────────────────────────────────────────────────────
+// Floating Orb — decorative background element
+// ─────────────────────────────────────────────────────────────────────────────
+function FloatingOrb({ size, top, left, color, delay }: {
+  size: number; top: number; left: number; color: string; delay: number;
+}) {
+  const anim = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(anim, { toValue: 1, duration: 3000 + delay, useNativeDriver: true }),
+        Animated.timing(anim, { toValue: 0, duration: 3000 + delay, useNativeDriver: true }),
+      ])
+    ).start();
+  }, []);
 
+  const translateY = anim.interpolate({ inputRange: [0, 1], outputRange: [0, -18] });
+  const scale = anim.interpolate({ inputRange: [0, 0.5, 1], outputRange: [1, 1.08, 1] });
+
+  return (
+    <Animated.View style={{
+      position: 'absolute',
+      top, left,
+      width: size, height: size,
+      borderRadius: size / 2,
+      backgroundColor: color,
+      opacity: 0.25,
+      transform: [{ translateY }, { scale }],
+    }} />
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Main Component
+// ─────────────────────────────────────────────────────────────────────────────
 export default function LoginScreen() {
   const { login, isLoading, error, clearError } = useAuthStore();
+  const { colors, isDark } = useTheme();
+
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
+  const [usernameError, setUsernameError] = useState('');
+  const [passwordError, setPasswordError] = useState('');
   const [lang, setLang] = useState<'mr' | 'en'>('mr');
+
+  // Entry animations
+  const headerAnim  = useRef(new Animated.Value(0)).current;
+  const cardAnim    = useRef(new Animated.Value(0)).current;
+  const cardSlide   = useRef(new Animated.Value(40)).current;
+  const footerAnim  = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.stagger(120, [
+      Animated.timing(headerAnim, { toValue: 1, duration: 500, useNativeDriver: true }),
+      Animated.parallel([
+        Animated.timing(cardAnim,  { toValue: 1, duration: 500, useNativeDriver: true }),
+        Animated.spring(cardSlide, { toValue: 0, friction: 7, tension: 60, useNativeDriver: true }),
+      ]),
+      Animated.timing(footerAnim, { toValue: 1, duration: 400, useNativeDriver: true }),
+    ]).start();
+  }, []);
 
   useEffect(() => {
     if (error) {
       Alert.alert(
-        lang === 'mr' ? 'त्रुटी' : 'Error',
+        T.errorTitle,
         error,
         [{ text: 'OK', onPress: clearError }]
       );
     }
   }, [error]);
 
+  const T = {
+    appName:    lang === 'mr' ? 'EduShakti One' : 'EduShakti One',
+    subtitle:   lang === 'mr' ? 'एंटरप्राइझ ERP प्लॅटफॉर्म' : 'Enterprise ERP Platform',
+    welcome:    lang === 'mr' ? 'स्वागत आहे' : 'Welcome back',
+    signIn:     lang === 'mr' ? 'साइन इन करा' : 'Sign In',
+    username:   lang === 'mr' ? 'युजरनेम / मोबाईल' : 'Username / Mobile',
+    password:   lang === 'mr' ? 'पासवर्ड' : 'Password',
+    loginBtn:   lang === 'mr' ? 'लॉगिन करा' : 'Login',
+    forgotPass: lang === 'mr' ? 'पासवर्ड विसरलात?' : 'Forgot password?',
+    poweredBy:  lang === 'mr' ? 'द्वारे संचालित EduShakti v1.0' : 'Powered by EduShakti v1.0',
+    errorTitle: lang === 'mr' ? 'त्रुटी' : 'Login Failed',
+    required:   lang === 'mr' ? 'हे क्षेत्र आवश्यक आहे' : 'This field is required',
+  };
+
+  const validate = () => {
+    let valid = true;
+    setUsernameError('');
+    setPasswordError('');
+    if (!username.trim()) { setUsernameError(T.required); valid = false; }
+    if (!password.trim()) { setPasswordError(T.required); valid = false; }
+    return valid;
+  };
+
   const handleLogin = () => {
-    if (!username.trim() || !password.trim()) {
-      Alert.alert(
-        lang === 'mr' ? 'माहिती भरा' : 'Required',
-        lang === 'mr' ? 'कृपया युजरनेम आणि पासवर्ड भरा' : 'Please enter username and password'
-      );
-      return;
-    }
+    if (!validate()) return;
     login(username.trim(), password);
   };
 
-  const T = {
-    title:    lang === 'mr' ? 'विद्यासेतु ERP' : 'VidyaSetu ERP',
-    subtitle: lang === 'mr' ? 'शाळा व्यवस्थापन प्रणाली' : 'School Management System',
-    username: lang === 'mr' ? 'युजरनेम / मोबाईल' : 'Username / Mobile',
-    password: lang === 'mr' ? 'पासवर्ड' : 'Password',
-    loginBtn: lang === 'mr' ? 'लॉगिन करा' : 'Login',
-    poweredBy: lang === 'mr' ? 'द्वारे संचालित' : 'Powered by',
-  };
+  const gradientColors = isDark
+    ? ['#1e1b4b', '#312e81', '#4338ca']
+    : ['#4338ca', '#4f46e5', '#6366f1'];
 
   return (
     <KeyboardAvoidingView
-      style={styles.container}
+      style={[styles.root, { backgroundColor: colors.background }]}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-      <StatusBar barStyle="light-content" backgroundColor={COLORS.primary} />
+      <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
 
-      {/* Gradient Header */}
-      <LinearGradient
-        colors={[COLORS.primary, COLORS.primaryDark, '#312e81']}
-        style={styles.header}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-      >
-        {/* Language Toggle */}
-        <TouchableOpacity
-          style={styles.langBtn}
-          onPress={() => setLang(l => l === 'mr' ? 'en' : 'mr')}
-        >
-          <Text style={styles.langBtnText}>{lang === 'mr' ? 'EN' : 'मर'}</Text>
-        </TouchableOpacity>
+      {/* ── Gradient Hero ─────────────────────────────────────────── */}
+      <Animated.View style={[styles.heroWrap, { opacity: headerAnim }]}>
+        <LinearGradient colors={gradientColors} style={styles.hero} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
+          {/* Floating orbs */}
+          <FloatingOrb size={180} top={-60}  left={-60}  color="#818cf8" delay={0}    />
+          <FloatingOrb size={120} top={40}   left={width - 80} color="#a5b4fc" delay={800} />
+          <FloatingOrb size={80}  top={100}  left={60}   color="#c7d2fe" delay={400} />
 
-        {/* Logo Area */}
-        <View style={styles.logoArea}>
-          <View style={styles.logoCircle}>
-            <Text style={styles.logoText}>VS</Text>
+          {/* Language Toggle */}
+          <TouchableOpacity
+            style={[styles.langToggle, { backgroundColor: 'rgba(255,255,255,0.18)' }]}
+            onPress={() => setLang(l => l === 'mr' ? 'en' : 'mr')}
+            activeOpacity={0.75}
+          >
+            <Icon name="globe" size={12} color="#fff" solid />
+            <Text style={styles.langText}>{lang === 'mr' ? 'EN' : 'मर'}</Text>
+          </TouchableOpacity>
+
+          {/* Logo + Title */}
+          <View style={styles.heroContent}>
+            <View style={styles.logoWrap}>
+              <Text style={styles.logoText}>ES</Text>
+            </View>
+            <Text style={styles.appName}>{T.appName}</Text>
+            <Text style={styles.appSubtitle}>{T.subtitle}</Text>
           </View>
-          <Text style={styles.headerTitle}>{T.title}</Text>
-          <Text style={styles.headerSubtitle}>{T.subtitle}</Text>
-        </View>
-      </LinearGradient>
+        </LinearGradient>
+      </Animated.View>
 
-      {/* Login Card */}
+      {/* ── Login Card ─────────────────────────────────────────────── */}
       <ScrollView
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={styles.scroll}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        <View style={styles.card}>
-          {/* Username */}
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>{T.username}</Text>
-            <View style={styles.inputWrap}>
-              <Text style={styles.inputIcon}>👤</Text>
-              <TextInput
-                style={styles.input}
-                value={username}
-                onChangeText={setUsername}
-                placeholder={lang === 'mr' ? 'आपला युजरनेम टाका' : 'Enter your username'}
-                placeholderTextColor={COLORS.textSecondary}
-                autoCapitalize="none"
-                autoCorrect={false}
-                keyboardType="default"
-                returnKeyType="next"
-              />
-            </View>
+        <Animated.View
+          style={[
+            styles.card,
+            {
+              backgroundColor: colors.surface,
+              ...shadows.xl,
+              opacity: cardAnim,
+              transform: [{ translateY: cardSlide }],
+            },
+          ]}
+        >
+          {/* Card Header */}
+          <View style={styles.cardHeader}>
+            <Text style={[styles.welcomeText, { color: colors.textSecondary }]}>{T.welcome}</Text>
+            <Text style={[styles.signInText, { color: colors.text }]}>{T.signIn}</Text>
+            <View style={[styles.dividerAccent, { backgroundColor: colors.primary }]} />
           </View>
 
-          {/* Password */}
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>{T.password}</Text>
-            <View style={styles.inputWrap}>
-              <Text style={styles.inputIcon}>🔒</Text>
-              <TextInput
-                style={[styles.input, { flex: 1 }]}
-                value={password}
-                onChangeText={setPassword}
-                placeholder={lang === 'mr' ? 'पासवर्ड टाका' : 'Enter password'}
-                placeholderTextColor={COLORS.textSecondary}
-                secureTextEntry={!showPassword}
-                returnKeyType="done"
-                onSubmitEditing={handleLogin}
-              />
-              <TouchableOpacity
-                onPress={() => setShowPassword(v => !v)}
-                style={styles.eyeBtn}
-              >
-                <Text>{showPassword ? '🙈' : '👁️'}</Text>
-              </TouchableOpacity>
-            </View>
+          {/* Form */}
+          <View style={styles.form}>
+            <PremiumInput
+              label={T.username}
+              value={username}
+              onChangeText={t => { setUsername(t); setUsernameError(''); }}
+              icon="user"
+              error={usernameError}
+              autoCapitalize="none"
+              autoCorrect={false}
+              returnKeyType="next"
+            />
+            <PremiumInput
+              label={T.password}
+              value={password}
+              onChangeText={t => { setPassword(t); setPasswordError(''); }}
+              icon="lock"
+              error={passwordError}
+              secureEntry
+              returnKeyType="done"
+              onSubmitEditing={handleLogin}
+            />
           </View>
 
-          {/* Login Button */}
-          <TouchableOpacity
-            style={[styles.loginBtn, isLoading && styles.loginBtnDisabled]}
-            onPress={handleLogin}
-            disabled={isLoading}
-            activeOpacity={0.85}
-          >
-            <LinearGradient
-              colors={[COLORS.primary, COLORS.primaryDark]}
-              style={styles.loginBtnGradient}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-            >
-              {isLoading ? (
-                <ActivityIndicator color="#fff" size="small" />
-              ) : (
-                <Text style={styles.loginBtnText}>{T.loginBtn}</Text>
-              )}
-            </LinearGradient>
+          {/* Forgot Password */}
+          <TouchableOpacity style={styles.forgotBtn} activeOpacity={0.7}>
+            <Text style={[styles.forgotText, { color: colors.primary }]}>{T.forgotPass}</Text>
           </TouchableOpacity>
 
-          {/* Demo credentials */}
+          {/* Login Button */}
+          <PremiumButton
+            label={isLoading ? '' : T.loginBtn}
+            onPress={handleLogin}
+            loading={isLoading}
+            variant="primary"
+            size="lg"
+            iconLeft={isLoading ? undefined : 'sign-in-alt'}
+            fullWidth
+            style={{ marginTop: spacing.sm }}
+          />
+
+          {/* Dev credentials */}
           {__DEV__ && (
-            <View style={styles.devNote}>
-              <Text style={styles.devNoteText}>Dev: admin / admin123</Text>
+            <View style={[styles.devNote, { backgroundColor: colors.warningBg }]}>
+              <Icon name="code" size={11} color={colors.warning} solid />
+              <Text style={[styles.devNoteText, { color: colors.warning }]}>Dev: admin / Admin@2024!</Text>
             </View>
           )}
-        </View>
+        </Animated.View>
 
         {/* Footer */}
-        <Text style={styles.footer}>
-          {T.poweredBy} VidyaSetu ERP v1.0
-        </Text>
+        <Animated.View style={{ opacity: footerAnim }}>
+          <Text style={[styles.footer, { color: colors.textTertiary }]}>{T.poweredBy}</Text>
+        </Animated.View>
       </ScrollView>
     </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f0f0ff' },
+  root: { flex: 1 },
 
-  /* Header */
-  header: {
-    paddingTop: Platform.OS === 'ios' ? 50 : 30,
-    paddingBottom: 50,
-    paddingHorizontal: 24,
-    borderBottomLeftRadius: 32,
-    borderBottomRightRadius: 32,
+  /* Hero */
+  heroWrap: {},
+  hero: {
+    paddingTop: Platform.OS === 'ios' ? 56 : 40,
+    paddingBottom: 56,
+    paddingHorizontal: spacing.xl,
+    overflow: 'hidden',
   },
-  langBtn: {
+  langToggle: {
     alignSelf: 'flex-end',
-    backgroundColor: 'rgba(255,255,255,0.2)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
     paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 20,
+    paddingVertical: 5,
+    borderRadius: radius.full,
   },
-  langBtnText: { color: '#fff', fontWeight: '700', fontSize: 12 },
-  logoArea: { alignItems: 'center', marginTop: 16 },
-  logoCircle: {
-    width: 72, height: 72, borderRadius: 36,
+  langText: {
+    color: '#fff',
+    fontSize: typography.size.sm,
+    fontWeight: typography.weight.bold,
+  },
+  heroContent: {
+    alignItems: 'center',
+    marginTop: spacing.xl,
+  },
+  logoWrap: {
+    width: 80,
+    height: 80,
+    borderRadius: 22,
     backgroundColor: 'rgba(255,255,255,0.2)',
-    alignItems: 'center', justifyContent: 'center',
-    marginBottom: 12,
-    borderWidth: 2,
-    borderColor: 'rgba(255,255,255,0.4)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.35)',
+    marginBottom: spacing.base,
+    ...shadows.lg,
   },
-  logoText: { color: '#fff', fontSize: 26, fontWeight: '900' },
-  headerTitle: {
-    color: '#fff', fontSize: 26, fontWeight: '800',
-    letterSpacing: 0.5,
+  logoText: {
+    color: '#fff',
+    fontSize: typography.size['3xl'],
+    fontWeight: typography.weight.black,
+    letterSpacing: -1,
   },
-  headerSubtitle: {
-    color: 'rgba(255,255,255,0.8)', fontSize: 13,
-    marginTop: 4, fontWeight: '500',
+  appName: {
+    color: '#fff',
+    fontSize: typography.size['2xl'],
+    fontWeight: typography.weight.extrabold,
+    letterSpacing: -0.5,
+  },
+  appSubtitle: {
+    color: 'rgba(255,255,255,0.75)',
+    fontSize: typography.size.base,
+    fontWeight: typography.weight.medium,
+    marginTop: 4,
   },
 
   /* Scroll */
-  scrollContent: {
-    paddingHorizontal: 20,
-    paddingTop: 24,
-    paddingBottom: 40,
+  scroll: {
+    paddingHorizontal: spacing.base,
+    paddingTop: spacing.xl,
+    paddingBottom: spacing['3xl'],
   },
 
   /* Card */
   card: {
-    backgroundColor: '#fff',
-    borderRadius: 20,
-    padding: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 6,
+    borderRadius: radius['2xl'],
+    padding: spacing.xl,
+    marginBottom: spacing.xl,
+  },
+  cardHeader: { marginBottom: spacing.lg },
+  welcomeText: {
+    fontSize: typography.size.sm,
+    fontWeight: typography.weight.medium,
+    marginBottom: 2,
+  },
+  signInText: {
+    fontSize: typography.size['2xl'],
+    fontWeight: typography.weight.extrabold,
+    letterSpacing: -0.5,
+    marginBottom: spacing.sm,
+  },
+  dividerAccent: {
+    width: 36,
+    height: 3,
+    borderRadius: radius.full,
   },
 
   /* Form */
-  inputGroup: { marginBottom: 16 },
-  label: {
-    fontSize: 13, fontWeight: '600',
-    color: COLORS.textSecondary, marginBottom: 6,
-  },
-  inputWrap: {
-    flexDirection: 'row', alignItems: 'center',
-    backgroundColor: COLORS.inputBg,
-    borderRadius: 10,
-    borderWidth: 1.5, borderColor: COLORS.border,
-    paddingHorizontal: 12, height: 48,
-  },
-  inputIcon: { fontSize: 16, marginRight: 8 },
-  input: {
-    flex: 1, fontSize: 15,
-    color: COLORS.text, paddingVertical: 0,
-  },
-  eyeBtn: { padding: 4 },
+  form: { gap: 4 },
 
-  /* Login Button */
-  loginBtn: { marginTop: 8, borderRadius: 12, overflow: 'hidden' },
-  loginBtnDisabled: { opacity: 0.7 },
-  loginBtnGradient: {
-    height: 50, alignItems: 'center', justifyContent: 'center',
-  },
-  loginBtnText: {
-    color: '#fff', fontSize: 16,
-    fontWeight: '700', letterSpacing: 0.5,
+  /* Forgot */
+  forgotBtn: { alignSelf: 'flex-end', paddingVertical: spacing.xs, marginBottom: spacing.xs },
+  forgotText: {
+    fontSize: typography.size.sm,
+    fontWeight: typography.weight.semibold,
   },
 
   /* Dev */
   devNote: {
-    marginTop: 12, padding: 8,
-    backgroundColor: '#fef3c7', borderRadius: 6,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: spacing.md,
+    padding: spacing.sm,
+    borderRadius: radius.md,
   },
   devNoteText: {
-    fontSize: 11, color: '#92400e',
-    textAlign: 'center', fontFamily: 'monospace',
+    fontSize: typography.size.xs,
+    fontWeight: typography.weight.medium,
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
   },
 
   /* Footer */
   footer: {
-    textAlign: 'center', marginTop: 24,
-    color: COLORS.textSecondary, fontSize: 12,
+    textAlign: 'center',
+    fontSize: typography.size.xs,
+    fontWeight: typography.weight.medium,
   },
 });

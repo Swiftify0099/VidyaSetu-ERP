@@ -18,5 +18,7 @@ export { EmptyState } from './EmptyState';
 export { Pagination } from './Pagination';
 export { ExportButton } from './ExportButton';
 export { SkeletonLoader } from './SkeletonLoader';
+export { StudentIdCard } from './StudentIdCard';
+
 
 

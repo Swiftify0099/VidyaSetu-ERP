@@ -80,11 +80,11 @@ class StudentService:
     ) -> Student:
         """Create a new student and auto-assign GR number."""
         # Build full_name
-        name_parts = [data.first_name]
-        if data.middle_name:
-            name_parts.append(data.middle_name)
-        name_parts.append(data.last_name)
-        full_name = " ".join(name_parts)
+        if data.full_name and data.full_name.strip():
+            full_name = data.full_name.strip()
+        else:
+            name_parts = [p for p in [data.first_name, data.middle_name, data.last_name] if p and p != "."]
+            full_name = " ".join(name_parts) or "Student"
 
         # Generate GR number
         gr_number = GRNumberService.generate(db)
@@ -94,9 +94,9 @@ class StudentService:
             full_name=full_name,
             first_name=data.first_name,
             middle_name=data.middle_name,
-            last_name=data.last_name,
+            last_name=data.last_name if data.last_name != "." else None,
             full_name_marathi=data.full_name_marathi,
-            mother_name=data.mother_name,
+            mother_name=data.mother_name or data.mother_name_full,
             standard=data.standard,
             division=data.division,
             roll_number=data.roll_number,
@@ -365,6 +365,58 @@ class StudentService:
             "girls": girls,
             "left": total - active,
         }
+
+    @staticmethod
+    def get_admission_stats(db: Session) -> dict:
+        """Statistics specific to admission dashboard."""
+        from datetime import datetime, date
+        now = datetime.now()
+        first_of_month = date(now.year, now.month, 1)
+
+        total_this_year = db.scalar(
+            select(func.count(Student.id)).where(Student.is_deleted == False)
+        ) or 0
+        new_this_month = db.scalar(
+            select(func.count(Student.id)).where(
+                Student.is_deleted == False,
+                Student.admission_date >= first_of_month,
+            )
+        ) or 0
+        pending_gr = db.scalar(
+            select(func.count(Student.id)).where(
+                Student.is_deleted == False,
+                (Student.gr_number.is_(None)) | (Student.gr_number == ""),
+            )
+        ) or 0
+
+        return {
+            "total_admissions_this_year": total_this_year,
+            "new_this_month": new_this_month,
+            "pending_gr": pending_gr,
+            "promotions_pending": 0,
+        }
+
+    @staticmethod
+    def bulk_promote(db: Session, promotions: list[dict], to_academic_year_id: int, by: int) -> int:
+        """Promote students to next standard/academic year."""
+        count = 0
+        for item in promotions:
+            student_id = item.get("student_id")
+            result = item.get("result")
+            promoted_to = item.get("promoted_to_standard")
+            if not student_id or result != "pass":
+                continue
+            student = db.get(Student, student_id)
+            if student and not student.is_deleted:
+                if promoted_to:
+                    student.standard = str(promoted_to)
+                if to_academic_year_id:
+                    student.academic_year_id = to_academic_year_id
+                student.updated_by = by
+                count += 1
+        db.commit()
+        return count
+
 
 
 class AttendanceService:

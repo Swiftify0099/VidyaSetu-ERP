@@ -57,7 +57,8 @@ export default function RoleManagementPage() {
     setLoading(true);
     try {
       const res = await api.get('/auth/roles');
-      setRoles(res.data?.data ?? []);
+      const data = res.data?.data;
+      setRoles(Array.isArray(data) ? data : data?.roles ?? []);
     } catch { toast.error('Failed to load roles'); }
     finally { setLoading(false); }
   };
@@ -65,7 +66,12 @@ export default function RoleManagementPage() {
   const fetchPermissions = async () => {
     try {
       const res = await api.get('/auth/permissions');
-      setPermissions(res.data?.data ?? []);
+      const d = res.data?.data;
+      if (Array.isArray(d)) setPermissions(d);
+      else if (d?.by_module) {
+        const flat = Object.values(d.by_module).flat() as Permission[];
+        setPermissions(flat);
+      }
     } catch { /* ignore */ }
   };
 
@@ -73,7 +79,8 @@ export default function RoleManagementPage() {
     setSelectedRole(role);
     try {
       const res = await api.get(`/auth/roles/${role.id}/permissions`);
-      setRolePerms((res.data?.data ?? []).map((p: Permission) => p.code));
+      const list = res.data?.data?.permissions ?? res.data?.data ?? [];
+      setRolePerms(list.map((p: any) => (typeof p === 'string' ? p : p.code)));
     } catch { setRolePerms([]); }
     setShowPermModal(true);
   };
@@ -91,6 +98,7 @@ export default function RoleManagementPage() {
       await api.put(`/auth/roles/${selectedRole.id}/permissions`, { permission_codes: rolePerms });
       toast.success('Permissions saved!');
       setShowPermModal(false);
+      fetchRoles();
     } catch { toast.error('Failed to save permissions'); }
     finally { setSavingPerms(false); }
   };

@@ -34,12 +34,27 @@ export interface CommLog {
   channel: string;
   recipient_type: string;
   recipient_id?: number;
+  recipient_name?: string;
   recipient_phone?: string;
   subject?: string;
   message_body: string;
   status: string;
+  is_read?: boolean;
   sent_at?: string;
   error_message?: string;
+}
+
+export interface RecipientOption {
+  id: number;
+  full_name: string;
+  gr_number?: string;
+  employee_id?: string;
+  standard?: string;
+  division?: string;
+  designation?: string;
+  department?: string;
+  fcm_token?: string;
+  label: string;
 }
 
 export interface Announcement {
@@ -105,18 +120,64 @@ const communicationService = {
     const res = await api.post('/communication/templates', data);
     return res.data.data;
   },
+  async updateTemplate(id: number, data: Partial<MessageTemplate>): Promise<MessageTemplate> {
+    const res = await api.put(`/communication/templates/${id}`, data);
+    return res.data.data;
+  },
   async deleteTemplate(id: number): Promise<void> {
     await api.delete(`/communication/templates/${id}`);
   },
 
   // Send
-  async sendMessage(data: { channel: string; recipient_type: string; recipient_ids?: number[]; recipient_phones?: string[]; subject?: string; message_body: string; template_id?: number; notice_id?: number }): Promise<number> {
+  async sendMessage(data: {
+    channel: string;
+    recipient_type: string;
+    recipient_id?: number;
+    recipient_name?: string;
+    fcm_token?: string;
+    recipient_ids?: number[];
+    recipient_phones?: string[];
+    subject?: string;
+    message_body: string;
+    template_id?: number;
+    notice_id?: number;
+  }): Promise<number> {
     const res = await api.post('/communication/send', data);
     return res.data.data.sent;
   },
   async getLogs(params?: { channel?: string; status?: string; limit?: number }): Promise<CommLog[]> {
     const res = await api.get('/communication/logs', { params });
     return res.data.data;
+  },
+
+  // Target Recipients
+  async getStudentRecipients(): Promise<RecipientOption[]> {
+    const res = await api.get('/communication/recipients/students');
+    return res.data.data;
+  },
+  async getTeacherRecipients(): Promise<RecipientOption[]> {
+    const res = await api.get('/communication/recipients/teachers');
+    return res.data.data;
+  },
+  async getStaffRecipients(): Promise<RecipientOption[]> {
+    const res = await api.get('/communication/recipients/staff');
+    return res.data.data;
+  },
+  async getAllFcmTokens(): Promise<Array<{ role: string; id: number; name: string; identifier: string; fcm_token: string | null; topic: string }>> {
+    const res = await api.get('/communication/fcm-tokens');
+    return res.data.data;
+  },
+
+  // My Notifications (Navbar Center)
+  async getMyNotifications(): Promise<CommLog[]> {
+    const res = await api.get('/communication/my-notifications');
+    return res.data.data;
+  },
+  async markNotificationRead(id: number): Promise<void> {
+    await api.post(`/communication/my-notifications/${id}/read`);
+  },
+  async markAllNotificationsRead(): Promise<void> {
+    await api.post('/communication/my-notifications/read-all');
   },
 
   // Announcements
@@ -126,6 +187,10 @@ const communicationService = {
   },
   async createAnnouncement(data: Partial<Announcement>): Promise<Announcement> {
     const res = await api.post('/communication/announcements', data);
+    return res.data.data;
+  },
+  async updateAnnouncement(id: number, data: Partial<Announcement>): Promise<Announcement> {
+    const res = await api.put(`/communication/announcements/${id}`, data);
     return res.data.data;
   },
   async deleteAnnouncement(id: number): Promise<void> {

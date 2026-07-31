@@ -1,125 +1,201 @@
 /**
- * VidyaSetu Mobile — Enhanced Profile Screen (All roles)
+ * EduShakti One ERP — Premium Profile Screen
  */
-import React, { useState } from 'react';
+import React from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Switch,
+  View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Platform,
 } from 'react-native';
+import LinearGradient from 'react-native-linear-gradient';
+import Icon from 'react-native-vector-icons/FontAwesome5';
 import { useAuthStore } from '../../store/authStore';
+import { useTheme } from '../../theme/ThemeContext';
+import PremiumCard from '../../components/ui/PremiumCard';
+import Badge from '../../components/ui/Badge';
+import { spacing, radius, typography, shadows } from '../../theme';
 
-const ROLE_COLORS: Record<string, string> = {
-  super_admin: '#dc2626', admin: '#b91c1c', principal: '#7c3aed',
-  vice_principal: '#6d28d9', teacher: '#2563eb', class_teacher: '#1d4ed8',
-  clerk: '#0891b2', accountant: '#059669', librarian: '#d97706',
-  receptionist: '#ec4899', office_staff: '#6b7280', student: '#10b981',
-  parent: '#f59e0b',
-};
+interface InfoRowProps { icon: string; label: string; value: string; }
+function InfoRow({ icon, label, value }: InfoRowProps) {
+  const { colors } = useTheme();
+  return (
+    <View style={[styles.infoRow, { borderBottomColor: colors.divider }]}>
+      <View style={[styles.infoIcon, { backgroundColor: colors.primaryBg }]}>
+        <Icon name={icon} size={13} color={colors.primary} solid />
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>{label}</Text>
+        <Text style={[styles.infoValue, { color: colors.text }]}>{value}</Text>
+      </View>
+    </View>
+  );
+}
+
+interface SettingRowProps { icon: string; label: string; onPress: () => void; variant?: 'default' | 'danger'; }
+function SettingRow({ icon, label, onPress, variant = 'default' }: SettingRowProps) {
+  const { colors } = useTheme();
+  const color = variant === 'danger' ? colors.danger : colors.text;
+  const iconBg = variant === 'danger' ? colors.dangerBg : colors.surfaceAlt;
+  const iconColor = variant === 'danger' ? colors.danger : colors.textSecondary;
+  return (
+    <TouchableOpacity onPress={onPress} activeOpacity={0.7} style={[styles.settingRow, { borderBottomColor: colors.divider }]}>
+      <View style={[styles.settingIcon, { backgroundColor: iconBg }]}>
+        <Icon name={icon} size={13} color={iconColor} solid />
+      </View>
+      <Text style={[styles.settingLabel, { color }]}>{label}</Text>
+      <Icon name="chevron-right" size={12} color={colors.textTertiary} solid />
+    </TouchableOpacity>
+  );
+}
 
 export default function ProfileScreen() {
   const { user, logout } = useAuthStore();
-  const [darkMode, setDarkMode] = useState(false);
-  const [notifications, setNotifications] = useState(true);
+  const { colors, roleAccent, isDark, toggleTheme } = useTheme();
 
-  const primaryRole = user?.roles?.[0];
-  const roleColor = ROLE_COLORS[primaryRole?.code ?? ''] ?? '#4f46e5';
+  const firstName = user?.full_name?.split(' ')[0] ?? 'User';
+  const roleName = user?.roles?.[0]?.name ?? 'User';
 
-  const confirmLogout = () => {
-    Alert.alert(
-      'Logout',
-      'Are you sure you want to logout?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Logout', style: 'destructive', onPress: logout },
-      ]
-    );
+  const handleLogout = () => {
+    Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Sign Out', style: 'destructive', onPress: logout },
+    ]);
   };
 
   return (
-    <ScrollView style={s.page} contentContainerStyle={{ paddingBottom: 40 }}>
-      {/* Avatar + Name */}
-      <View style={[s.header, { backgroundColor: roleColor }]}>
-        <View style={s.avatar}>
-          <Text style={s.avatarText}>{user?.full_name?.charAt(0) ?? 'U'}</Text>
+    <ScrollView
+      style={[styles.root, { backgroundColor: colors.background }]}
+      showsVerticalScrollIndicator={false}
+    >
+      {/* ── Hero Header ──────────────────────────────────────── */}
+      <LinearGradient
+        colors={roleAccent.gradient}
+        style={[styles.hero, { paddingTop: Platform.OS === 'ios' ? 56 : 40 }]}
+        start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+      >
+        <View style={[styles.heroCircle, { backgroundColor: 'rgba(255,255,255,0.07)' }]} />
+        <View style={styles.heroContent}>
+          {/* Large Avatar */}
+          <View style={[styles.avatarLarge, { backgroundColor: 'rgba(255,255,255,0.2)', borderColor: 'rgba(255,255,255,0.5)' }]}>
+            <Text style={styles.avatarText}>{(user?.full_name ?? 'U')[0]}</Text>
+          </View>
+          <Text style={styles.heroName}>{user?.full_name ?? 'User'}</Text>
+          <View style={[styles.rolePill, { backgroundColor: 'rgba(255,255,255,0.18)' }]}>
+            <Icon name="shield-alt" size={10} color="rgba(255,255,255,0.9)" solid />
+            <Text style={styles.rolePillText}>{roleName}</Text>
+          </View>
+          {user?.employee_id && (
+            <Text style={styles.heroSub}>ID: {user.employee_id}</Text>
+          )}
         </View>
-        <Text style={s.fullName}>{user?.full_name}</Text>
-        <Text style={s.username}>@{user?.username}</Text>
-        <View style={s.roleBadge}>
-          <Text style={s.roleBadgeText}>{primaryRole?.name ?? 'User'}</Text>
-        </View>
-      </View>
+      </LinearGradient>
 
-      {/* Info Cards */}
-      <View style={s.infoSection}>
+      {/* ── Stats Strip ──────────────────────────────────────── */}
+      <View style={[styles.statsStrip, { backgroundColor: colors.surface, ...shadows.md }]}>
         {[
-          { icon: '📧', label: 'Username', value: user?.username },
-          { icon: '📱', label: 'Mobile', value: user?.mobile ?? 'Not set' },
-          { icon: '🆔', label: 'Employee ID', value: user?.employee_id ?? 'N/A' },
-          { icon: '🔐', label: 'Role', value: user?.roles?.map(r => r.name).join(', ') ?? '—' },
-        ].map((item, i) => (
-          <View key={i} style={s.infoRow}>
-            <Text style={s.infoIcon}>{item.icon}</Text>
-            <View style={s.infoDetails}>
-              <Text style={s.infoLabel}>{item.label}</Text>
-              <Text style={s.infoValue}>{item.value}</Text>
-            </View>
+          { label: 'Year', value: '2025-26', icon: 'calendar' },
+          { label: 'Role', value: roleName.slice(0, 10), icon: 'user-tag' },
+          { label: 'Status', value: 'Active', icon: 'check-circle' },
+        ].map((s, i) => (
+          <View key={i} style={[styles.statItem, i < 2 && { borderRightWidth: 1, borderRightColor: colors.divider }]}>
+            <Icon name={s.icon} size={14} color={colors.primary} solid />
+            <Text style={[styles.statValue, { color: colors.text }]}>{s.value}</Text>
+            <Text style={[styles.statLabel, { color: colors.textSecondary }]}>{s.label}</Text>
           </View>
         ))}
       </View>
 
-      {/* Settings */}
-      <View style={s.settingsSection}>
-        <Text style={s.settingsTitle}>⚙️ Preferences</Text>
-
-        <View style={s.settingRow}>
-          <Text style={s.settingIcon}>🌙</Text>
-          <Text style={s.settingLabel}>Dark Mode</Text>
-          <Switch value={darkMode} onValueChange={setDarkMode} trackColor={{ true: roleColor }} />
-        </View>
-
-        <View style={s.settingRow}>
-          <Text style={s.settingIcon}>🔔</Text>
-          <Text style={s.settingLabel}>Push Notifications</Text>
-          <Switch value={notifications} onValueChange={setNotifications} trackColor={{ true: roleColor }} />
-        </View>
+      {/* ── Personal Info ─────────────────────────────────────── */}
+      <View style={styles.section}>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>Personal Information</Text>
+        <PremiumCard variant="default" padding={0}>
+          <InfoRow icon="user"    label="Full Name" value={user?.full_name ?? '—'} />
+          <InfoRow icon="at"      label="Username"  value={user?.username  ?? '—'} />
+          <InfoRow icon="phone"   label="Mobile"    value={user?.mobile    ?? '—'} />
+          <InfoRow icon="id-card" label="Employee ID" value={user?.employee_id ?? '—'} />
+        </PremiumCard>
       </View>
 
-      {/* App Info */}
-      <View style={s.appInfo}>
-        <Text style={s.appName}>🏫 VidyaSetu ERP</Text>
-        <Text style={s.appVersion}>Version 1.0.0  •  Hindkesri Maruti Mane Vidyalay</Text>
+      {/* ── Settings ─────────────────────────────────────────── */}
+      <View style={styles.section}>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>Settings</Text>
+        <PremiumCard variant="default" padding={0}>
+          <SettingRow icon={isDark ? 'sun' : 'moon'} label={isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode'} onPress={toggleTheme} />
+          <SettingRow icon="bell"          label="Notifications"  onPress={() => {}} />
+          <SettingRow icon="language"      label="Language"       onPress={() => {}} />
+          <SettingRow icon="lock"          label="Change Password" onPress={() => {}} />
+          <SettingRow icon="shield-alt"    label="Privacy"        onPress={() => {}} />
+        </PremiumCard>
       </View>
 
-      {/* Logout */}
-      <TouchableOpacity style={s.logoutBtn} onPress={confirmLogout}>
-        <Text style={s.logoutText}>🚪 Logout</Text>
-      </TouchableOpacity>
+      {/* ── Help & About ──────────────────────────────────────── */}
+      <View style={styles.section}>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>Help & Support</Text>
+        <PremiumCard variant="default" padding={0}>
+          <SettingRow icon="question-circle" label="Help Center"  onPress={() => {}} />
+          <SettingRow icon="info-circle"     label="About EduShakti" onPress={() => {}} />
+        </PremiumCard>
+      </View>
+
+      {/* ── Logout ───────────────────────────────────────────── */}
+      <View style={styles.section}>
+        <PremiumCard variant="default" padding={0}>
+          <SettingRow icon="sign-out-alt" label="Sign Out" onPress={handleLogout} variant="danger" />
+        </PremiumCard>
+      </View>
+
+      {/* Footer */}
+      <Text style={[styles.footer, { color: colors.textTertiary }]}>
+        EduShakti One ERP v1.0 · Enterprise Platform
+      </Text>
+
+      <View style={{ height: spacing['3xl'] }} />
     </ScrollView>
   );
 }
 
-const s = StyleSheet.create({
-  page: { flex: 1, backgroundColor: '#f8fafc' },
-  header: { padding: 28, alignItems: 'center', paddingBottom: 32 },
-  avatar: { width: 80, height: 80, borderRadius: 40, backgroundColor: 'rgba(255,255,255,0.25)', alignItems: 'center', justifyContent: 'center', marginBottom: 12 },
-  avatarText: { fontSize: 36, color: '#fff', fontWeight: '900' },
-  fullName: { fontSize: 20, fontWeight: '900', color: '#fff' },
-  username: { fontSize: 13, color: 'rgba(255,255,255,0.75)', marginTop: 4 },
-  roleBadge: { marginTop: 10, backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 20, paddingHorizontal: 16, paddingVertical: 5 },
-  roleBadgeText: { color: '#fff', fontSize: 12, fontWeight: '800' },
-  infoSection: { margin: 14, backgroundColor: '#fff', borderRadius: 16, overflow: 'hidden', shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 8, elevation: 2 },
-  infoRow: { flexDirection: 'row', alignItems: 'center', padding: 14, borderBottomWidth: 1, borderBottomColor: '#f1f5f9', gap: 12 },
-  infoIcon: { fontSize: 20, width: 28, textAlign: 'center' },
-  infoDetails: { flex: 1 },
-  infoLabel: { fontSize: 11, color: '#9ca3af', fontWeight: '600', textTransform: 'uppercase' },
-  infoValue: { fontSize: 14, color: '#1e293b', fontWeight: '700', marginTop: 2 },
-  settingsSection: { marginHorizontal: 14, backgroundColor: '#fff', borderRadius: 16, overflow: 'hidden', shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 8, elevation: 2, marginBottom: 14 },
-  settingsTitle: { fontSize: 13, fontWeight: '800', color: '#6b7280', padding: 14, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' },
-  settingRow: { flexDirection: 'row', alignItems: 'center', padding: 14, borderBottomWidth: 1, borderBottomColor: '#f1f5f9', gap: 12 },
-  settingIcon: { fontSize: 20 },
-  settingLabel: { flex: 1, fontSize: 14, fontWeight: '700', color: '#1e293b' },
-  appInfo: { marginHorizontal: 14, marginBottom: 14, alignItems: 'center', gap: 4 },
-  appName: { fontSize: 14, fontWeight: '800', color: '#1e293b' },
-  appVersion: { fontSize: 11, color: '#9ca3af', textAlign: 'center' },
-  logoutBtn: { marginHorizontal: 14, backgroundColor: '#fee2e2', borderRadius: 14, padding: 16, alignItems: 'center', borderWidth: 1.5, borderColor: '#fca5a5' },
-  logoutText: { color: '#dc2626', fontSize: 15, fontWeight: '900' },
+const styles = StyleSheet.create({
+  root: { flex: 1 },
+  hero: { paddingHorizontal: spacing.base, paddingBottom: spacing['3xl'], overflow: 'hidden' },
+  heroCircle: { position: 'absolute', width: 250, height: 250, borderRadius: 125, top: -100, right: -80 },
+  heroContent: { alignItems: 'center', marginTop: spacing.base, gap: 8 },
+  avatarLarge: {
+    width: 84, height: 84, borderRadius: 42,
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 3,
+    marginBottom: 4,
+  },
+  avatarText: { color: '#fff', fontSize: typography.size['3xl'], fontWeight: typography.weight.black },
+  heroName: { color: '#fff', fontSize: typography.size.xl, fontWeight: typography.weight.extrabold, letterSpacing: -0.3 },
+  rolePill: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 5, borderRadius: radius.full },
+  rolePillText: { color: 'rgba(255,255,255,0.95)', fontSize: typography.size.xs, fontWeight: typography.weight.semibold },
+  heroSub: { color: 'rgba(255,255,255,0.7)', fontSize: typography.size.sm },
+  statsStrip: {
+    flexDirection: 'row',
+    marginHorizontal: spacing.base,
+    borderRadius: radius.xl,
+    marginTop: -spacing.xl,
+    overflow: 'hidden',
+  },
+  statItem: {
+    flex: 1, alignItems: 'center', paddingVertical: spacing.md, gap: 3,
+  },
+  statValue: { fontSize: typography.size.base, fontWeight: typography.weight.bold },
+  statLabel: { fontSize: typography.size.xs },
+  section: { paddingHorizontal: spacing.base, marginTop: spacing.lg },
+  sectionTitle: { fontSize: typography.size.sm, fontWeight: typography.weight.bold, marginBottom: spacing.sm, textTransform: 'uppercase', letterSpacing: 0.8 },
+  infoRow: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing.md,
+    paddingHorizontal: spacing.base, paddingVertical: spacing.md,
+    borderBottomWidth: 1,
+  },
+  infoIcon: { width: 34, height: 34, borderRadius: radius.sm, alignItems: 'center', justifyContent: 'center' },
+  infoLabel: { fontSize: typography.size.xs, fontWeight: typography.weight.medium, marginBottom: 2 },
+  infoValue: { fontSize: typography.size.base, fontWeight: typography.weight.semibold },
+  settingRow: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing.md,
+    paddingHorizontal: spacing.base, paddingVertical: spacing.md,
+    borderBottomWidth: 1,
+  },
+  settingIcon: { width: 34, height: 34, borderRadius: radius.sm, alignItems: 'center', justifyContent: 'center' },
+  settingLabel: { flex: 1, fontSize: typography.size.base, fontWeight: typography.weight.medium },
+  footer: { textAlign: 'center', fontSize: typography.size.xs, marginTop: spacing.xl },
 });

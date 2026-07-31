@@ -14,10 +14,12 @@ from app.modules.office.schemas import (
     EventCreateRequest, EventResponse,
     ComplaintCreateRequest, ComplaintUpdateRequest, ComplaintResponse,
     RegisterCreateRequest, RegisterResponse,
+    BonafideApplyRequest, BonafideClerkCreateRequest, BonafideApproveRejectRequest,
 )
 from app.modules.office.service import (
     NoticeService, EnquiryService, VisitorService,
     EventService, ComplaintService, RegisterService, OfficeStatsService,
+    BonafideService,
 )
 from app.shared.responses import APIResponse
 
@@ -245,3 +247,50 @@ async def list_register(current_user: AuthUser, db: DBSession,
         "items": [RegisterResponse.model_validate(r).model_dump() for r in items],
         "meta": {"total": total, "page": page, "per_page": per_page},
     })
+
+
+# ── Bonafide Certificate Applications ──────────────────────────
+@router.get("/bonafide/applications", response_model=APIResponse,
+            dependencies=[Depends(require_permission("office.read"))])
+async def list_bonafide_applications(current_user: AuthUser, db: DBSession,
+                                      status: Optional[str] = None,
+                                      student_id: Optional[int] = None,
+                                      search: Optional[str] = None,
+                                      page: int = Query(1, ge=1),
+                                      per_page: int = Query(20, ge=1, le=100)):
+    items, total = BonafideService.get_applications(db, status=status, student_id=student_id, search=search, page=page, per_page=per_page)
+    total_pages = max(1, (total + per_page - 1) // per_page)
+    return APIResponse.ok(data={
+        "items": items,
+        "meta": {"total": total, "page": page, "per_page": per_page, "total_pages": total_pages},
+    })
+
+
+@router.post("/bonafide/applications", response_model=APIResponse, status_code=201,
+             dependencies=[Depends(require_permission("office.create"))])
+async def create_direct_bonafide(body: BonafideClerkCreateRequest, current_user: AuthUser, db: DBSession):
+    app = BonafideService.clerk_create(db, body, current_user.user_id)
+    return APIResponse.created(data={"id": app.id, "application_number": app.application_number}, message=f"Bonafide certificate issued directly: {app.application_number}")
+
+
+@router.put("/bonafide/applications/{app_id}/approve", response_model=APIResponse,
+            dependencies=[Depends(require_permission("office.update"))])
+async def approve_bonafide_application(app_id: int, current_user: AuthUser, db: DBSession, remarks: Optional[str] = Query(None)):
+    app = BonafideService.approve_application(db, app_id, current_user.user_id, remarks)
+    return APIResponse.ok(data={"id": app.id, "status": app.status, "issued_certificate_number": app.issued_certificate_number}, message="Bonafide application approved.")
+
+
+@router.put("/bonafide/applications/{app_id}/reject", response_model=APIResponse,
+            dependencies=[Depends(require_permission("office.update"))])
+async def reject_bonafide_application(app_id: int, body: BonafideApproveRejectRequest, current_user: AuthUser, db: DBSession):
+    reason = body.rejection_reason or "Verification documents pending or incomplete."
+    app = BonafideService.reject_application(db, app_id, current_user.user_id, reason, body.remarks)
+    return APIResponse.ok(data={"id": app.id, "status": app.status, "rejection_reason": app.rejection_reason}, message="Bonafide application rejected.")
+
+
+@router.get("/bonafide/applications/{app_id}/print-data", response_model=APIResponse,
+            dependencies=[Depends(require_permission("office.read"))])
+async def get_bonafide_print_data(app_id: int, current_user: AuthUser, db: DBSession):
+    data = BonafideService.get_print_data(db, app_id)
+    return APIResponse.ok(data=data.model_dump())
+

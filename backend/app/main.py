@@ -24,7 +24,7 @@ from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 
 from app.core.config import settings
-from app.modules.auth.router import router as auth_router
+from app.modules.auth.router import router as auth_router, admin_router
 from app.modules.settings.router import router as settings_router
 from app.modules.student.router import router as student_router
 from app.modules.teacher.router import router as teacher_router
@@ -46,6 +46,7 @@ from app.modules.search.router import router as search_router
 from app.modules.exports.router import router as exports_router
 from app.modules.qr.router import router as qr_router
 from app.modules.ai.router import router as ai_router
+from app.modules.behaviour.router import router as behaviour_router
 from app.shared.storage import StorageService
 
 # ── Logging ───────────────────────────────────────────────────
@@ -73,6 +74,20 @@ async def lifespan(app: FastAPI):
     # Initialize storage directories
     StorageService.initialize_storage()
     logger.info("   Storage     : Initialized ✓")
+
+    # Initialize database tables
+    try:
+        from app.database.session import engine
+        from app.database.base import BaseModel
+        import app.modules.auth.models, app.modules.settings.models, app.modules.student.models
+        import app.modules.teacher.models, app.modules.office.models, app.modules.finance.models
+        import app.modules.library.models, app.modules.exam.models, app.modules.attendance.models
+        import app.modules.timetable.models, app.modules.communication.models, app.modules.inventory.models
+        import app.modules.leave.models, app.modules.lesson_plan.models, app.modules.behaviour.models
+        BaseModel.metadata.create_all(bind=engine)
+        logger.info("   Database    : All tables verified ✓")
+    except Exception as err:
+        logger.warning(f"   Database Init Warning: {err}")
 
     yield
 
@@ -157,6 +172,7 @@ app.mount("/storage", StaticFiles(directory=storage_path), name="storage")
 API_PREFIX = "/api/v1"
 
 app.include_router(auth_router, prefix=API_PREFIX)
+app.include_router(admin_router, prefix=API_PREFIX)
 app.include_router(settings_router, prefix=API_PREFIX)
 app.include_router(student_router, prefix=API_PREFIX)
 app.include_router(teacher_router, prefix=API_PREFIX)
@@ -178,6 +194,7 @@ app.include_router(search_router,          prefix=API_PREFIX)
 app.include_router(exports_router,         prefix=API_PREFIX)
 app.include_router(qr_router,              prefix=API_PREFIX)
 app.include_router(ai_router,              prefix=API_PREFIX)
+app.include_router(behaviour_router,       prefix=API_PREFIX)
 
 
 # ── Root Endpoint ─────────────────────────────────────────────
