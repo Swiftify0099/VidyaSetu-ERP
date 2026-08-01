@@ -12,6 +12,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database.base import BaseModel
+from app.modules.attendance.models import StudentAttendance  # noqa: F401
 
 
 class Student(BaseModel):
@@ -163,3 +164,22 @@ class StudentDocument(BaseModel):
     verified: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     verified_by: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
     remarks: Mapped[str | None] = mapped_column(String(500), nullable=True)
+
+
+class StudentLeave(BaseModel):
+    """Leave application submitted by a student / parent."""
+    __tablename__ = "student_leaves"
+
+    student_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("students.id"), nullable=False, index=True)
+    leave_type: Mapped[str] = mapped_column(String(50), nullable=False, default="casual")
+    # casual / medical / family / function / official
+    start_date: Mapped[date] = mapped_column(Date, nullable=False)
+    end_date: Mapped[date] = mapped_column(Date, nullable=False)
+    total_days: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    reason: Mapped[str] = mapped_column(Text, nullable=False)
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="pending", index=True)
+    # pending / approved / rejected / cancelled
+    rejection_reason: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    actioned_by: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    actioned_at: Mapped[date | None] = mapped_column(Date, nullable=True)
+

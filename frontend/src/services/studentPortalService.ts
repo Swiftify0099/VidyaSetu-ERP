@@ -88,12 +88,18 @@ export interface ExamResult {
   exam_type: string;
   exam_type_marathi?: string;
   standard: string;
+  division?: string;
   result_declared: boolean;
   result_date?: string;
   subjects: ExamSubjectResult[];
   total_marks: number;
   total_max: number;
   percentage: number;
+  grade?: string;
+  rank?: number;
+  class_total_students?: number;
+  remarks?: string;
+  gpa?: string;
   all_pass: boolean;
 }
 
@@ -153,14 +159,35 @@ const studentPortalService = {
     return res.data.data;
   },
 
-  async getResults(): Promise<{ results: ExamResult[]; academic_year?: string }> {
+  async getResults(): Promise<{ results: ExamResult[]; merit_list?: any[]; upcoming_exam?: any; class_name?: string; academic_year?: string }> {
     const res = await api.get('/student-portal/results');
     return res.data.data;
   },
 
   async getFees(): Promise<{
     academic_year?: string;
-    summary: { total_due: number; total_paid: number; balance: number };
+    standard?: string;
+    summary: { total_due: number; total_paid: number; total_remaining: number; balance: number; paid_percentage: number };
+    class_total_fee: number;
+    class_fee_structure: Array<{
+      id: number;
+      category: string;
+      category_marathi?: string;
+      frequency: string;
+      amount: number;
+      due_date?: string;
+      late_fine_per_day?: number;
+    }>;
+    installments: Array<{
+      id: number;
+      installment_name: string;
+      amount: number;
+      paid_amount: number;
+      remaining_amount: number;
+      due_date?: string;
+      status: string;
+      remarks?: string;
+    }>;
     fee_records: FeeRecord[];
     payments: Payment[];
   }> {
@@ -268,8 +295,9 @@ const studentPortalService = {
     return res.data;
   },
 
-  async cancelLeave() {
-    const res = await api.post('/student-portal/leaves/cancel');
+  async cancelLeave(leaveId?: number) {
+    const url = leaveId ? `/student-portal/leaves/${leaveId}/cancel` : '/student-portal/leaves/cancel';
+    const res = await api.post(url);
     return res.data;
   },
 
@@ -284,6 +312,41 @@ const studentPortalService = {
     if (Array.isArray(data)) return data;
     if (data && Array.isArray(data.items)) return data.items;
     return [];
+  },
+
+  async getAssessments(): Promise<{ assessments: any[]; total: number }> {
+    const res = await api.get('/student-portal/assessments');
+    return res.data.data;
+  },
+
+  async startAssessment(assessmentId: number): Promise<{
+    assessment_id: number;
+    title: string;
+    subject: string;
+    topic?: string;
+    duration_minutes: number;
+    total_marks: number;
+    instructions?: string;
+    total_questions: number;
+    questions: Array<{
+      id: number;
+      question: string;
+      options: string[];
+      marks: number;
+    }>;
+    already_attempted: boolean;
+    previous_result?: any;
+  }> {
+    const res = await api.get(`/student-portal/assessments/${assessmentId}/start`);
+    return res.data.data;
+  },
+
+  async submitAssessment(assessmentId: number, answers: Record<string, number>): Promise<any> {
+    const res = await api.post(`/student-portal/assessments/${assessmentId}/submit`, {
+      assessment_id: assessmentId,
+      answers,
+    });
+    return res.data.data;
   },
 };
 

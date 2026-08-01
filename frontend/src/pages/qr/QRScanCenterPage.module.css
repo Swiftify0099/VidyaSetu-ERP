@@ -109,3 +109,57 @@
 .recentMeta { flex: 1; }
 .recentLabel { font-size: 0.82rem; font-weight: 600; color: var(--color-text-primary); display: block; }
 .recentCode { font-size: 0.72rem; color: var(--color-text-muted); font-family: monospace; }
+
+/* Suggestions Dropdown */
+.suggestWrapper { position: relative; width: 100%; }
+.suggestionsBox {
+  position: absolute; top: 100%; left: 0; right: 0; z-index: 100;
+  background: var(--color-surface); border: 1.5px solid var(--color-border);
+  border-radius: 10px; margin-top: 4px; max-height: 220px; overflow-y: auto;
+  box-shadow: var(--shadow-md);
+}
+.suggestItem {
+  padding: 8px 12px; cursor: pointer; border-bottom: 1px solid var(--color-border);
+  display: flex; flex-direction: column; transition: background 0.1s;
+}
+.suggestItem:last-child { border-bottom: none; }
+.suggestItem:hover { background: var(--color-surface-2); }
+.suggestTitle { font-size: 0.85rem; font-weight: 600; color: var(--color-text-primary); }
+.suggestSub { font-size: 0.75rem; color: var(--color-text-secondary); }
+
+/* Printable Student ID Card Badge */
+.idCardContainer {
+  width: 100%; max-width: 380px; background: linear-gradient(135deg, #1e1b4b 0%, #312e81 100%);
+  color: #fff; border-radius: 16px; padding: 16px; box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+  display: flex; flex-direction: column; gap: 12px; border: 2px solid #4f46e5;
+  margin-top: 12px; font-family: var(--font-family); position: relative; overflow: hidden;
+}
+.idCardHeader { display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.2); padding-bottom: 8px; }
+.idCardSchool { font-size: 0.9rem; font-weight: 800; letter-spacing: 0.05em; text-transform: uppercase; color: #fbbf24; }
+.idCardBadge { font-size: 0.65rem; background: #4f46e5; padding: 2px 8px; border-radius: 12px; font-weight: 700; text-transform: uppercase; }
+
+.idCardBody { display: flex; gap: 14px; align-items: center; }
+.idCardPhoto {
+  width: 70px; height: 85px; background: #e0e7ff; border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  color: #3730a3; font-weight: 700; border: 2px solid #ffffff33; flex-shrink: 0;
+  overflow: hidden;
+}
+.idCardDetails { flex: 1; display: flex; flex-direction: column; gap: 4px; }
+.idCardName { font-size: 1rem; font-weight: 700; color: #ffffff; line-height: 1.2; margin: 0; }
+.idCardInfo { font-size: 0.78rem; color: #c7d2fe; margin: 0; }
+.idCardCode { font-size: 0.75rem; color: #fbbf24; font-family: monospace; font-weight: 700; }
+
+.idCardFooter {
+  display: flex; justify-content: space-between; align-items: center;
+  background: rgba(255,255,255,0.08); padding: 8px 12px; border-radius: 10px;
+}
+.idCardQR { width: 65px; height: 65px; background: #fff; padding: 4px; border-radius: 6px; }
+
+/* Print Mode */
+@media print {
+  body * { visibility: hidden; }
+  .printableCard, .printableCard * { visibility: visible; }
+  .printableCard { position: absolute; left: 0; top: 0; width: 100%; }
+}
+

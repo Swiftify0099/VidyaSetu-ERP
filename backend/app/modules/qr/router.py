@@ -47,6 +47,18 @@ async def generate_qr(
         raise HTTPException(status_code=400, detail=str(e))
 
 
+@router.get("/entities/search", response_model=APIResponse)
+async def search_entities(
+    type: str = Query(..., pattern="^(student|library|fee)$"),
+    q: Optional[str] = Query(default=""),
+    current_user: AuthUser = None,
+    db: DBSession = None,
+):
+    """Search entity suggestions (students, books, fee receipts) for QR code generation."""
+    results = QRService.search_entities(db, type, q or "")
+    return APIResponse.ok(data=results)
+
+
 @router.post("/scan", response_model=APIResponse)
 async def scan_qr(
     body: QRScanRequest,

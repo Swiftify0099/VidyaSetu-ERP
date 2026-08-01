@@ -16,12 +16,29 @@ export const STORAGE_KEYS = {
   THEME:         'vs_theme',
 };
 
-// ── Base URL — change for production ─────────────────────────
-// Android emulator uses 10.0.2.2 to connect to host machine localhost
-const DEV_HOST = Platform.OS === 'android' ? '10.0.2.2' : 'localhost'; 
+// ── Base URL ─────────────────────────────────────────────────
+//
+// ┌─────────────────────────────────────────────────────────────┐
+// │  NETWORK SETUP GUIDE                                        │
+// │  ─────────────────────────────────────────────────────────  │
+// │  Android Emulator : backend at 10.0.2.2  (maps to host)    │
+// │  Physical Device  : backend at YOUR PC's LAN IP             │
+// │                     Run: ipconfig  → look for IPv4          │
+// │                     e.g. 10.194.201.223                     │
+// │  ⚠ Backend must run with:                                   │
+// │    uvicorn app.main:app --host 0.0.0.0 --port 8000          │
+// └─────────────────────────────────────────────────────────────┘
+//
+// ── Base URL ─────────────────────────────────────────────────
+// With `adb reverse tcp:8000 tcp:8000` executed for connected Android devices/emulators,
+// `localhost:8000` routes directly from the mobile app to your backend at 127.0.0.1:8000.
+
+const DEV_HOST = 'localhost';
+
 const BASE_URL = __DEV__
   ? `http://${DEV_HOST}:8000/api/v1`
   : 'https://your-production-domain.com/api/v1';
+
 
 // ── Axios Instance ────────────────────────────────────────────
 const api: AxiosInstance = axios.create({
@@ -42,17 +59,29 @@ api.interceptors.request.use(async config => {
   return config;
 });
 
-// ── Response Interceptor — handle 401 ────────────────────────
+// ── Response Interceptor — handle errors ─────────────────────
 api.interceptors.response.use(
   response => response,
   async (error: AxiosError) => {
+    // Network / connection error (no response from server)
+    if (!error.response) {
+      const isTimeout = error.code === 'ECONNABORTED';
+      error.message = isTimeout
+        ? 'Request timed out. Make sure the server is running and your device is on the same WiFi network.'
+        : `Cannot connect to server at ${BASE_URL}.\n\n` +
+          'Please check:\n' +
+          '1. Backend is running (uvicorn --host 0.0.0.0 --port 8000)\n' +
+          '2. Phone & PC are on the same WiFi\n' +
+          `3. Server IP is correct: ${DEV_HOST}`;
+    }
+
+    // Token expired — clear stored credentials
     if (error.response?.status === 401) {
       await AsyncStorage.multiRemove([
         STORAGE_KEYS.ACCESS_TOKEN,
         STORAGE_KEYS.REFRESH_TOKEN,
         STORAGE_KEYS.USER,
       ]);
-      // Navigation to login is handled at the app level via auth state
     }
     return Promise.reject(error);
   }

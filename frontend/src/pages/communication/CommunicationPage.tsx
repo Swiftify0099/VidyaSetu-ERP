@@ -87,6 +87,7 @@ export default function CommunicationPage() {
   const [sendChannel, setSendChannel] = useState('firebase_fcm');
   const [sendAudience, setSendAudience] = useState('specific_student');
   const [sendSubject, setSendSubject] = useState('');
+  const [sendImageUrl, setSendImageUrl] = useState('');
   const [sendBody, setSendBody] = useState('');
   const [sendPhones, setSendPhones] = useState('');
   const [sending, setSending] = useState(false);
@@ -286,9 +287,10 @@ export default function CommunicationPage() {
         recipient_phones: phones,
         subject: sendSubject || undefined,
         message_body: sendBody,
+        image_url: sendImageUrl.trim() || undefined,
       });
       toast.success(`${count} notification(s) dispatched via ${sendChannel === 'firebase_fcm' ? 'FIREBASE FCM' : sendChannel.toUpperCase()}! 🚀`);
-      setSendBody(''); setSendSubject(''); setSendPhones(''); setCharCount(0);
+      setSendBody(''); setSendSubject(''); setSendPhones(''); setSendImageUrl(''); setCharCount(0);
       loadStats();
       loadLogs();
     } catch { toast.error('Send failed.'); }
@@ -950,7 +952,98 @@ export default function CommunicationPage() {
               {(sendChannel==='email'||sendChannel==='whatsapp'||sendChannel==='firebase_fcm') && (
                 <div className={styles.sendField}>
                   <label className={styles.sendLabel}>Notification Title / Subject</label>
-                  <input className={styles.sendInput} value={sendSubject} onChange={e=>setSendSubject(e.target.value)} placeholder="Notification title..."/>
+                  <input className={styles.sendInput} value={sendSubject} onChange={e=>setSendSubject(e.target.value)} placeholder="Notification title (e.g., Annual Sports Day Announcement)..."/>
+                </div>
+              )}
+
+              {/* Notification Image URL Input & Presets */}
+              {sendChannel === 'firebase_fcm' && (
+                <div className={styles.sendField} style={{ background: '#faf5ff', padding: '14px', borderRadius: '10px', border: '1px solid #e9d5ff' }}>
+                  <label className={styles.sendLabel} style={{ color: '#7e22ce', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <span>🖼️ Notification Image URL (Optional — Instagram / LinkedIn Style Banner)</span>
+                    {sendImageUrl && (
+                      <button type="button" style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 600 }} onClick={() => setSendImageUrl('')}>
+                        Clear Image
+                      </button>
+                    )}
+                  </label>
+                  <input
+                    className={styles.sendInput}
+                    placeholder="Enter HTTPS Image URL (e.g. https://domain.com/banner.jpg)"
+                    value={sendImageUrl}
+                    onChange={e => setSendImageUrl(e.target.value)}
+                    style={{ background: 'white' }}
+                  />
+
+                  {/* Sample Preset Image Shortcuts */}
+                  <div style={{ marginTop: '8px', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: '0.72rem', color: '#6b21a8', fontWeight: 600 }}>Quick Preset Banners:</span>
+                    {[
+                      { label: '🏫 School Campus', url: 'https://images.unsplash.com/photo-1546410531-bb4caa6b424d?w=600&auto=format&fit=crop' },
+                      { label: '📢 Notice & Circular', url: 'https://images.unsplash.com/photo-1577563908411-5077b6dc7624?w=600&auto=format&fit=crop' },
+                      { label: '🎓 Exam & Results', url: 'https://images.unsplash.com/photo-1434030216411-0b793f4b4173?w=600&auto=format&fit=crop' },
+                      { label: '🏆 Sports & Event', url: 'https://images.unsplash.com/photo-1511578314322-379afb476865?w=600&auto=format&fit=crop' },
+                    ].map((preset, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        style={{ background: '#f3e8ff', border: '1px solid #d8b4fe', color: '#6b21a8', borderRadius: '6px', padding: '3px 8px', fontSize: '0.73rem', fontWeight: 600, cursor: 'pointer' }}
+                        onClick={() => setSendImageUrl(preset.url)}
+                      >
+                        {preset.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Live Instagram / LinkedIn Inspired Preview Card */}
+                  <div style={{ marginTop: '14px', paddingTop: '12px', borderTop: '1px solid #e9d5ff' }}>
+                    <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#6b21a8', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <Sparkles size={14} /> Live Notification Preview (Instagram & LinkedIn Overlay Style)
+                    </div>
+                    <div style={{
+                      background: 'rgba(15, 23, 42, 0.94)',
+                      borderRadius: '14px',
+                      padding: '14px',
+                      color: 'white',
+                      border: '1px solid rgba(255, 255, 255, 0.15)',
+                      boxShadow: '0 10px 30px rgba(0, 0, 0, 0.4)',
+                      maxWidth: '380px'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: 'rgba(249, 115, 22, 0.2)', color: '#ff8c42', border: '1px solid rgba(249, 115, 22, 0.4)', borderRadius: '99px', padding: '2px 8px', fontSize: '0.68rem', fontWeight: 700 }}>
+                          🔥 VidyaSetu Push
+                        </div>
+                        <span style={{ fontSize: '0.65rem', background: 'rgba(99, 102, 241, 0.25)', color: '#a5b4fc', padding: '2px 6px', borderRadius: '4px', fontWeight: 700 }}>
+                          MEDIUM
+                        </span>
+                      </div>
+                      <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+                        <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: 'rgba(255, 255, 255, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.2rem', flexShrink: 0 }}>
+                          📢
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontWeight: 700, fontSize: '0.9rem', color: '#f8fafc', marginBottom: '2px' }}>
+                            {sendSubject || 'Notification Title'}
+                          </div>
+                          <div style={{ fontSize: '0.8rem', color: '#cbd5e1', lineHeight: '1.3' }}>
+                            {stripHtml(sendBody) || 'Notification message body content preview...'}
+                          </div>
+                        </div>
+                      </div>
+                      {sendImageUrl && (
+                        <div style={{ marginTop: '10px', borderRadius: '10px', overflow: 'hidden', border: '1px solid rgba(255, 255, 255, 0.15)', maxHeight: '140px' }}>
+                          <img src={sendImageUrl} alt="Preview banner" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} onError={(e) => (e.target as HTMLElement).style.display = 'none'} />
+                        </div>
+                      )}
+                      <div style={{ marginTop: '10px', display: 'flex', gap: '8px', paddingTop: '8px', borderTop: '1px solid rgba(255, 255, 255, 0.1)' }}>
+                        <span style={{ fontSize: '0.72rem', background: 'linear-gradient(135deg, #6366f1, #4f46e5)', color: 'white', padding: '4px 10px', borderRadius: '6px', fontWeight: 600 }}>View Details</span>
+                        <span style={{ fontSize: '0.72rem', background: 'rgba(255, 255, 255, 0.1)', color: '#e2e8f0', padding: '4px 10px', borderRadius: '6px', fontWeight: 500 }}>Dismiss</span>
+                      </div>
+                    </div>
+                    <div style={{ fontSize: '0.72rem', color: '#7e22ce', marginTop: '8px', fontStyle: 'italic' }}>
+                      🟢 <strong>In App</strong>: Shows this rich overlay toast | 🔵 <strong>Outside App</strong>: Shows native Windows / OS notification tray shade.
+                    </div>
+                  </div>
                 </div>
               )}
 

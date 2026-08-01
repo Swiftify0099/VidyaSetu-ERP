@@ -122,11 +122,18 @@ export default function LibraryPage() {
   const resetBookForm = () => setNewBook({ title: '', title_marathi: '', isbn: '', language: 'Marathi', publication_year: '', edition: '', pages: '', price: '', author_id: '', publisher_id: '', category_id: '', total_copies: '1', location_shelf: '', keywords: '', description: '' });
 
   const saveBook = async () => {
-    if (!newBook.title) { toast.error('Title is required.'); return; }
+    if (!newBook.title.trim()) { toast.error('Title is required.'); return; }
     setSavingBook(true);
     try {
       const payload: any = {
         ...newBook,
+        title: newBook.title.trim(),
+        title_marathi: newBook.title_marathi.trim() || null,
+        isbn: newBook.isbn.trim() || null,
+        edition: newBook.edition.trim() || null,
+        location_shelf: newBook.location_shelf.trim() || null,
+        keywords: newBook.keywords.trim() || null,
+        description: newBook.description.trim() || null,
         publication_year: newBook.publication_year ? Number(newBook.publication_year) : null,
         pages: newBook.pages ? Number(newBook.pages) : null,
         price: newBook.price ? Number(newBook.price) : null,
@@ -139,8 +146,9 @@ export default function LibraryPage() {
       else { await libraryService.createBook(payload); toast.success('Book added to catalog!'); }
       setShowBookModal(false); setEditBook(null); resetBookForm();
       loadBooks(); loadStats();
-    } catch { toast.error('Failed to save book.'); }
-    finally { setSavingBook(false); }
+    } catch (e: any) {
+      toast.error(e?.response?.data?.detail || e?.response?.data?.message || 'Failed to save book.');
+    } finally { setSavingBook(false); }
   };
 
   const deleteBook = async (id: number) => {

@@ -91,7 +91,7 @@ async def initialize_balance(employee_id: int, current_user: AuthUser,
 
 # ── Leave Applications ─────────────────────────────────────────
 @router.post("/apply", response_model=APIResponse, status_code=201,
-             dependencies=[Depends(require_permission("leave.apply"))])
+             dependencies=[Depends(require_permission("leave.create", "leave.apply", "leave.manage"))])
 async def apply_leave(body: LeaveApplyRequest, current_user: AuthUser, db: DBSession):
     app = LeaveApplicationService.apply(
         db,
@@ -122,7 +122,7 @@ async def list_applications(current_user: AuthUser, db: DBSession,
 
 
 @router.get("/my-applications", response_model=APIResponse,
-            dependencies=[Depends(require_permission("leave.apply"))])
+            dependencies=[Depends(require_permission("leave.read", "leave.apply", "leave.create"))])
 async def my_applications(current_user: AuthUser, db: DBSession,
                           academic_year: Optional[str] = None,
                           status: Optional[str] = None):
@@ -137,7 +137,16 @@ async def my_applications(current_user: AuthUser, db: DBSession,
              dependencies=[Depends(require_permission("leave.approve"))])
 async def approve_or_reject_leave(app_id: int, body: LeaveApproveRequest,
                                   current_user: AuthUser, db: DBSession):
-    app = LeaveApplicationService.approve_or_reject(db, app_id, body, current_user.user_id)
+    # Determine actor role from JWT — pick the highest-authority role
+    role_priority = ["super_admin", "admin", "principal", "vice_principal", "class_teacher"]
+    actor_role = "class_teacher"  # default
+    for rp in role_priority:
+        if rp in current_user.role_codes:
+            actor_role = rp
+            break
+    app = LeaveApplicationService.approve_or_reject(
+        db, app_id, body, current_user.user_id, actor_role=actor_role
+    )
     return APIResponse.ok(
         data=LeaveApplicationResponse.model_validate(app).model_dump(),
         message=f"Leave application {app.status}.",
@@ -161,14 +170,15 @@ async def list_holidays(current_user: AuthUser, db: DBSession,
 
 
 @router.post("/holidays", response_model=APIResponse, status_code=201,
-             dependencies=[Depends(require_permission("leave.manage"))])
+             dependencies=[Depends(require_permission("leave.manage", "leave.create", "leave.approve"))])
 async def create_holiday(body: HolidayCreate, current_user: AuthUser, db: DBSession):
     h = HolidayService.create(db, body, current_user.user_id)
     return APIResponse.created(data=HolidayResponse.model_validate(h).model_dump())
 
 
 @router.delete("/holidays/{holiday_id}", response_model=APIResponse,
-               dependencies=[Depends(require_permission("leave.manage"))])
+               dependencies=[Depends(require_permission("leave.manage", "leave.approve"))])
 async def delete_holiday(holiday_id: int, current_user: AuthUser, db: DBSession):
     HolidayService.delete(db, holiday_id, current_user.user_id)
     return APIResponse.ok(message="Holiday deleted.")
+

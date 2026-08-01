@@ -12,10 +12,14 @@ export interface Holiday {
 export interface AttendanceRecord {
   id: number;
   student_id: number;
+  student_name?: string;
+  gr_number?: string;
   date: string;
   standard: string;
   division?: string;
   period: string;
+  subject_id?: number;
+  subject_name?: string;
   status: string;
   remarks?: string;
 }
@@ -26,12 +30,51 @@ export interface ClassSession {
   standard: string;
   division?: string;
   period: string;
+  subject_id?: number;
+  subject_name?: string;
   total_students: number;
   present_count: number;
   absent_count: number;
   late_count: number;
   leave_count: number;
   is_holiday: boolean;
+}
+
+export interface HeadcountSummary {
+  total: number;
+  present: number;
+  absent: number;
+  late: number;
+  half_day: number;
+  leave: number;
+  medical_leave: number;
+  percentage: number;
+}
+
+export interface ClassRosterResponse {
+  standard: string;
+  division?: string;
+  date: string;
+  period: string;
+  subject_id?: number;
+  subject_name?: string;
+  already_marked: boolean;
+  headcount: HeadcountSummary;
+  students: Array<{
+    student_id: number;
+    student_name: string;
+    gr_number: string;
+    roll_number?: number;
+    status: AttendanceStatus;
+    remarks?: string;
+  }>;
+}
+
+export interface SubjectOption {
+  id: number;
+  name: string;
+  name_marathi?: string;
+  code?: string;
 }
 
 export interface TeacherAttendanceRecord {
@@ -80,6 +123,16 @@ const attendanceService = {
     return res.data.data;
   },
 
+  // Subjects
+  async getSubjects(): Promise<SubjectOption[]> {
+    try {
+      const res = await api.get('/timetable/subjects');
+      return res.data.data || [];
+    } catch {
+      return [];
+    }
+  },
+
   // Holidays
   async getHolidays(year: number, month: number): Promise<Holiday[]> {
     const res = await api.get('/attendance/holidays', { params: { year, month } });
@@ -93,16 +146,24 @@ const attendanceService = {
   // Student attendance
   async markStudentAttendance(data: {
     date: string; standard: string; division?: string;
-    academic_year_id: number; period?: string;
+    academic_year_id: number; period?: string; subject_id?: number;
     rows: Array<{ student_id: number; status: AttendanceStatus; remarks?: string }>;
   }): Promise<number> {
     const res = await api.post('/attendance/student/bulk', data);
     return res.data.data.saved;
   },
 
+  async getStudentRoster(params: {
+    att_date: string; standard: string; division?: string;
+    academic_year_id: number; period?: string; subject_id?: number;
+  }): Promise<ClassRosterResponse> {
+    const res = await api.get('/attendance/student/roster', { params });
+    return res.data.data;
+  },
+
   async getDayAttendance(params: {
     att_date: string; standard: string; division?: string;
-    academic_year_id: number; period?: string;
+    academic_year_id: number; period?: string; subject_id?: number;
   }): Promise<AttendanceRecord[]> {
     const res = await api.get('/attendance/student/day', { params });
     return res.data.data;
@@ -113,8 +174,8 @@ const attendanceService = {
     return res.data.data;
   },
 
-  async getClassSessions(standard: string, academic_year_id: number, year: number, month: number): Promise<ClassSession[]> {
-    const res = await api.get('/attendance/class/sessions', { params: { standard, academic_year_id, year, month } });
+  async getClassSessions(standard: string, academic_year_id: number, year: number, month: number, subject_id?: number, period?: string): Promise<ClassSession[]> {
+    const res = await api.get('/attendance/class/sessions', { params: { standard, academic_year_id, year, month, subject_id, period } });
     return res.data.data;
   },
 

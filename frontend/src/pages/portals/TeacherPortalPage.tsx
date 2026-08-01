@@ -9,14 +9,14 @@ import { useSearchParams } from 'react-router-dom';
 import {
   Users, CalendarDays, ClipboardList, BookOpen,
   Bell, UserCheck, X, Search, Plus,
-  Palmtree, LayoutDashboard, CheckCircle2, RefreshCw,
+  Palmtree, LayoutDashboard, CheckCircle2, RefreshCw, Brain, Trophy, Target, Clock, Trash2, Eye,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../../services/api';
 import styles from './TeacherPortalPage.module.css';
 import { TeacherDashboardHero } from '../../components/teacher/dashboard/TeacherDashboardHero';
 
-type Tab = 'dashboard' | 'timetable' | 'students' | 'attendance' | 'notices' | 'leaves' | 'profile' | 'homework' | 'materials' | 'videos' | 'marks' | 'ai_tools';
+type Tab = 'dashboard' | 'timetable' | 'students' | 'attendance' | 'notices' | 'leaves' | 'profile' | 'homework' | 'materials' | 'videos' | 'marks' | 'ai_tools' | 'assessments';
 
 const TEACHER_TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
   { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard size={15} /> },
@@ -24,6 +24,7 @@ const TEACHER_TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
   { id: 'timetable', label: 'Timetable', icon: <CalendarDays size={15} /> },
   { id: 'students', label: 'Students', icon: <Users size={15} /> },
   { id: 'homework', label: 'Homework', icon: <BookOpen size={15} /> },
+  { id: 'assessments', label: 'Assessments', icon: <Brain size={15} /> },
   { id: 'materials', label: 'Study Materials', icon: <Bell size={15} /> },
   { id: 'videos', label: 'Video Lectures', icon: <UserCheck size={15} /> },
   { id: 'marks', label: 'Marks Entry', icon: <CheckCircle2 size={15} /> },
@@ -105,6 +106,18 @@ export default function TeacherPortalPage() {
   const [leaveForm, setLeaveForm] = useState({ leave_type: 'casual', start_date: '', end_date: '', reason: '' });
   const [savingLeave, setSavingLeave] = useState(false);
 
+  // Assessments
+  const [teacherAssessments, setTeacherAssessments] = useState<any[]>([]);
+  const [viewingResultsId, setViewingResultsId] = useState<number | null>(null);
+  const [assessmentResults, setAssessmentResults] = useState<any>(null);
+  const [savingAssessment, setSavingAssessment] = useState(false);
+  const [asmForm, setAsmForm] = useState({
+    title: '', subject: '', topic: '', class_standard: '9', division: '', duration_minutes: 15, passing_marks: 4, instructions: '',
+    start_date: new Date().toISOString().split('T')[0],
+    end_date: new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0],
+  });
+  const [asmQuestions, setAsmQuestions] = useState<Array<{ question: string; options: string[]; correct_index: number; marks: number }>>([{ question: '', options: ['', '', '', ''], correct_index: 0, marks: 1 }]);
+
   // Load profile
   const loadProfile = useCallback(async () => {
     setLoading(true);
@@ -183,6 +196,7 @@ export default function TeacherPortalPage() {
     else if (tab === 'materials') loadMaterials();
     else if (tab === 'videos') loadVideos();
     else if (tab === 'marks') loadMarksExams();
+    else if (tab === 'assessments') loadTeacherAssessments();
   }, [tab, loadTimetable, loadStudents, loadAttStudents, loadNotices, loadLeaves]);
 
   const loadHomework = async () => {
@@ -190,6 +204,51 @@ export default function TeacherPortalPage() {
       const res = await api.get('/teacher-portal/homework');
       setHomeworkList(res.data.data?.homework || res.data.data || []);
     } catch { setHomeworkList([]); }
+  };
+
+  const loadTeacherAssessments = async () => {
+    try {
+      const res = await api.get('/teacher-portal/assessments');
+      setTeacherAssessments(res.data.data?.assessments || []);
+    } catch { setTeacherAssessments([]); }
+  };
+
+  const loadAssessmentResults = async (id: number) => {
+    try {
+      const res = await api.get(`/teacher-portal/assessments/${id}/results`);
+      setAssessmentResults(res.data.data);
+      setViewingResultsId(id);
+    } catch { toast.error('Failed to load results'); }
+  };
+
+  const handleCreateAssessment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const emptyQ = asmQuestions.some(q => !q.question.trim() || q.options.some(o => !o.trim()));
+    if (emptyQ) { toast.error('Fill all questions and options.'); return; }
+    setSavingAssessment(true);
+    try {
+      await api.post('/teacher-portal/assessments', {
+        ...asmForm,
+        duration_minutes: Number(asmForm.duration_minutes),
+        passing_marks: Number(asmForm.passing_marks),
+        questions: asmQuestions,
+      });
+      toast.success('Assessment created and published to students!');
+      loadTeacherAssessments();
+      setAsmForm({ title: '', subject: '', topic: '', class_standard: '9', division: '', duration_minutes: 15, passing_marks: 4, instructions: '', start_date: new Date().toISOString().split('T')[0], end_date: new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0] });
+      setAsmQuestions([{ question: '', options: ['', '', '', ''], correct_index: 0, marks: 1 }]);
+    } catch (err: any) {
+      toast.error(err?.response?.data?.detail || 'Failed to create assessment');
+    } finally { setSavingAssessment(false); }
+  };
+
+  const handleDeleteAssessment = async (id: number) => {
+    if (!window.confirm('Deactivate this assessment?')) return;
+    try {
+      await api.delete('/teacher-portal/assessments/' + id);
+      toast.success('Assessment deactivated.');
+      loadTeacherAssessments();
+    } catch { toast.error('Failed to deactivate'); }
   };
 
   const loadMaterials = async () => {
@@ -705,6 +764,147 @@ export default function TeacherPortalPage() {
         </div>
       )}
 
+      {/* 8b. ASSESSMENTS */}
+      {tab === 'assessments' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+          {/* View Results Panel */}
+          {viewingResultsId && assessmentResults && (
+            <div className={styles.card}>
+              <div className={styles.cardHeader}>
+                <h3 className={styles.cardTitle}><Trophy size={20} color='var(--color-warning)' /> Assessment Results: {assessmentResults.assessment?.title}</h3>
+                <button className={styles.secondaryBtn} onClick={() => { setViewingResultsId(null); setAssessmentResults(null); }}>Back to List</button>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 20 }}>
+                <div style={{ padding: 16, background: 'var(--color-surface-2)', borderRadius: 'var(--radius-md)', textAlign: 'center' }}>
+                  <div style={{ fontSize: '1.8rem', fontWeight: 900, color: 'var(--color-primary)' }}>{assessmentResults.stats?.total_attempted}</div>
+                  <div style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>Attempted</div>
+                </div>
+                <div style={{ padding: 16, background: 'var(--color-surface-2)', borderRadius: 'var(--radius-md)', textAlign: 'center' }}>
+                  <div style={{ fontSize: '1.8rem', fontWeight: 900, color: 'var(--color-success)' }}>{assessmentResults.stats?.passed_count}</div>
+                  <div style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>Passed</div>
+                </div>
+                <div style={{ padding: 16, background: 'var(--color-surface-2)', borderRadius: 'var(--radius-md)', textAlign: 'center' }}>
+                  <div style={{ fontSize: '1.8rem', fontWeight: 900, color: 'var(--color-danger)' }}>{assessmentResults.stats?.failed_count}</div>
+                  <div style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>Failed</div>
+                </div>
+                <div style={{ padding: 16, background: 'var(--color-surface-2)', borderRadius: 'var(--radius-md)', textAlign: 'center' }}>
+                  <div style={{ fontSize: '1.8rem', fontWeight: 900, color: 'var(--color-warning)' }}>{assessmentResults.stats?.avg_score}%</div>
+                  <div style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>Avg Score</div>
+                </div>
+              </div>
+              {assessmentResults.student_results?.length === 0 ? (
+                <p style={{ color: 'var(--color-text-muted)', textAlign: 'center', padding: 32 }}>No students have attempted this assessment yet.</p>
+              ) : (
+                <div style={{ overflowX: 'auto' }}>
+                  <table className={styles.table}>
+                    <thead><tr><th>Student</th><th>Score</th><th>%</th><th>Grade</th><th>Result</th><th>Correct</th><th>Wrong</th></tr></thead>
+                    <tbody>
+                      {assessmentResults.student_results?.map((r: any) => (
+                        <tr key={r.student_id}>
+                          <td><strong>{r.student_name}</strong></td>
+                          <td>{r.score}/{r.total_marks}</td>
+                          <td><strong style={{ color: r.percentage >= 60 ? 'var(--color-success)' : 'var(--color-danger)' }}>{r.percentage}%</strong></td>
+                          <td><strong>{r.grade}</strong></td>
+                          <td><span style={{ padding: '2px 8px', borderRadius: 4, background: r.passed ? 'var(--color-success-light)' : 'var(--color-danger-light)', color: r.passed ? 'var(--color-success)' : 'var(--color-danger)', fontWeight: 700, fontSize: '0.8rem' }}>{r.result}</span></td>
+                          <td style={{ color: 'var(--color-success)' }}>{r.correct_count}</td>
+                          <td style={{ color: 'var(--color-danger)' }}>{r.wrong_count}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Create Assessment Form */}
+          <div className={styles.card}>
+            <div className={styles.cardHeader}>
+              <h3 className={styles.cardTitle}><Brain size={20} color='var(--color-primary)' /> Create New Assessment / Quiz</h3>
+            </div>
+            <form onSubmit={handleCreateAssessment} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gap: 12 }}>
+                <div><label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--color-text-muted)', display: 'block', marginBottom: 4 }}>Title *</label><input className={styles.inputField} value={asmForm.title} onChange={e => setAsmForm(f => ({ ...f, title: e.target.value }))} required placeholder='e.g. Mathematics Chapter 3 Test' /></div>
+                <div><label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--color-text-muted)', display: 'block', marginBottom: 4 }}>Subject *</label><input className={styles.inputField} value={asmForm.subject} onChange={e => setAsmForm(f => ({ ...f, subject: e.target.value }))} required placeholder='Mathematics' /></div>
+                <div><label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--color-text-muted)', display: 'block', marginBottom: 4 }}>Topic</label><input className={styles.inputField} value={asmForm.topic} onChange={e => setAsmForm(f => ({ ...f, topic: e.target.value }))} placeholder='Quadratic Equations' /></div>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 12 }}>
+                <div><label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--color-text-muted)', display: 'block', marginBottom: 4 }}>Class Std *</label><input className={styles.inputField} value={asmForm.class_standard} onChange={e => setAsmForm(f => ({ ...f, class_standard: e.target.value }))} required placeholder='9' /></div>
+                <div><label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--color-text-muted)', display: 'block', marginBottom: 4 }}>Duration (min)</label><input type='number' className={styles.inputField} value={asmForm.duration_minutes} onChange={e => setAsmForm(f => ({ ...f, duration_minutes: Number(e.target.value) }))} min={5} max={180} /></div>
+                <div><label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--color-text-muted)', display: 'block', marginBottom: 4 }}>Passing Marks *</label><input type='number' className={styles.inputField} value={asmForm.passing_marks} onChange={e => setAsmForm(f => ({ ...f, passing_marks: Number(e.target.value) }))} min={1} required /></div>
+                <div><label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--color-text-muted)', display: 'block', marginBottom: 4 }}>Start Date</label><input type='date' className={styles.inputField} value={asmForm.start_date} onChange={e => setAsmForm(f => ({ ...f, start_date: e.target.value }))} /></div>
+              </div>
+
+              {/* Questions */}
+              <div style={{ borderTop: '1px solid var(--color-border)', paddingTop: 16 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                  <h4 style={{ margin: 0 }}>Questions ({asmQuestions.length})</h4>
+                  <button type='button' className={styles.secondaryBtn} onClick={() => setAsmQuestions(qs => [...qs, { question: '', options: ['', '', '', ''], correct_index: 0, marks: 1 }])}>
+                    <Plus size={14} /> Add Question
+                  </button>
+                </div>
+                {asmQuestions.map((q, qi) => (
+                  <div key={qi} style={{ padding: 16, background: 'var(--color-surface-2)', borderRadius: 'var(--radius-md)', marginBottom: 12, border: '1px solid var(--color-border)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10 }}>
+                      <strong style={{ fontSize: '0.9rem' }}>Q{qi + 1}</strong>
+                      {asmQuestions.length > 1 && <button type='button' onClick={() => setAsmQuestions(qs => qs.filter((_, i) => i !== qi))} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-danger)' }}><Trash2 size={16} /></button>}
+                    </div>
+                    <input className={styles.inputField} value={q.question} onChange={e => setAsmQuestions(qs => qs.map((x, i) => i === qi ? { ...x, question: e.target.value } : x))} placeholder={'Question ' + (qi + 1)} style={{ marginBottom: 10 }} required />
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 10 }}>
+                      {q.options.map((opt, oi) => (
+                        <div key={oi} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <input type='radio' name={'correct_' + qi} checked={q.correct_index === oi} onChange={() => setAsmQuestions(qs => qs.map((x, i) => i === qi ? { ...x, correct_index: oi } : x))} title='Mark as correct answer' />
+                          <input className={styles.inputField} value={opt} onChange={e => setAsmQuestions(qs => qs.map((x, i) => i === qi ? { ...x, options: x.options.map((o, j) => j === oi ? e.target.value : o) } : x))} placeholder={'Option ' + String.fromCharCode(65 + oi)} required />
+                        </div>
+                      ))}
+                    </div>
+                    <div style={{ fontSize: '0.75rem', color: 'var(--color-success)', fontWeight: 600 }}>
+                      Correct Answer: Option {String.fromCharCode(65 + q.correct_index)} (select radio button to change)
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <button type='submit' className={styles.primaryBtn} disabled={savingAssessment} style={{ alignSelf: 'flex-start' }}>
+                {savingAssessment ? 'Publishing...' : <><Brain size={16} /> Publish Assessment to Students</>}
+              </button>
+            </form>
+          </div>
+
+          {/* Existing Assessments List */}
+          <div className={styles.card}>
+            <div className={styles.cardHeader}>
+              <h3 className={styles.cardTitle}><ClipboardList size={20} color='var(--color-primary)' /> Published Assessments</h3>
+              <button className={styles.secondaryBtn} onClick={loadTeacherAssessments}><RefreshCw size={14} /> Refresh</button>
+            </div>
+            {teacherAssessments.length === 0 ? (
+              <p style={{ color: 'var(--color-text-muted)', textAlign: 'center', padding: 32 }}>No assessments created yet. Create one above!</p>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                {teacherAssessments.map((asm: any) => (
+                  <div key={asm.id} style={{ padding: '14px 18px', background: 'var(--color-surface-2)', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div>
+                      <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 4 }}>
+                        <span style={{ fontSize: '0.75rem', padding: '2px 8px', background: 'var(--color-primary-light)', color: 'var(--color-primary)', borderRadius: 4, fontWeight: 700 }}>{asm.subject}</span>
+                        <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>Std {asm.class_standard}</span>
+                        <span style={{ fontSize: '0.75rem', padding: '2px 8px', background: asm.status === 'active' ? 'var(--color-success-light)' : 'var(--color-danger-light)', color: asm.status === 'active' ? 'var(--color-success)' : 'var(--color-danger)', borderRadius: 4, fontWeight: 700 }}>{asm.status.toUpperCase()}</span>
+                      </div>
+                      <div style={{ fontWeight: 700 }}>{asm.title}</div>
+                      <div style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)', marginTop: 4 }}>
+                        {asm.total_questions} questions &bull; {asm.total_marks} marks &bull; {asm.duration_minutes} min &bull; {asm.attempted_count} attempted &bull; Avg: {asm.avg_score}%
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <button className={styles.secondaryBtn} onClick={() => loadAssessmentResults(asm.id)}><Eye size={14} /> Results</button>
+                      <button className={styles.secondaryBtn} style={{ color: 'var(--color-danger)' }} onClick={() => handleDeleteAssessment(asm.id)}><Trash2 size={14} /></button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* 9. MATERIALS */}
       {tab === 'materials' && (
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-5)' }}>
@@ -775,16 +975,31 @@ export default function TeacherPortalPage() {
               <button className={styles.primaryBtn} onClick={handleSaveMarks} disabled={savingMarks}>{savingMarks ? 'Saving...' : 'Save Marks'}</button>
             )}
           </div>
-          <div style={{ display: 'flex', gap: 'var(--space-3)', flexWrap: 'wrap', marginBottom: 'var(--space-4)' }}>
+          <div style={{ display: 'flex', gap: 'var(--space-3)', flexWrap: 'wrap', marginBottom: 'var(--space-4)', alignItems: 'center' }}>
             <select className={styles.selectField} value={selectedMarksExam?.id || ''} onChange={e => {
               const ex = marksExams.find((x: any) => x.id === parseInt(e.target.value));
               setSelectedMarksExam(ex || null);
-              if (ex) loadMarksStudents(ex.id, ex.standard, ex.division);
+              if (ex) {
+                loadMarksStudents(ex.id, ex.standard, ex.division);
+                if (ex.subjects && ex.subjects.length > 0) {
+                  setMarksSubject(ex.subjects[0]);
+                }
+              }
             }}>
               <option value="">Select Exam</option>
               {marksExams.map((ex: any) => <option key={ex.id} value={ex.id}>{ex.name || ex.exam_type_name} - Std {ex.standard}</option>)}
             </select>
-            <input className={styles.inputField} placeholder="Subject Name" value={marksSubject} onChange={e => setMarksSubject(e.target.value)} style={{ width: 180 }} />
+
+            {selectedMarksExam?.subjects && selectedMarksExam.subjects.length > 0 ? (
+              <select className={styles.selectField} value={marksSubject} onChange={e => setMarksSubject(e.target.value)} style={{ minWidth: 180 }}>
+                <option value="">Select Subject</option>
+                {selectedMarksExam.subjects.map((sub: string) => (
+                  <option key={sub} value={sub}>{sub}</option>
+                ))}
+              </select>
+            ) : (
+              <input className={styles.inputField} placeholder="Subject Name" value={marksSubject} onChange={e => setMarksSubject(e.target.value)} style={{ width: 180 }} />
+            )}
           </div>
           {marksStudents.length === 0 ? (
             <div style={{ textAlign: 'center', padding: 'var(--space-8)', color: 'var(--color-text-muted)' }}>Select an exam to load students</div>

@@ -19,6 +19,21 @@ const DIVISIONS  = ['A','B','C','D'];
 const CURRENT_AY = 1;
 const TODAY = new Date().toISOString().split('T')[0];
 const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+const SESSIONS = [
+  { id: 'full_day', label: 'Full Day (Daily General)' },
+  { id: 'morning', label: 'Morning Session' },
+  { id: 'afternoon', label: 'Afternoon Session' },
+  { id: 'period_1', label: 'Period 1' },
+  { id: 'period_2', label: 'Period 2' },
+  { id: 'period_3', label: 'Period 3' },
+  { id: 'period_4', label: 'Period 4' },
+  { id: 'period_5', label: 'Period 5' },
+  { id: 'period_6', label: 'Period 6' },
+  { id: 'period_7', label: 'Period 7' },
+  { id: 'period_8', label: 'Period 8' },
+];
+
 const STATUS_CONFIG: Record<AttendanceStatus, { label: string; color: string; short: string }> = {
   present:       { label: 'Present',       color: 'var(--color-success)', short: 'P' },
   absent:        { label: 'Absent',        color: 'var(--color-danger)',  short: 'A' },
@@ -39,11 +54,14 @@ interface MarkRow {
 export default function AttendancePage() {
   const [section, setSection] = useState<Section>('dashboard');
   const [stats, setStats] = useState<AttendanceStats | null>(null);
+  const [subjects, setSubjects] = useState<Array<{ id: number; name: string; code?: string }>>([]);
 
   // Mark attendance
   const [markDate, setMarkDate] = useState(TODAY);
   const [markStd, setMarkStd] = useState('8');
   const [markDiv, setMarkDiv] = useState('A');
+  const [markPeriod, setMarkPeriod] = useState('full_day');
+  const [markSubjectId, setMarkSubjectId] = useState<number | undefined>(undefined);
   const [markRows, setMarkRows] = useState<MarkRow[]>([]);
   const [markLoading, setMarkLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -53,6 +71,8 @@ export default function AttendancePage() {
   const [repStd, setRepStd] = useState('8');
   const [repYear, setRepYear] = useState(new Date().getFullYear());
   const [repMonth, setRepMonth] = useState(new Date().getMonth() + 1);
+  const [repPeriod, setRepPeriod] = useState<string | undefined>(undefined);
+  const [repSubjectId, setRepSubjectId] = useState<number | undefined>(undefined);
   const [sessions, setSessions] = useState<ClassSession[]>([]);
   const [loadingSessions, setLoadingSessions] = useState(false);
 
@@ -81,36 +101,48 @@ export default function AttendancePage() {
     try { setStats(await attendanceService.getStats(CURRENT_AY)); } catch {}
   }, []);
 
-  useEffect(() => { loadStats(); }, [loadStats]);
-
-  // Load existing marks when mark params change
-  const loadExistingMarks = useCallback(async () => {
-    setMarkLoading(true);
+  const loadSubjects = useCallback(async () => {
     try {
-      const existing = await attendanceService.getDayAttendance({
-        att_date: markDate, standard: markStd,
-        division: markDiv, academic_year_id: CURRENT_AY,
-      });
-      if (existing.length > 0) {
-        setAlreadyMarked(true);
-        setMarkRows(existing.map(r => ({
-          student_id: r.student_id,
-          student_name: `Student #${r.student_id}`,
-          gr_number: `GR-${r.student_id}`,
-          status: r.status as AttendanceStatus,
-          remarks: '',
-        })));
-      } else {
-        setAlreadyMarked(false);
-        setMarkRows([]);
-      }
-    } catch { setMarkRows([]); }
-    finally { setMarkLoading(false); }
-  }, [markDate, markStd, markDiv]);
+      const subs = await attendanceService.getSubjects();
+      setSubjects(subs);
+    } catch {}
+  }, []);
 
   useEffect(() => {
-    if (section === 'mark') loadExistingMarks();
-  }, [section, loadExistingMarks]);
+    loadStats();
+    loadSubjects();
+  }, [loadStats, loadSubjects]);
+
+  // Auto load roster & existing attendance marks
+  const loadRoster = useCallback(async () => {
+    setMarkLoading(true);
+    try {
+      const res = await attendanceService.getStudentRoster({
+        att_date: markDate,
+        standard: markStd,
+        division: markDiv,
+        academic_year_id: CURRENT_AY,
+        period: markPeriod,
+        subject_id: markSubjectId,
+      });
+      setAlreadyMarked(res.already_marked);
+      setMarkRows(res.students.map(s => ({
+        student_id: s.student_id,
+        student_name: s.student_name,
+        gr_number: s.gr_number,
+        status: s.status,
+        remarks: s.remarks || '',
+      })));
+    } catch {
+      setMarkRows([]);
+    } finally {
+      setMarkLoading(false);
+    }
+  }, [markDate, markStd, markDiv, markPeriod, markSubjectId]);
+
+  useEffect(() => {
+    if (section === 'mark') loadRoster();
+  }, [section, loadRoster]);
 
   const addMarkRow = () => setMarkRows(p => [...p, {
     student_id: 0, student_name: '', gr_number: '', status: 'present', remarks: '',
@@ -130,6 +162,8 @@ export default function AttendancePage() {
       const saved = await attendanceService.markStudentAttendance({
         date: markDate, standard: markStd, division: markDiv,
         academic_year_id: CURRENT_AY,
+        period: markPeriod,
+        subject_id: markSubjectId,
         rows: validRows.map(r => ({
           student_id: r.student_id,
           status: r.status,
@@ -145,9 +179,12 @@ export default function AttendancePage() {
 
   const loadSessions = useCallback(async () => {
     setLoadingSessions(true);
-    try { setSessions(await attendanceService.getClassSessions(repStd, CURRENT_AY, repYear, repMonth)); }
-    catch {} finally { setLoadingSessions(false); }
-  }, [repStd, repYear, repMonth]);
+    try {
+      setSessions(await attendanceService.getClassSessions(
+        repStd, CURRENT_AY, repYear, repMonth, repSubjectId, repPeriod
+      ));
+    } catch {} finally { setLoadingSessions(false); }
+  }, [repStd, repYear, repMonth, repSubjectId, repPeriod]);
 
   useEffect(() => { if (section === 'reports') loadSessions(); }, [section, loadSessions]);
 
@@ -203,6 +240,16 @@ export default function AttendancePage() {
     finally { setSavingTeacher(false); }
   };
 
+  // Live Headcount metrics computation
+  const totalHeadcount = markRows.length;
+  const presentCount = markRows.filter(r => r.status === 'present').length;
+  const absentCount = markRows.filter(r => r.status === 'absent').length;
+  const lateCount = markRows.filter(r => r.status === 'late').length;
+  const halfDayCount = markRows.filter(r => r.status === 'half_day').length;
+  const leaveCount = markRows.filter(r => r.status === 'leave').length;
+  const medicalCount = markRows.filter(r => r.status === 'medical_leave').length;
+  const presentPct = totalHeadcount > 0 ? (((presentCount + halfDayCount) / totalHeadcount) * 100).toFixed(1) : '0';
+
   // Calendar session map for report view
   const sessionMap = new Map(sessions.map(s => [s.date, s]));
   const daysInMonth = new Date(repYear, repMonth, 0).getDate();
@@ -213,7 +260,7 @@ export default function AttendancePage() {
       <div className={styles.pageHeader}>
         <div>
           <h1 className={styles.pageTitle}>Attendance Management</h1>
-          <p className={styles.pageSub}>उपस्थिती व्यवस्थापन · Daily Marking & Reports</p>
+          <p className={styles.pageSub}>उपस्थिती व्यवस्थापन · Session-Wise & Subject-Wise Headcount Tracking</p>
         </div>
         <div className={styles.todayBadge}><CalendarDays size={14}/> {new Date().toLocaleDateString('en-IN', { weekday:'long', day:'numeric', month:'long' })}</div>
       </div>
@@ -307,12 +354,68 @@ export default function AttendancePage() {
                 {DIVISIONS.map(d => <option key={d} value={d}>{d}</option>)}
               </select>
             </div>
-            <button className={styles.iconBtn} onClick={loadExistingMarks}><RefreshCw size={14}/></button>
+            <div className={styles.controlGroup}>
+              <label className={styles.controlLabel}>Session Slot</label>
+              <select className={styles.sel} value={markPeriod} onChange={e => setMarkPeriod(e.target.value)}>
+                {SESSIONS.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
+              </select>
+            </div>
+            <div className={styles.controlGroup}>
+              <label className={styles.controlLabel}>Subject (Optional)</label>
+              <select className={styles.sel} value={markSubjectId || ''} onChange={e => setMarkSubjectId(e.target.value ? Number(e.target.value) : undefined)}>
+                <option value="">General / Daily Attendance</option>
+                {subjects.map(sub => (
+                  <option key={sub.id} value={sub.id}>{sub.name} {sub.code ? `(${sub.code})` : ''}</option>
+                ))}
+              </select>
+            </div>
+            <button className={styles.autoLoadBtn} onClick={loadRoster} disabled={markLoading}>
+              <RefreshCw size={14} className={markLoading ? styles.spin : ''}/> Fetch Class Roster
+            </button>
+          </div>
+
+          {/* Live Headcount Summary Card */}
+          <div className={styles.headcountCard}>
+            <div className={styles.headcountGrid}>
+              <div className={styles.headcountBadge}>
+                <span className={styles.hbVal} style={{ color: 'var(--color-primary)' }}>{totalHeadcount}</span>
+                <span className={styles.hbLabel}>Total</span>
+              </div>
+              <div className={styles.headcountBadge}>
+                <span className={styles.hbVal} style={{ color: 'var(--color-success)' }}>{presentCount}</span>
+                <span className={styles.hbLabel}>Present</span>
+              </div>
+              <div className={styles.headcountBadge}>
+                <span className={styles.hbVal} style={{ color: 'var(--color-danger)' }}>{absentCount}</span>
+                <span className={styles.hbLabel}>Absent</span>
+              </div>
+              <div className={styles.headcountBadge}>
+                <span className={styles.hbVal} style={{ color: 'var(--color-warning)' }}>{lateCount}</span>
+                <span className={styles.hbLabel}>Late</span>
+              </div>
+              <div className={styles.headcountBadge}>
+                <span className={styles.hbVal} style={{ color: 'var(--color-info)' }}>{halfDayCount}</span>
+                <span className={styles.hbLabel}>Half Day</span>
+              </div>
+              <div className={styles.headcountBadge}>
+                <span className={styles.hbVal} style={{ color: 'var(--color-primary)' }}>{leaveCount}</span>
+                <span className={styles.hbLabel}>Leave</span>
+              </div>
+              <div className={styles.headcountBadge}>
+                <span className={styles.hbVal} style={{ color: '#8b5cf6' }}>{medicalCount}</span>
+                <span className={styles.hbLabel}>Medical</span>
+              </div>
+            </div>
+            <div className={styles.todayCircle} style={{ width: 68, height: 68, '--pct': `${presentPct}` } as React.CSSProperties}>
+              <div className={styles.todayCircleInner} style={{ width: 52, height: 52 }}>
+                <span className={styles.todayPct} style={{ fontSize: '13px' }}>{presentPct}%</span>
+              </div>
+            </div>
           </div>
 
           {alreadyMarked && (
             <div className={styles.alreadyMarkedBanner}>
-              <Check size={16}/> Attendance already marked for Std {markStd}-{markDiv} on {markDate}. You can update it below.
+              <Check size={16}/> Attendance already recorded for Std {markStd}-{markDiv} ({SESSIONS.find(s=>s.id===markPeriod)?.label}) on {markDate}. You can modify and update it below.
             </div>
           )}
 
@@ -334,12 +437,12 @@ export default function AttendancePage() {
             {markLoading ? <div className={styles.loadingSkel}/> : (
               <table className={styles.table}>
                 <thead><tr>
-                  <th>#</th><th>Student ID</th><th>Name</th><th>Status</th><th>Remarks</th><th>Action</th>
+                  <th>#</th><th>Student ID</th><th>GR Number</th><th>Student Name</th><th>Status</th><th>Remarks</th><th>Action</th>
                 </tr></thead>
                 <tbody>
                   {markRows.length === 0 ? (
-                    <tr><td colSpan={6} className={styles.emptyCell}>
-                      <div className={styles.emptyState}><UserCheck size={48}/><p>Add student rows or load from student list.</p></div>
+                    <tr><td colSpan={7} className={styles.emptyCell}>
+                      <div className={styles.emptyState}><UserCheck size={48}/><p>No students found for Std {markStd}-{markDiv}. Click "Fetch Class Roster" or add student rows.</p></div>
                     </td></tr>
                   ) : markRows.map((row, i) => (
                     <tr key={i} className={styles.tr}>
@@ -347,6 +450,10 @@ export default function AttendancePage() {
                       <td>
                         <input className={styles.miniInput} type="number" value={row.student_id || ''} placeholder="ID"
                           onChange={e => updateRow(i, 'student_id', e.target.value)}/>
+                      </td>
+                      <td>
+                        <input className={styles.miniInput} value={row.gr_number} placeholder="GR No."
+                          onChange={e => updateRow(i, 'gr_number', e.target.value)}/>
                       </td>
                       <td>
                         <input className={styles.miniInput} value={row.student_name} placeholder="Name"
@@ -365,7 +472,7 @@ export default function AttendancePage() {
                         </div>
                       </td>
                       <td>
-                        <input className={styles.miniInput} value={row.remarks} placeholder="Optional"
+                        <input className={styles.miniInput} value={row.remarks} placeholder="Remarks (e.g. good, sick)"
                           onChange={e => updateRow(i, 'remarks', e.target.value)}/>
                       </td>
                       <td>
@@ -397,7 +504,7 @@ export default function AttendancePage() {
           <PermissionGate permission="attendance.mark">
             <button className={styles.saveBtn} onClick={saveAttendance} disabled={saving || markRows.length === 0}>
               {saving ? <span className={styles.spin}/> : <Check size={16}/>}
-              {saving ? 'Saving...' : `Save Attendance (${markRows.length} students)`}
+              {saving ? 'Saving...' : `Save Attendance (${markRows.length} Headcount)`}
             </button>
           </PermissionGate>
         </div>
@@ -411,6 +518,22 @@ export default function AttendancePage() {
               <label className={styles.controlLabel}>Standard</label>
               <select className={styles.sel} value={repStd} onChange={e => setRepStd(e.target.value)}>
                 {STANDARDS.map(s => <option key={s} value={s}>Std {s}</option>)}
+              </select>
+            </div>
+            <div className={styles.controlGroup}>
+              <label className={styles.controlLabel}>Session</label>
+              <select className={styles.sel} value={repPeriod || ''} onChange={e => setRepPeriod(e.target.value || undefined)}>
+                <option value="">All Sessions</option>
+                {SESSIONS.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
+              </select>
+            </div>
+            <div className={styles.controlGroup}>
+              <label className={styles.controlLabel}>Subject</label>
+              <select className={styles.sel} value={repSubjectId || ''} onChange={e => setRepSubjectId(e.target.value ? Number(e.target.value) : undefined)}>
+                <option value="">All Subjects</option>
+                {subjects.map(sub => (
+                  <option key={sub.id} value={sub.id}>{sub.name}</option>
+                ))}
               </select>
             </div>
             <div className={styles.monthNav}>

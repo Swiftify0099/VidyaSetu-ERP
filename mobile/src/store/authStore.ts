@@ -59,11 +59,22 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         error: null,
       });
     } catch (err: unknown) {
-      const responseData = (err as { response?: { data?: { detail?: string; message?: string } } })?.response?.data;
-      const msg = responseData?.detail
-        ?? responseData?.message
-        ?? (err as { message?: string })?.message
-        ?? 'Login failed. Please check your credentials.';
+      const axiosErr = err as { response?: { data?: { detail?: string; message?: string }; status?: number }; message?: string; code?: string };
+      const responseData = axiosErr?.response?.data;
+      const status = axiosErr?.response?.status;
+      const rawMsg = axiosErr?.message ?? '';
+
+      let msg: string;
+      if (!axiosErr.response) {
+        // Pure network error — no response received
+        msg = rawMsg || 'Network Error: Cannot reach the server.\n\nMake sure your phone and PC are on the same WiFi, and the backend is running.';
+      } else if (status === 401 || status === 403) {
+        msg = responseData?.detail ?? responseData?.message ?? 'Invalid username or password.';
+      } else if (status === 422) {
+        msg = 'Invalid input. Please check your username and password.';
+      } else {
+        msg = responseData?.detail ?? responseData?.message ?? rawMsg ?? 'Login failed. Please try again.';
+      }
       set({ isLoading: false, error: msg, isAuthenticated: false });
     }
   },

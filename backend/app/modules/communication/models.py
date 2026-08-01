@@ -7,6 +7,7 @@ School-wide communication system:
 - Parent SMS/WhatsApp notifications (log)
 - Message templates
 - Communication log (audit trail)
+- Notification inbox (per-user, role-based, event-driven)
 """
 from datetime import date, datetime
 from sqlalchemy import (
@@ -105,3 +106,59 @@ class Announcement(BaseModel):
     is_pinned: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     expiry_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     academic_year_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+
+
+class Notification(BaseModel):
+    """
+    VidyaSetu ERP — Per-User Notification Inbox
+    ============================================
+    One row per recipient per workflow event.
+    Separate from CommunicationLog (outgoing SMS/email audit).
+
+    Flow: WorkflowAction → NotificationService.push() → Notification row + FCM push
+    """
+    __tablename__ = "notifications"
+
+    # ── Sender ──────────────────────────────────────────────
+    sender_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True, index=True)
+    sender_role: Mapped[str | None] = mapped_column(String(50), nullable=True)
+
+    # ── Recipient ────────────────────────────────────────────
+    recipient_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True, index=True)
+    # NULL = broadcast; specific user_id for targeted notification
+    recipient_role: Mapped[str | None] = mapped_column(String(50), nullable=True, index=True)
+    # "student" / "teacher" / "class_teacher" / "principal" / "all" / etc.
+
+    # ── Content ──────────────────────────────────────────────
+    category: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
+    # attendance / exam / fee / leave / library / security / system /
+    # homework / certificate / behaviour / transport / notice / birthday
+    notification_type: Mapped[str] = mapped_column(String(100), nullable=False)
+    # homework_assigned / leave_approved / fee_due / result_published / login_alert / etc.
+    priority: Mapped[str] = mapped_column(String(20), nullable=False, default="medium", index=True)
+    # critical / high / medium / low / silent
+    title: Mapped[str] = mapped_column(String(300), nullable=False)
+    body: Mapped[str] = mapped_column(Text, nullable=False)
+
+    # ── Click Navigation / Deep Link ─────────────────────────
+    reference_module: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    reference_id: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    action_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    # Frontend route to navigate on click: /leave/applications/123
+
+    # ── FCM Delivery ─────────────────────────────────────────
+    channel: Mapped[str] = mapped_column(String(20), nullable=False, default="both")
+    # in_app / push / both / silent
+    fcm_message_id: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    delivered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    # ── State ────────────────────────────────────────────────
+    is_read: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    read_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    seen_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    clicked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    # ── Lifecycle ────────────────────────────────────────────
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # Stale notifications expire after 30 days by default
+

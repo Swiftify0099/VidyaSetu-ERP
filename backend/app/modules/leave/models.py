@@ -85,8 +85,35 @@ class LeaveApplication(BaseModel):
     document_path: Mapped[str | None] = mapped_column(String(500), nullable=True)
 
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="pending")
-    # pending / approved / rejected / cancelled / withdrawn
+    # pending / ct_approved / vp_pending / vp_approved / principal_pending / approved / rejected / cancelled / withdrawn
 
+    # ── Multi-Stage Approval Chain ─────────────────────────────
+    # Stage: class_teacher → vice_principal → principal
+    # - ≤2 days:  class_teacher approves directly → approved
+    # - 3-7 days: class_teacher recommends → vice_principal approves
+    # - 8+ days:  class_teacher → vice_principal → principal
+    approval_stage: Mapped[str] = mapped_column(
+        String(30), nullable=False, default="class_teacher"
+    )
+    # Current stage: class_teacher | vice_principal | principal | completed
+
+    current_approver_role: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    # Tracks the role that should act next
+
+    # Stage 1 — Class Teacher
+    ct_action: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    # approved | rejected | recommended
+    ct_approver_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    ct_actioned_on: Mapped[date | None] = mapped_column(Date, nullable=True)
+    ct_remarks: Mapped[str | None] = mapped_column(String(500), nullable=True)
+
+    # Stage 2 — Vice Principal
+    vp_action: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    vp_approver_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    vp_actioned_on: Mapped[date | None] = mapped_column(Date, nullable=True)
+    vp_remarks: Mapped[str | None] = mapped_column(String(500), nullable=True)
+
+    # Stage 3 — Principal (final)
     approved_by: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
     approved_on: Mapped[date | None] = mapped_column(Date, nullable=True)
     rejection_reason: Mapped[str | None] = mapped_column(String(500), nullable=True)
@@ -96,6 +123,7 @@ class LeaveApplication(BaseModel):
     substitute_accepted: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
 
     leave_type: Mapped["LeaveType"] = relationship("LeaveType")
+
 
 
 class HolidayCalendar(BaseModel):

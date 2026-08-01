@@ -171,8 +171,73 @@ FeeReceipt = FeePayment
 FeeReceiptItem = StudentFeeRecord
 
 
+# ── Fee Waiver Request (Approval Workflow) ─────────────────────
+class FeeWaiver(BaseModel):
+    """
+    Fee Waiver / Concession Request Workflow.
+    Submitted by parent/student → Accountant reviews → Principal approves.
+    Status: pending → accountant_reviewed → approved / rejected
+    """
+    __tablename__ = "fee_waivers"
+
+    waiver_number: Mapped[str] = mapped_column(String(50), unique=True, nullable=False, index=True)
+    student_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("students.id"), nullable=False, index=True)
+    academic_year: Mapped[str] = mapped_column(String(10), nullable=False)
+    requested_by: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    # user_id of requester (parent or student)
+
+    # Request details
+    reason: Mapped[str] = mapped_column(Text, nullable=False)
+    waiver_type: Mapped[str] = mapped_column(String(50), nullable=False, default="partial")
+    # full / partial / scholarship
+    requested_amount: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False, default=0)
+    # 0 = full waiver
+    document_path: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    # Supporting document (income certificate, etc.)
+
+    # Approval workflow
+    status: Mapped[str] = mapped_column(String(30), nullable=False, default="pending", index=True)
+    # pending → accountant_reviewed → approved / rejected
+
+    # Stage 1: Accountant Review
+    accountant_remarks: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    accountant_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    accountant_reviewed_on: Mapped[date | None] = mapped_column(Date, nullable=True)
+    accountant_recommended_amount: Mapped[Decimal | None] = mapped_column(Numeric(10, 2), nullable=True)
+    accountant_action: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    # recommend / reject
+
+    # Stage 2: Principal Final Approval
+    principal_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    principal_approved_on: Mapped[date | None] = mapped_column(Date, nullable=True)
+    principal_remarks: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    approved_amount: Mapped[Decimal | None] = mapped_column(Numeric(10, 2), nullable=True)
+    # Final approved waiver amount
+
+    student: Mapped["Student"] = relationship("Student", foreign_keys=[student_id])  # type: ignore
 
 # ── Aliases ────────────────────────────────────────────────────
 FeeReceipt = FeePayment
 FeeReceiptItem = StudentFeeRecord
+
+
+class StudentInstallment(BaseModel):
+    """
+    Student fee payment installment schedule.
+    Created by admin / accountant for a specific student.
+    e.g. Installment 1 (Term 1), Installment 2 (Term 2), Installment 3 (Term 3).
+    """
+    __tablename__ = "student_installments"
+
+    student_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("students.id"), nullable=False, index=True)
+    academic_year_id: Mapped[int] = mapped_column(BigInteger, nullable=False, index=True)
+    installment_name: Mapped[str] = mapped_column(String(100), nullable=False)
+    amount: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
+    paid_amount: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False, default=0)
+    due_date: Mapped[date] = mapped_column(Date, nullable=False)
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="pending")  # pending / partial / paid / overdue
+    remarks: Mapped[str | None] = mapped_column(String(255), nullable=True)
+
+    student: Mapped["Student"] = relationship("Student", foreign_keys=[student_id])  # type: ignore
+
 

@@ -21,6 +21,53 @@ from app.core.config import settings
 from app.shared.audit import create_audit_log
 
 
+# ── Module-level helpers ──────────────────────────────────────
+
+def _finalize_approval(db: "Session", app: "LeaveApplication", by: int) -> None:
+    """Mark leave application as fully approved and update balance."""
+    balance = db.scalar(
+        select(LeaveBalance).where(
+            LeaveBalance.employee_id == app.employee_id,
+            LeaveBalance.leave_type_id == app.leave_type_id,
+            LeaveBalance.academic_year == app.academic_year,
+        )
+    )
+    if balance:
+        balance.pending_days = max(Decimal("0"), balance.pending_days - app.total_days)
+        balance.used_days += app.total_days
+        balance.updated_by = by
+
+    app.status = "approved"
+    app.approved_by = by
+    app.approved_on = date.today()
+    app.approval_stage = "completed"
+    app.current_approver_role = None
+    app.updated_by = by
+    create_audit_log(db, "update", "leave_applications", app.id, {"status": "pending"}, {"status": "approved"}, by)
+    _notify_leave(db, app, "leave.approved", by, "Leave approved")
+
+
+def _notify_leave(db: "Session", app: "LeaveApplication", event: str, by: int, msg: str = "") -> None:
+    """Fire a leave notification event."""
+    try:
+        from app.shared.notifications import push_event
+        push_event(db, event, {
+            "applicant_id": app.employee_id,
+            "applicant_name": app.employee_name or "Employee",
+            "approver_name": "Approving Authority",
+            "days": float(app.total_days),
+            "from_date": str(app.from_date),
+            "to_date": str(app.to_date),
+            "reason": msg or "",
+            "app_id": app.id,
+            "sender_id": by,
+        })
+    except Exception:
+        pass
+
+
+
+
 def _gen_application_number(db: Session) -> str:
     today = date.today()
     prefix = f"LVE-{today.year}-"
@@ -223,39 +270,129 @@ class LeaveApplicationService:
         db.commit()
         db.refresh(app)
         create_audit_log(db, "create", "leave_applications", app.id, None, {"status": "pending", "days": str(total_days)}, by)
+        # ── Notify approver (class teacher) that leave was submitted
+        try:
+            from app.shared.notifications import push_event
+            push_event(db, "leave.applied", {
+                "applicant_id": by,
+                "applicant_name": employee_name or "Employee",
+                "approver_id": None,  # Will be resolved by class teacher lookup
+                "days": float(total_days),
+                "from_date": str(data.from_date),
+                "to_date": str(data.to_date),
+                "app_id": app.id,
+                "sender_id": by,
+            })
+        except Exception:
+            pass
         return app
 
     @staticmethod
-    def approve_or_reject(db: Session, app_id: int, data: LeaveApproveRequest, by: int) -> LeaveApplication:
+    def approve_or_reject(
+        db: Session,
+        app_id: int,
+        data: "LeaveApproveRequest",
+        by: int,
+        actor_role: str = "class_teacher",  # class_teacher | vice_principal | principal
+    ) -> LeaveApplication:
+        """
+        Multi-Stage Leave Approval:
+          ≤2 days  → Class Teacher approves directly
+          3-7 days → Class Teacher recommends → Vice Principal approves
+          8+ days  → Class Teacher → Vice Principal → Principal
+        """
         app = db.get(LeaveApplication, app_id)
         if not app or app.is_deleted:
             raise ValueError("Leave application not found")
-        if app.status != "pending":
-            raise ValueError(f"Cannot {data.action} a {app.status} application")
+        if app.status in ("approved", "rejected", "cancelled"):
+            raise ValueError(f"Cannot action a {app.status} application")
 
-        # Update balance
-        balance = db.scalar(
-            select(LeaveBalance).where(
-                LeaveBalance.employee_id == app.employee_id,
-                LeaveBalance.leave_type_id == app.leave_type_id,
-                LeaveBalance.academic_year == app.academic_year,
+        total_days = float(app.total_days)
+        action = data.action  # "approve" | "reject" | "recommend"
+        remarks = getattr(data, "rejection_reason", None) or getattr(data, "remarks", None) or ""
+
+        # ── Reject at any stage ────────────────────────────────
+        if action == "reject":
+            app.status = "rejected"
+            app.rejection_reason = remarks
+            app.approved_by = by
+            app.approved_on = date.today()
+            app.approval_stage = "completed"
+            app.updated_by = by
+            # Restore balance
+            balance = db.scalar(
+                select(LeaveBalance).where(
+                    LeaveBalance.employee_id == app.employee_id,
+                    LeaveBalance.leave_type_id == app.leave_type_id,
+                    LeaveBalance.academic_year == app.academic_year,
+                )
             )
-        )
-        if balance:
-            balance.pending_days = max(Decimal("0"), balance.pending_days - app.total_days)
-            if data.action == "approve":
-                balance.used_days += app.total_days
-            balance.updated_by = by
+            if balance:
+                balance.pending_days = max(Decimal("0"), balance.pending_days - app.total_days)
+                balance.updated_by = by
+            db.commit()
+            db.refresh(app)
+            create_audit_log(db, "update", "leave_applications", app_id, {"status": "pending"}, {"status": "rejected"}, by)
+            # Notify applicant
+            _notify_leave(db, app, "leave.rejected", by, remarks)
+            return app
 
-        app.status = "approved" if data.action == "approve" else "rejected"
-        app.approved_by = by
-        app.approved_on = date.today()
-        app.rejection_reason = data.rejection_reason
-        app.updated_by = by
+        # ── Class Teacher Stage ────────────────────────────────
+        if actor_role == "class_teacher":
+            app.ct_action = action  # "approve" or "recommend"
+            app.ct_approver_id = by
+            app.ct_actioned_on = date.today()
+            app.ct_remarks = remarks
+
+            if action == "approve" and total_days <= 2:
+                # CT directly approves for short leaves
+                _finalize_approval(db, app, by)
+            elif total_days <= 2:
+                # CT can only directly approve ≤2 days, not recommend
+                raise ValueError("Class Teacher can only directly approve leaves ≤ 2 days")
+            else:
+                # Escalate to VP
+                app.status = "vp_pending"
+                app.approval_stage = "vice_principal"
+                app.current_approver_role = "vice_principal"
+                app.updated_by = by
+                # Notify VP
+                _notify_leave(db, app, "leave.stage_escalated", by, "Requires Vice Principal approval")
+
+        # ── Vice Principal Stage ───────────────────────────────
+        elif actor_role == "vice_principal":
+            if app.approval_stage != "vice_principal":
+                raise ValueError(f"Leave is at '{app.approval_stage}' stage — VP cannot act yet")
+            app.vp_action = action
+            app.vp_approver_id = by
+            app.vp_actioned_on = date.today()
+            app.vp_remarks = remarks
+
+            if action == "approve" and total_days <= 7:
+                # VP directly approves for medium leaves
+                _finalize_approval(db, app, by)
+            else:
+                # Escalate to Principal
+                app.status = "principal_pending"
+                app.approval_stage = "principal"
+                app.current_approver_role = "principal"
+                app.updated_by = by
+                _notify_leave(db, app, "leave.stage_escalated", by, "Requires Principal approval")
+
+        # ── Principal Stage (Final) ────────────────────────────
+        elif actor_role in ("principal", "admin", "super_admin"):
+            if app.approval_stage not in ("principal", "class_teacher", "vice_principal"):
+                raise ValueError("Principal can approve any pending leave")
+            _finalize_approval(db, app, by)
+
+        else:
+            raise ValueError(f"Role '{actor_role}' cannot approve leave applications")
+
         db.commit()
         db.refresh(app)
-        create_audit_log(db, "update", "leave_applications", app_id, {"status": "pending"}, {"status": app.status}, by)
         return app
+
+
 
     @staticmethod
     def cancel(db: Session, app_id: int, by: int) -> LeaveApplication:

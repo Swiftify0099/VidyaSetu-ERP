@@ -3,17 +3,20 @@ import {
   Package, Plus, RefreshCw, Check, X, AlertTriangle,
   Wrench, ArrowDownToLine, ArrowUpFromLine, BarChart3,
   Pencil, Trash2, ArrowRight, ShieldCheck, History,
+  Printer, FileText, Calendar, Filter, Search, IndianRupee,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import inventoryService, {
-  Asset, AssetCategory, StockItem, StockTransaction, InventoryStats,
+  Asset, AssetCategory, StockItem, StockTransaction, InventoryStats, RegisterEntry,
 } from '../../services/inventoryService';
 import PermissionGate from '../../components/ui/PermissionGate';
 import styles from './InventoryPage.module.css';
 
-type Section = 'dashboard' | 'assets' | 'stock' | 'maintenance';
+type Section = 'dashboard' | 'assets' | 'stock' | 'register' | 'maintenance';
 
 const TODAY = new Date().toISOString().split('T')[0];
+const FIRST_DAY_YEAR = `${new Date().getFullYear()}-04-01`;
+
 const ASSET_STATUSES = ['active','in_repair','disposed','lost','donated'];
 const ASSET_CONDITIONS = ['excellent','good','fair','poor'];
 const STOCK_CATS = ['stationery','lab','sports','cleaning','admin','medical','library'];
@@ -69,6 +72,15 @@ export default function InventoryPage() {
   const [txnForm, setTxnForm] = useState({ transaction_type:'receipt', quantity:'', unit_cost:'', reference:'', issued_to:'', purpose:'', transaction_date:TODAY });
   const [savingTxn, setSavingTxn] = useState(false);
 
+  // Date-wise Register (Dr / Cr)
+  const [regFromDate, setRegFromDate] = useState(FIRST_DAY_YEAR);
+  const [regToDate, setRegToDate] = useState(TODAY);
+  const [regType, setRegType] = useState('all');
+  const [regSearch, setRegSearch] = useState('');
+  const [registerEntries, setRegisterEntries] = useState<RegisterEntry[]>([]);
+  const [loadingRegister, setLoadingRegister] = useState(false);
+  const [showPrintModal, setShowPrintModal] = useState(false);
+
   const loadStats = useCallback(async () => {
     try { setStats(await inventoryService.getStats()); } catch {}
   }, []);
@@ -86,9 +98,27 @@ export default function InventoryPage() {
     catch {} finally { setLoadingStock(false); }
   }, [stockCat, lowOnly, stockSearch]);
 
+  const loadRegister = useCallback(async () => {
+    setLoadingRegister(true);
+    try {
+      const data = await inventoryService.getRegister({
+        from_date: regFromDate || undefined,
+        to_date: regToDate || undefined,
+        register_type: regType !== 'all' ? regType : undefined,
+        search: regSearch || undefined,
+      });
+      setRegisterEntries(data);
+    } catch {
+      toast.error('Failed to load register entries.');
+    } finally {
+      setLoadingRegister(false);
+    }
+  }, [regFromDate, regToDate, regType, regSearch]);
+
   useEffect(() => { loadStats(); loadCategories(); }, [loadStats, loadCategories]);
   useEffect(() => { if (section === 'assets' || section === 'maintenance') loadAssets(); }, [section, loadAssets]);
   useEffect(() => { if (section === 'stock') loadStock(); }, [section, loadStock]);
+  useEffect(() => { if (section === 'register') loadRegister(); }, [section, loadRegister]);
 
   const openAssetModal = (a?: Asset) => {
     setEditAsset(a || null);
@@ -165,6 +195,14 @@ export default function InventoryPage() {
     } catch (e: any) { toast.error(e?.response?.data?.detail || 'Failed.'); } finally { setSavingTxn(false); }
   };
 
+  const handlePrint = () => {
+    window.print();
+  };
+
+  const totalDr = registerEntries.reduce((acc, curr) => acc + (Number(curr.dr_amount) || 0), 0);
+  const totalCr = registerEntries.reduce((acc, curr) => acc + (Number(curr.cr_amount) || 0), 0);
+  const netBalance = totalDr - totalCr;
+
   const fmt = (n?: number) => n != null ? `₹${Number(n).toLocaleString('en-IN')}` : '—';
   const fmtDate = (d?: string) => d ? new Date(d).toLocaleDateString('en-IN') : '—';
 
@@ -179,10 +217,11 @@ export default function InventoryPage() {
 
       <div className={styles.tabBar}>
         {([
-          { id:'dashboard', label:'Dashboard',   icon:<BarChart3 size={14}/> },
-          { id:'assets',    label:'Asset Register', icon:<Package size={14}/> },
-          { id:'stock',     label:'Stock & Consumables', icon:<ArrowDownToLine size={14}/> },
-          { id:'maintenance', label:'Maintenance', icon:<Wrench size={14}/> },
+          { id:'dashboard',   label:'Dashboard',               icon:<BarChart3 size={14}/> },
+          { id:'assets',      label:'Asset Register',          icon:<Package size={14}/> },
+          { id:'stock',       label:'Stock & Consumables',     icon:<ArrowDownToLine size={14}/> },
+          { id:'register',    label:'Date-wise Register (Dr/Cr)', icon:<FileText size={14}/> },
+          { id:'maintenance', label:'Maintenance',             icon:<Wrench size={14}/> },
         ] as const).map(t => (
           <button key={t.id} className={`${styles.tab} ${section===t.id?styles.tabActive:''}`}
             onClick={() => setSection(t.id as Section)}>{t.icon} {t.label}</button>
@@ -248,15 +287,13 @@ export default function InventoryPage() {
                       <td>{a.location||'—'}</td>
                       <td><span className={styles.condTag} style={{color:COND_COLOR[a.condition],background:`${COND_COLOR[a.condition]}18`}}>{a.condition}</span></td>
                       <td><span className={styles.statusTag} style={{color:STATUS_COLOR[a.status],background:`${STATUS_COLOR[a.status]}18`}}>{a.status}</span></td>
-                      <td>{fmt(a.purchase_price)}</td>
-                      <td className={a.warranty_till && new Date(a.warranty_till) < new Date(Date.now()+30*86400000) ? styles.warningDate : ''}>{fmtDate(a.warranty_till)}</td>
+                      <td><strong>{fmt(a.purchase_price)}</strong></td>
+                      <td>{fmtDate(a.warranty_till)}</td>
                       <td>
-                        <div className={styles.actionBtns}>
-                          <PermissionGate permission="inventory.manage">
-                            <button className={styles.miniBtn} title="Maintenance" onClick={()=>openMaintModal(a)}><Wrench size={11}/></button>
-                            <button className={styles.miniBtn} title="Edit" onClick={()=>openAssetModal(a)}><Pencil size={11}/></button>
-                            <button className={`${styles.miniBtn} ${styles.miniBtnDanger}`} onClick={()=>deleteAsset(a.id)}><Trash2 size={11}/></button>
-                          </PermissionGate>
+                        <div className={styles.rowActions}>
+                          <button className={styles.rowBtn} onClick={()=>openAssetModal(a)} title="Edit"><Pencil size={13}/></button>
+                          <button className={styles.rowBtn} onClick={()=>openMaintModal(a)} title="Maintenance"><Wrench size={13}/></button>
+                          <button className={styles.rowBtnDanger} onClick={()=>deleteAsset(a.id)} title="Delete"><Trash2 size={13}/></button>
                         </div>
                       </td>
                     </tr>
@@ -272,44 +309,130 @@ export default function InventoryPage() {
       {section==='stock' && (
         <div className={styles.stockContent}>
           <div className={styles.toolbar}>
-            <input className={styles.searchInput} placeholder="Search stock..." value={stockSearch} onChange={e=>setStockSearch(e.target.value)} onKeyDown={e=>e.key==='Enter'&&loadStock()}/>
-            <div className={styles.filterTabs}>
-              <button className={`${styles.fTab} ${!stockCat?styles.fTabActive:''}`} onClick={()=>{setStockCat('');setLowOnly(false);}}>All</button>
-              {STOCK_CATS.map(c=><button key={c} className={`${styles.fTab} ${stockCat===c?styles.fTabActive:''}`} onClick={()=>setStockCat(c)}>{c}</button>)}
-              <button className={`${styles.fTab} ${styles.fTabLow} ${lowOnly?styles.fTabActive:''}`} onClick={()=>setLowOnly(v=>!v)}>🔴 Low Stock</button>
-            </div>
+            <input className={styles.searchInput} placeholder="Search item code/name..." value={stockSearch}
+              onChange={e=>setStockSearch(e.target.value)} onKeyDown={e=>e.key==='Enter'&&loadStock()}/>
+            <select className={styles.filterSel} value={stockCat} onChange={e=>{setStockCat(e.target.value);setTimeout(loadStock,50);}}>
+              <option value="">All Categories</option>
+              {STOCK_CATS.map(c=><option key={c} value={c}>{c}</option>)}
+            </select>
+            <label className={styles.checkLabel}><input type="checkbox" checked={lowOnly} onChange={e=>{setLowOnly(e.target.checked);setTimeout(loadStock,50);}}/> Low Stock Only</label>
             <button className={styles.iconBtn} onClick={loadStock}><RefreshCw size={14}/></button>
             <PermissionGate permission="inventory.manage">
-              <button className={styles.addBtn} onClick={()=>setShowStockModal(true)}><Plus size={15}/> Add Item</button>
+              <button className={styles.addBtn} onClick={()=>setShowStockModal(true)}><Plus size={15}/> Add Stock Item</button>
             </PermissionGate>
           </div>
           {loadingStock ? <div className={styles.loadingSkel}/> : (
-            <div className={styles.stockGrid}>
-              {stock.length===0 ? <div className={styles.emptyState}><Package size={64}/><p>No stock items.</p></div>
-              : stock.map(s=>(
-                <div key={s.id} className={`${styles.stockCard} ${s.is_low_stock?styles.stockLow:''}`}>
-                  {s.is_low_stock && <div className={styles.lowBadge}><AlertTriangle size={10}/> Low Stock</div>}
-                  <div className={styles.stockTop}>
-                    <div className={styles.stockCode}>{s.item_code}</div>
-                    <span className={styles.stockCatTag}>{s.category}</span>
-                  </div>
-                  <div className={styles.stockName}>{s.name}</div>
-                  {s.name_marathi && <div className={styles.stockNameMr}>{s.name_marathi}</div>}
-                  <div className={styles.stockBar}>
-                    <div className={styles.stockBarFill} style={{ width:`${Math.min(100,Number(s.current_stock)/Number(s.minimum_stock)*50)}%`, background: s.is_low_stock?'var(--color-danger)':'var(--color-success)' }}/>
-                  </div>
-                  <div className={styles.stockNums}>
-                    <span className={`${styles.stockQty} ${s.is_low_stock?styles.stockQtyLow:''}`}>{s.current_stock} {s.unit}</span>
-                    <span className={styles.stockMin}>Min: {s.minimum_stock}</span>
-                  </div>
-                  {s.unit_cost && <div className={styles.stockCost}>{fmt(s.unit_cost)} / {s.unit}</div>}
-                  <div className={styles.stockActions}>
-                    <button className={styles.txnBtn} onClick={()=>openTxnModal(s)}>
-                      <History size={12}/> Transactions
-                    </button>
-                  </div>
-                </div>
-              ))}
+            <div className={styles.tableWrap}>
+              <table className={styles.table}>
+                <thead><tr><th>Code</th><th>Item Name</th><th>Category</th><th>Current Stock</th><th>Min Stock</th><th>Unit Cost</th><th>Total Value</th><th>Actions</th></tr></thead>
+                <tbody>
+                  {stock.length===0 ? <tr><td colSpan={8} className={styles.emptyCell}><div className={styles.emptyState}><Package size={48}/><p>No stock items found.</p></div></td></tr>
+                  : stock.map(item => (
+                    <tr key={item.id} className={`${styles.tr} ${item.is_low_stock?styles.lowStockRow:''}`}>
+                      <td><span className={styles.assetCode}>{item.item_code}</span></td>
+                      <td><div className={styles.assetName}>{item.name}</div>{item.name_marathi&&<div className={styles.assetNameMr}>{item.name_marathi}</div>}</td>
+                      <td><span className={styles.catBadge}>{item.category}</span></td>
+                      <td><strong className={item.is_low_stock?styles.lowStockText:''}>{item.current_stock} {item.unit}</strong>{item.is_low_stock&&<span className={styles.lowBadge}>Low</span>}</td>
+                      <td>{item.minimum_stock} {item.unit}</td>
+                      <td>{fmt(item.unit_cost)}</td>
+                      <td><strong>{fmt((item.unit_cost||0)*item.current_stock)}</strong></td>
+                      <td><button className={styles.transactBtn} onClick={()=>openTxnModal(item)}><ArrowDownToLine size={13}/> Transact</button></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── DATE-WISE REGISTER (DR / CR) ───────────────────── */}
+      {section==='register' && (
+        <div className={styles.registerContent}>
+          <div className={styles.registerToolbar}>
+            <div className={styles.dateGroup}>
+              <label><Calendar size={13}/> From:</label>
+              <input type="date" className={styles.dateInp} value={regFromDate} onChange={e=>setRegFromDate(e.target.value)}/>
+            </div>
+            <div className={styles.dateGroup}>
+              <label><Calendar size={13}/> To:</label>
+              <input type="date" className={styles.dateInp} value={regToDate} onChange={e=>setRegToDate(e.target.value)}/>
+            </div>
+            <select className={styles.filterSel} value={regType} onChange={e=>setRegType(e.target.value)}>
+              <option value="all">All Entries (Assets & Stock)</option>
+              <option value="asset">Assets Only (Purchases & Disposal)</option>
+              <option value="stock">Stock Consumables Only</option>
+            </select>
+            <input className={styles.searchInput} placeholder="Search Code, Ref, Vendor, Particulars..."
+              value={regSearch} onChange={e=>setRegSearch(e.target.value)} onKeyDown={e=>e.key==='Enter'&&loadRegister()}/>
+            <button className={styles.iconBtn} onClick={loadRegister} title="Refresh"><RefreshCw size={14}/></button>
+            <button className={styles.printBtn} onClick={()=>setShowPrintModal(true)} title="Print Date-wise Register">
+              <Printer size={15}/> Print Register (Dr/Cr)
+            </button>
+          </div>
+
+          {/* Dr / Cr Summary Header */}
+          <div className={styles.regSummaryGrid}>
+            <div className={`${styles.regSummaryCard} ${styles.drCard}`}>
+              <div className={styles.regSumLabel}>Total Debit (Dr / जमा / Inward)</div>
+              <div className={styles.regSumVal}>{fmt(totalDr)}</div>
+              <div className={styles.regSumSub}>Purchases, Stock Receipts & Returns</div>
+            </div>
+            <div className={`${styles.regSummaryCard} ${styles.crCard}`}>
+              <div className={styles.regSumLabel}>Total Credit (Cr / नावे / Outward)</div>
+              <div className={styles.regSumVal}>{fmt(totalCr)}</div>
+              <div className={styles.regSumSub}>Stock Issues, Maintenance & Disposals</div>
+            </div>
+            <div className={`${styles.regSummaryCard} ${styles.netCard}`}>
+              <div className={styles.regSumLabel}>Net Closing Balance (शिल्लक)</div>
+              <div className={styles.regSumVal}>{fmt(netBalance)}</div>
+              <div className={styles.regSumSub}>Difference (Dr - Cr)</div>
+            </div>
+          </div>
+
+          {loadingRegister ? <div className={styles.loadingSkel}/> : (
+            <div className={styles.tableWrap}>
+              <table className={styles.table}>
+                <thead>
+                  <tr>
+                    <th>Date (दिनांक)</th>
+                    <th>Voucher / Ref (पावती/कोड)</th>
+                    <th>Code & Particulars (तपशील)</th>
+                    <th>Type / Category</th>
+                    <th style={{textAlign:'right', color:'#16a34a'}}>Dr / Addition (जमा ₹)</th>
+                    <th style={{textAlign:'right', color:'#dc2626'}}>Cr / Issue (नावे ₹)</th>
+                    <th>Party / Location</th>
+                    <th>Remarks (शेरा)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {registerEntries.length === 0 ? (
+                    <tr><td colSpan={8} className={styles.emptyCell}><div className={styles.emptyState}><FileText size={48}/><p>No register entries found for selected dates.</p></div></td></tr>
+                  ) : registerEntries.map((e, idx) => (
+                    <tr key={`${e.id}-${idx}`} className={styles.tr}>
+                      <td><strong>{fmtDate(e.entry_date)}</strong></td>
+                      <td><code className={styles.refCode}>{e.reference || e.code}</code></td>
+                      <td>
+                        <div className={styles.assetName}>{e.particulars}</div>
+                        {e.particulars_marathi && <div className={styles.assetNameMr}>{e.particulars_marathi}</div>}
+                      </td>
+                      <td><span className={styles.catBadge}>{e.category} ({e.entry_type.replace('_',' ')})</span></td>
+                      <td style={{textAlign:'right'}} className={Number(e.dr_amount)>0 ? styles.drText : ''}>
+                        {Number(e.dr_amount) > 0 ? (
+                          <div><strong>{fmt(e.dr_amount)}</strong>{e.dr_qty ? <div style={{fontSize:'0.75rem',color:'#16a34a'}}>({e.dr_qty} Qty)</div> : null}</div>
+                        ) : '—'}
+                      </td>
+                      <td style={{textAlign:'right'}} className={Number(e.cr_amount)>0 ? styles.crText : ''}>
+                        {Number(e.cr_amount) > 0 ? (
+                          <div><strong>{fmt(e.cr_amount)}</strong>{e.cr_qty ? <div style={{fontSize:'0.75rem',color:'#dc2626'}}>({e.cr_qty} Qty)</div> : null}</div>
+                        ) : '—'}
+                      </td>
+                      <td>{e.party_location || '—'}</td>
+                      <td><span className={styles.remarksText}>{e.remarks || '—'}</span></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           )}
         </div>
@@ -319,124 +442,170 @@ export default function InventoryPage() {
       {section==='maintenance' && (
         <div className={styles.maintContent}>
           <div className={styles.toolbar}>
+            <input className={styles.searchInput} placeholder="Search asset name/code for maintenance..." value={assetSearch}
+              onChange={e=>setAssetSearch(e.target.value)} onKeyDown={e=>e.key==='Enter'&&loadAssets()}/>
             <button className={styles.iconBtn} onClick={loadAssets}><RefreshCw size={14}/></button>
           </div>
           <div className={styles.tableWrap}>
             <table className={styles.table}>
-              <thead><tr><th>Asset</th><th>Serial</th><th>Status</th><th>Location</th><th>Next Service</th><th>Actions</th></tr></thead>
+              <thead><tr><th>Code</th><th>Asset Name</th><th>Location</th><th>Condition</th><th>Status</th><th>Actions</th></tr></thead>
               <tbody>
-                {assets.filter(a=>a.status==='in_repair'||a.warranty_till).map(a=>(
+                {assets.map(a => (
                   <tr key={a.id} className={styles.tr}>
-                    <td><div className={styles.assetName}>{a.name}</div><div className={styles.assetCode}>{a.asset_code}</div></td>
-                    <td>{a.serial_number||'—'}</td>
-                    <td><span className={styles.statusTag} style={{color:STATUS_COLOR[a.status],background:`${STATUS_COLOR[a.status]}18`}}>{a.status}</span></td>
+                    <td><span className={styles.assetCode}>{a.asset_code}</span></td>
+                    <td><div className={styles.assetName}>{a.name}</div></td>
                     <td>{a.location||'—'}</td>
-                    <td className={styles.warningDate}>{fmtDate(a.warranty_till)}</td>
-                    <td><button className={styles.miniBtn} onClick={()=>openMaintModal(a)}><Wrench size={11}/> Log Maintenance</button></td>
+                    <td><span className={styles.condTag} style={{color:COND_COLOR[a.condition],background:`${COND_COLOR[a.condition]}18`}}>{a.condition}</span></td>
+                    <td><span className={styles.statusTag} style={{color:STATUS_COLOR[a.status],background:`${STATUS_COLOR[a.status]}18`}}>{a.status}</span></td>
+                    <td>
+                      <div className={styles.rowActions}>
+                        <button className={styles.addBtnSmall} onClick={()=>openMaintModal(a)}><Plus size={12}/> Add Service Record</button>
+                        <button className={styles.rowBtn} onClick={()=>loadMaintenance(a)} title="History"><History size={13}/></button>
+                      </div>
+                    </td>
                   </tr>
                 ))}
-                {assets.filter(a=>a.status==='in_repair'||a.warranty_till).length===0 && (
-                  <tr><td colSpan={6} className={styles.emptyCell}><div className={styles.emptyState}><Wrench size={48}/><p>No assets in repair or with warranty.</p></div></td></tr>
-                )}
               </tbody>
             </table>
           </div>
+
+          {assetDetail && maintenance.length > 0 && (
+            <div className={styles.maintHistoryCard}>
+              <h3>Maintenance History for: {assetDetail.name} ({assetDetail.asset_code})</h3>
+              <table className={styles.table}>
+                <thead><tr><th>Date</th><th>Type</th><th>Description</th><th>Cost</th><th>Vendor</th><th>Status After</th></tr></thead>
+                <tbody>
+                  {maintenance.map(m => (
+                    <tr key={m.id}>
+                      <td>{fmtDate(m.maintenance_date)}</td>
+                      <td><span className={styles.catBadge}>{m.maintenance_type}</span></td>
+                      <td>{m.description}</td>
+                      <td><strong>{fmt(m.cost)}</strong></td>
+                      <td>{m.vendor||'—'}</td>
+                      <td><span className={styles.statusTag} style={{color:STATUS_COLOR[m.status_after],background:`${STATUS_COLOR[m.status_after]}18`}}>{m.status_after}</span></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       )}
 
-      {/* ════ Asset Modal ════ */}
+      {/* ── MODALS ─────────────────────────────────────────── */}
+      {/* Add/Edit Asset Modal */}
       {showAssetModal && (
-        <div className={styles.overlay} onClick={()=>setShowAssetModal(false)}>
-          <div className={`${styles.modal} ${styles.wideModal}`} onClick={e=>e.stopPropagation()}>
-            <div className={styles.modalHeader}><h3 className={styles.modalTitle}>{editAsset?'Edit Asset':'Add Asset'}</h3><button className={styles.modalClose} onClick={()=>setShowAssetModal(false)}><X size={16}/></button></div>
+        <div className={styles.modalOverlay} onClick={()=>setShowAssetModal(false)}>
+          <div className={styles.modal} onClick={e=>e.stopPropagation()}>
+            <div className={styles.modalHeader}>
+              <h3>{editAsset ? 'Edit Asset' : 'Add New Asset (नवीन मालमत्ता)'}</h3>
+              <button className={styles.closeBtn} onClick={()=>setShowAssetModal(false)}><X size={16}/></button>
+            </div>
             <div className={styles.modalBody}>
               <div className={styles.mfRow}>
-                <div className={styles.mf}><label className={styles.ml}>Asset Code *</label><input className={styles.mi} value={assetForm.asset_code} onChange={e=>setAssetForm(p=>({...p,asset_code:e.target.value}))} placeholder="e.g. COMP-001"/></div>
-                <div className={styles.mf}><label className={styles.ml}>Category</label><select className={styles.mi} value={assetForm.category_id} onChange={e=>setAssetForm(p=>({...p,category_id:e.target.value}))}><option value="">-- None --</option>{categories.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select></div>
+                <div className={styles.mf}><label className={styles.ml}>Asset Code *</label><input className={styles.mi} value={assetForm.asset_code} onChange={e=>setAssetForm(p=>({...p,asset_code:e.target.value}))} placeholder="AST-001"/></div>
+                <div className={styles.mf}><label className={styles.ml}>Name (English) *</label><input className={styles.mi} value={assetForm.name} onChange={e=>setAssetForm(p=>({...p,name:e.target.value}))} placeholder="Smart Board 65 inch"/></div>
               </div>
-              <div className={styles.mf}><label className={styles.ml}>Asset Name *</label><input className={styles.mi} value={assetForm.name} onChange={e=>setAssetForm(p=>({...p,name:e.target.value}))} placeholder="e.g. Dell Laptop"/></div>
-              <div className={styles.mf}><label className={styles.ml}>Marathi Name</label><input className={styles.mi} value={assetForm.name_marathi} onChange={e=>setAssetForm(p=>({...p,name_marathi:e.target.value}))}/></div>
+              <div className={styles.mfRow}>
+                <div className={styles.mf}><label className={styles.ml}>Name (Marathi)</label><input className={styles.mi} value={assetForm.name_marathi} onChange={e=>setAssetForm(p=>({...p,name_marathi:e.target.value}))} placeholder="डिजिटल फलक 65 इंच"/></div>
+                <div className={styles.mf}><label className={styles.ml}>Category</label>
+                  <select className={styles.mi} value={assetForm.category_id} onChange={e=>setAssetForm(p=>({...p,category_id:e.target.value}))}>
+                    <option value="">Select Category</option>
+                    {categories.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
+                  </select>
+                </div>
+              </div>
               <div className={styles.mfRow}>
                 <div className={styles.mf}><label className={styles.ml}>Brand</label><input className={styles.mi} value={assetForm.brand} onChange={e=>setAssetForm(p=>({...p,brand:e.target.value}))}/></div>
-                <div className={styles.mf}><label className={styles.ml}>Model</label><input className={styles.mi} value={assetForm.model_number} onChange={e=>setAssetForm(p=>({...p,model_number:e.target.value}))}/></div>
-                <div className={styles.mf}><label className={styles.ml}>Serial No.</label><input className={styles.mi} value={assetForm.serial_number} onChange={e=>setAssetForm(p=>({...p,serial_number:e.target.value}))}/></div>
+                <div className={styles.mf}><label className={styles.ml}>Model Number</label><input className={styles.mi} value={assetForm.model_number} onChange={e=>setAssetForm(p=>({...p,model_number:e.target.value}))}/></div>
+                <div className={styles.mf}><label className={styles.ml}>Serial Number</label><input className={styles.mi} value={assetForm.serial_number} onChange={e=>setAssetForm(p=>({...p,serial_number:e.target.value}))}/></div>
               </div>
               <div className={styles.mfRow}>
                 <div className={styles.mf}><label className={styles.ml}>Purchase Date</label><input type="date" className={styles.mi} value={assetForm.purchase_date} onChange={e=>setAssetForm(p=>({...p,purchase_date:e.target.value}))}/></div>
                 <div className={styles.mf}><label className={styles.ml}>Purchase Price (₹)</label><input type="number" className={styles.mi} value={assetForm.purchase_price} onChange={e=>setAssetForm(p=>({...p,purchase_price:e.target.value}))}/></div>
+                <div className={styles.mf}><label className={styles.ml}>Vendor/Supplier</label><input className={styles.mi} value={assetForm.vendor} onChange={e=>setAssetForm(p=>({...p,vendor:e.target.value}))}/></div>
+              </div>
+              <div className={styles.mfRow}>
                 <div className={styles.mf}><label className={styles.ml}>Warranty Till</label><input type="date" className={styles.mi} value={assetForm.warranty_till} onChange={e=>setAssetForm(p=>({...p,warranty_till:e.target.value}))}/></div>
+                <div className={styles.mf}><label className={styles.ml}>Location/Room</label><input className={styles.mi} value={assetForm.location} onChange={e=>setAssetForm(p=>({...p,location:e.target.value}))} placeholder="Computer Lab 1"/></div>
               </div>
               <div className={styles.mfRow}>
-                <div className={styles.mf}><label className={styles.ml}>Vendor</label><input className={styles.mi} value={assetForm.vendor} onChange={e=>setAssetForm(p=>({...p,vendor:e.target.value}))}/></div>
-                <div className={styles.mf}><label className={styles.ml}>Location</label><input className={styles.mi} value={assetForm.location} onChange={e=>setAssetForm(p=>({...p,location:e.target.value}))} placeholder="Room 12, Computer Lab"/></div>
+                <div className={styles.mf}><label className={styles.ml}>Status</label>
+                  <select className={styles.mi} value={assetForm.status} onChange={e=>setAssetForm(p=>({...p,status:e.target.value}))}>
+                    {ASSET_STATUSES.map(s=><option key={s} value={s}>{s}</option>)}
+                  </select>
+                </div>
+                <div className={styles.mf}><label className={styles.ml}>Condition</label>
+                  <select className={styles.mi} value={assetForm.condition} onChange={e=>setAssetForm(p=>({...p,condition:e.target.value}))}>
+                    {ASSET_CONDITIONS.map(c=><option key={c} value={c}>{c}</option>)}
+                  </select>
+                </div>
               </div>
-              <div className={styles.mfRow}>
-                <div className={styles.mf}><label className={styles.ml}>Status</label><select className={styles.mi} value={assetForm.status} onChange={e=>setAssetForm(p=>({...p,status:e.target.value}))}>{ASSET_STATUSES.map(s=><option key={s}>{s}</option>)}</select></div>
-                <div className={styles.mf}><label className={styles.ml}>Condition</label><select className={styles.mi} value={assetForm.condition} onChange={e=>setAssetForm(p=>({...p,condition:e.target.value}))}>{ASSET_CONDITIONS.map(c=><option key={c}>{c}</option>)}</select></div>
-              </div>
+              <div className={styles.mf}><label className={styles.ml}>Description / Notes</label><textarea className={styles.mta} value={assetForm.description} onChange={e=>setAssetForm(p=>({...p,description:e.target.value}))} rows={2}/></div>
             </div>
-            <div className={styles.modalFooter}><button className={styles.cancelBtn} onClick={()=>setShowAssetModal(false)}>Cancel</button><button className={styles.submitBtn} onClick={saveAsset} disabled={savingAsset}>{savingAsset?<span className={styles.spin}/>:<Check size={14}/>} {editAsset?'Update':'Add'}</button></div>
+            <div className={styles.modalFooter}>
+              <button className={styles.cancelBtn} onClick={()=>setShowAssetModal(false)}>Cancel</button>
+              <button className={styles.saveBtn} onClick={saveAsset} disabled={savingAsset}>{savingAsset?<span className={styles.spin}/>:<Check size={14}/>} {editAsset?'Update Asset':'Save Asset'}</button>
+            </div>
           </div>
         </div>
       )}
 
-      {/* ════ Maintenance Modal ════ */}
-      {showMaintModal && assetDetail && (
-        <div className={styles.overlay} onClick={()=>setShowMaintModal(false)}>
-          <div className={styles.modal} onClick={e=>e.stopPropagation()}>
-            <div className={styles.modalHeader}><h3 className={styles.modalTitle}>Log Maintenance<span className={styles.modalSub}> — {assetDetail.name}</span></h3><button className={styles.modalClose} onClick={()=>setShowMaintModal(false)}><X size={16}/></button></div>
-            <div className={styles.modalBody}>
-              <div className={styles.mfRow}>
-                <div className={styles.mf}><label className={styles.ml}>Date *</label><input type="date" className={styles.mi} value={maintForm.maintenance_date} max={TODAY} onChange={e=>setMaintForm(p=>({...p,maintenance_date:e.target.value}))}/></div>
-                <div className={styles.mf}><label className={styles.ml}>Type</label><select className={styles.mi} value={maintForm.maintenance_type} onChange={e=>setMaintForm(p=>({...p,maintenance_type:e.target.value}))}>{MAINT_TYPES.map(t=><option key={t}>{t}</option>)}</select></div>
-              </div>
-              <div className={styles.mf}><label className={styles.ml}>Description *</label><textarea className={styles.mta} rows={3} value={maintForm.description} onChange={e=>setMaintForm(p=>({...p,description:e.target.value}))} placeholder="What was done?"/></div>
-              <div className={styles.mfRow}>
-                <div className={styles.mf}><label className={styles.ml}>Cost (₹)</label><input type="number" className={styles.mi} value={maintForm.cost} onChange={e=>setMaintForm(p=>({...p,cost:e.target.value}))}/></div>
-                <div className={styles.mf}><label className={styles.ml}>Vendor</label><input className={styles.mi} value={maintForm.vendor} onChange={e=>setMaintForm(p=>({...p,vendor:e.target.value}))}/></div>
-                <div className={styles.mf}><label className={styles.ml}>Next Service</label><input type="date" className={styles.mi} value={maintForm.next_service_date} onChange={e=>setMaintForm(p=>({...p,next_service_date:e.target.value}))}/></div>
-              </div>
-              <div className={styles.mf}><label className={styles.ml}>Asset Status After</label><select className={styles.mi} value={maintForm.status_after} onChange={e=>setMaintForm(p=>({...p,status_after:e.target.value}))}>{ASSET_STATUSES.map(s=><option key={s}>{s}</option>)}</select></div>
-            </div>
-            <div className={styles.modalFooter}><button className={styles.cancelBtn} onClick={()=>setShowMaintModal(false)}>Cancel</button><button className={styles.submitBtn} onClick={saveMaint} disabled={savingMaint}>{savingMaint?<span className={styles.spin}/>:<Check size={14}/>} Save</button></div>
-          </div>
-        </div>
-      )}
-
-      {/* ════ Stock Item Modal ════ */}
+      {/* Add Stock Item Modal */}
       {showStockModal && (
-        <div className={styles.overlay} onClick={()=>setShowStockModal(false)}>
+        <div className={styles.modalOverlay} onClick={()=>setShowStockModal(false)}>
           <div className={styles.modal} onClick={e=>e.stopPropagation()}>
-            <div className={styles.modalHeader}><h3 className={styles.modalTitle}>Add Stock Item</h3><button className={styles.modalClose} onClick={()=>setShowStockModal(false)}><X size={16}/></button></div>
-            <div className={styles.modalBody}>
-              <div className={styles.mfRow}><div className={styles.mf}><label className={styles.ml}>Item Code *</label><input className={styles.mi} value={stockForm.item_code} onChange={e=>setStockForm(p=>({...p,item_code:e.target.value}))} placeholder="STAT-001"/></div><div className={styles.mf}><label className={styles.ml}>Category</label><select className={styles.mi} value={stockForm.category} onChange={e=>setStockForm(p=>({...p,category:e.target.value}))}>{STOCK_CATS.map(c=><option key={c}>{c}</option>)}</select></div></div>
-              <div className={styles.mf}><label className={styles.ml}>Name *</label><input className={styles.mi} value={stockForm.name} onChange={e=>setStockForm(p=>({...p,name:e.target.value}))} placeholder="e.g. A4 Paper Ream"/></div>
-              <div className={styles.mf}><label className={styles.ml}>Marathi Name</label><input className={styles.mi} value={stockForm.name_marathi} onChange={e=>setStockForm(p=>({...p,name_marathi:e.target.value}))}/></div>
-              <div className={styles.mfRow}>
-                <div className={styles.mf}><label className={styles.ml}>Unit</label><select className={styles.mi} value={stockForm.unit} onChange={e=>setStockForm(p=>({...p,unit:e.target.value}))}>{STOCK_UNITS.map(u=><option key={u}>{u}</option>)}</select></div>
-                <div className={styles.mf}><label className={styles.ml}>Opening Stock</label><input type="number" className={styles.mi} value={stockForm.current_stock} onChange={e=>setStockForm(p=>({...p,current_stock:e.target.value}))}/></div>
-                <div className={styles.mf}><label className={styles.ml}>Min Stock (Alert)</label><input type="number" className={styles.mi} value={stockForm.minimum_stock} onChange={e=>setStockForm(p=>({...p,minimum_stock:e.target.value}))}/></div>
-                <div className={styles.mf}><label className={styles.ml}>Unit Cost (₹)</label><input type="number" className={styles.mi} value={stockForm.unit_cost} onChange={e=>setStockForm(p=>({...p,unit_cost:e.target.value}))}/></div>
-              </div>
-              <div className={styles.mf}><label className={styles.ml}>Location</label><input className={styles.mi} value={stockForm.location} onChange={e=>setStockForm(p=>({...p,location:e.target.value}))} placeholder="Storeroom, Lab Cupboard"/></div>
+            <div className={styles.modalHeader}>
+              <h3>Add Stock Item (नवीन साठा वस्तू)</h3>
+              <button className={styles.closeBtn} onClick={()=>setShowStockModal(false)}><X size={16}/></button>
             </div>
-            <div className={styles.modalFooter}><button className={styles.cancelBtn} onClick={()=>setShowStockModal(false)}>Cancel</button><button className={styles.submitBtn} onClick={saveStockItem} disabled={savingStock}>{savingStock?<span className={styles.spin}/>:<Check size={14}/>} Add</button></div>
+            <div className={styles.modalBody}>
+              <div className={styles.mfRow}>
+                <div className={styles.mf}><label className={styles.ml}>Item Code *</label><input className={styles.mi} value={stockForm.item_code} onChange={e=>setStockForm(p=>({...p,item_code:e.target.value}))} placeholder="STK-001"/></div>
+                <div className={styles.mf}><label className={styles.ml}>Item Name *</label><input className={styles.mi} value={stockForm.name} onChange={e=>setStockForm(p=>({...p,name:e.target.value}))} placeholder="A4 Paper Rim"/></div>
+              </div>
+              <div className={styles.mfRow}>
+                <div className={styles.mf}><label className={styles.ml}>Name (Marathi)</label><input className={styles.mi} value={stockForm.name_marathi} onChange={e=>setStockForm(p=>({...p,name_marathi:e.target.value}))} placeholder="A4 कागद रीम"/></div>
+                <div className={styles.mf}><label className={styles.ml}>Category</label>
+                  <select className={styles.mi} value={stockForm.category} onChange={e=>setStockForm(p=>({...p,category:e.target.value}))}>
+                    {STOCK_CATS.map(c=><option key={c} value={c}>{c}</option>)}
+                  </select>
+                </div>
+              </div>
+              <div className={styles.mfRow}>
+                <div className={styles.mf}><label className={styles.ml}>Unit</label>
+                  <select className={styles.mi} value={stockForm.unit} onChange={e=>setStockForm(p=>({...p,unit:e.target.value}))}>
+                    {STOCK_UNITS.map(u=><option key={u} value={u}>{u}</option>)}
+                  </select>
+                </div>
+                <div className={styles.mf}><label className={styles.ml}>Initial Stock</label><input type="number" className={styles.mi} value={stockForm.current_stock} onChange={e=>setStockForm(p=>({...p,current_stock:e.target.value}))}/></div>
+                <div className={styles.mf}><label className={styles.ml}>Min Warning Stock</label><input type="number" className={styles.mi} value={stockForm.minimum_stock} onChange={e=>setStockForm(p=>({...p,minimum_stock:e.target.value}))}/></div>
+              </div>
+              <div className={styles.mfRow}>
+                <div className={styles.mf}><label className={styles.ml}>Unit Cost (₹)</label><input type="number" className={styles.mi} value={stockForm.unit_cost} onChange={e=>setStockForm(p=>({...p,unit_cost:e.target.value}))}/></div>
+                <div className={styles.mf}><label className={styles.ml}>Storage Location</label><input className={styles.mi} value={stockForm.location} onChange={e=>setStockForm(p=>({...p,location:e.target.value}))} placeholder="Store Room Shelf A2"/></div>
+              </div>
+            </div>
+            <div className={styles.modalFooter}>
+              <button className={styles.cancelBtn} onClick={()=>setShowStockModal(false)}>Cancel</button>
+              <button className={styles.saveBtn} onClick={saveStockItem} disabled={savingStock}>{savingStock?<span className={styles.spin}/>:<Check size={14}/>} Save Stock Item</button>
+            </div>
           </div>
         </div>
       )}
 
-      {/* ════ Transaction Modal ════ */}
+      {/* Stock Transaction Modal */}
       {showTxnModal && txnItem && (
-        <div className={styles.overlay} onClick={()=>setShowTxnModal(false)}>
-          <div className={`${styles.modal} ${styles.wideModal}`} onClick={e=>e.stopPropagation()}>
+        <div className={styles.modalOverlay} onClick={()=>setShowTxnModal(false)}>
+          <div className={`${styles.modal} ${styles.modalLg}`} onClick={e=>e.stopPropagation()}>
             <div className={styles.modalHeader}>
-              <h3 className={styles.modalTitle}>{txnItem.name}<span className={styles.modalSub}> · {txnItem.current_stock} {txnItem.unit} in stock</span></h3>
-              <button className={styles.modalClose} onClick={()=>setShowTxnModal(false)}><X size={16}/></button>
+              <h3>Stock Transaction: {txnItem.name} ({txnItem.item_code})</h3>
+              <button className={styles.closeBtn} onClick={()=>setShowTxnModal(false)}><X size={16}/></button>
             </div>
             <div className={styles.modalBody}>
-              <div className={styles.txnForm}>
-                <div className={styles.txnTypeBtns}>
-                  {TXN_TYPES.map(t=>(
+              <div className={styles.txnFormBox}>
+                <div className={styles.txnTypeSelector}>
+                  {TXN_TYPES.map(t => (
                     <button key={t} className={`${styles.txnTypeBtn} ${txnForm.transaction_type===t?styles.txnTypeBtnActive:''}`}
                       style={{'--tc':TXN_COLOR[t]} as React.CSSProperties}
                       onClick={()=>setTxnForm(p=>({...p,transaction_type:t}))}>
@@ -476,6 +645,143 @@ export default function InventoryPage() {
                   </table>
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Maintenance Record Modal */}
+      {showMaintModal && assetDetail && (
+        <div className={styles.modalOverlay} onClick={()=>setShowMaintModal(false)}>
+          <div className={styles.modal} onClick={e=>e.stopPropagation()}>
+            <div className={styles.modalHeader}>
+              <h3>Add Maintenance Record for: {assetDetail.name}</h3>
+              <button className={styles.closeBtn} onClick={()=>setShowMaintModal(false)}><X size={16}/></button>
+            </div>
+            <div className={styles.modalBody}>
+              <div className={styles.mfRow}>
+                <div className={styles.mf}><label className={styles.ml}>Maintenance Date</label><input type="date" className={styles.mi} value={maintForm.maintenance_date} onChange={e=>setMaintForm(p=>({...p,maintenance_date:e.target.value}))}/></div>
+                <div className={styles.mf}><label className={styles.ml}>Type</label>
+                  <select className={styles.mi} value={maintForm.maintenance_type} onChange={e=>setMaintForm(p=>({...p,maintenance_type:e.target.value}))}>
+                    {MAINT_TYPES.map(t=><option key={t} value={t}>{t}</option>)}
+                  </select>
+                </div>
+              </div>
+              <div className={styles.mf}><label className={styles.ml}>Description / Work Done *</label><textarea className={styles.mta} value={maintForm.description} onChange={e=>setMaintForm(p=>({...p,description:e.target.value}))} rows={2} required/></div>
+              <div className={styles.mfRow}>
+                <div className={styles.mf}><label className={styles.ml}>Cost (₹)</label><input type="number" className={styles.mi} value={maintForm.cost} onChange={e=>setMaintForm(p=>({...p,cost:e.target.value}))}/></div>
+                <div className={styles.mf}><label className={styles.ml}>Service Provider / Vendor</label><input className={styles.mi} value={maintForm.vendor} onChange={e=>setMaintForm(p=>({...p,vendor:e.target.value}))}/></div>
+              </div>
+              <div className={styles.mfRow}>
+                <div className={styles.mf}><label className={styles.ml}>Next Scheduled Service</label><input type="date" className={styles.mi} value={maintForm.next_service_date} onChange={e=>setMaintForm(p=>({...p,next_service_date:e.target.value}))}/></div>
+                <div className={styles.mf}><label className={styles.ml}>Asset Status After</label>
+                  <select className={styles.mi} value={maintForm.status_after} onChange={e=>setMaintForm(p=>({...p,status_after:e.target.value}))}>
+                    {ASSET_STATUSES.map(s=><option key={s} value={s}>{s}</option>)}
+                  </select>
+                </div>
+              </div>
+            </div>
+            <div className={styles.modalFooter}>
+              <button className={styles.cancelBtn} onClick={()=>setShowMaintModal(false)}>Cancel</button>
+              <button className={styles.saveBtn} onClick={saveMaint} disabled={savingMaint}>{savingMaint?<span className={styles.spin}/>:<Check size={14}/>} Record Service</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── PRINT REGISTER MODAL / VIEW ────────────────────────── */}
+      {showPrintModal && (
+        <div className={styles.modalOverlay} onClick={()=>setShowPrintModal(false)}>
+          <div className={`${styles.modal} ${styles.printModal}`} onClick={e=>e.stopPropagation()}>
+            <div className={styles.modalHeader + ' ' + styles.noPrint}>
+              <h3><Printer size={16}/> Date-Wise Asset & Stock Register Print Preview</h3>
+              <div className={styles.headerActions}>
+                <button className={styles.primaryPrintBtn} onClick={handlePrint}><Printer size={14}/> Print Now (CTRL+P)</button>
+                <button className={styles.closeBtn} onClick={()=>setShowPrintModal(false)}><X size={16}/></button>
+              </div>
+            </div>
+
+            {/* Printable Document Container */}
+            <div className={styles.printableDocument}>
+              <div className={styles.schoolHeader}>
+                <h1 className={styles.schoolName}>विद्यासेतू माध्यमिक व उच्च माध्यमिक विद्यालय, पुणे</h1>
+                <p className={styles.schoolSub}>शासकीय नोंदणी क्र. SCH-2025/EX-884 · U-DISE Code: 27250100412</p>
+                <h2 className={styles.docTitle}>मालमत्ता व साठा दैनिक नोंदवही (ASSET & STOCK REGISTER - DR / CR)</h2>
+                <div className={styles.metaRow}>
+                  <span><strong>कालावधी (Period):</strong> {fmtDate(regFromDate)} ते {fmtDate(regToDate)}</span>
+                  <span><strong>मुद्रण दिनांक (Print Date):</strong> {fmtDate(TODAY)}</span>
+                  <span><strong>नोंदणी प्रकार:</strong> {regType.toUpperCase()}</span>
+                </div>
+              </div>
+
+              {/* Table */}
+              <table className={styles.printTable}>
+                <thead>
+                  <tr>
+                    <th style={{width:'50px'}}>क्र.</th>
+                    <th style={{width:'85px'}}>दिनांक</th>
+                    <th style={{width:'100px'}}>पावती / कोड</th>
+                    <th>मालमत्ता / साठा नाव (Particulars)</th>
+                    <th style={{width:'80px'}}>प्रकार</th>
+                    <th style={{width:'90px', textAlign:'right'}}>जमा ₹ (Dr)</th>
+                    <th style={{width:'90px', textAlign:'right'}}>नावे ₹ (Cr)</th>
+                    <th style={{width:'110px'}}>पुरवठादार / ठिकाण</th>
+                    <th>शेरा (Remarks)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {registerEntries.length === 0 ? (
+                    <tr><td colSpan={9} style={{textAlign:'center', padding:'20px'}}>या कालावधीसाठी कोणत्या नोंद आढळल्या नाहीत.</td></tr>
+                  ) : registerEntries.map((e, idx) => (
+                    <tr key={`print_${e.id}_${idx}`}>
+                      <td style={{textAlign:'center'}}>{idx + 1}</td>
+                      <td>{fmtDate(e.entry_date)}</td>
+                      <td><code>{e.reference || e.code}</code></td>
+                      <td>
+                        <strong>{e.particulars}</strong>
+                        {e.particulars_marathi && <div style={{fontSize:'0.75rem', color:'#4b5563'}}>{e.particulars_marathi}</div>}
+                      </td>
+                      <td>{e.category}</td>
+                      <td style={{textAlign:'right', color: Number(e.dr_amount) > 0 ? '#15803d' : '#000'}}>
+                        {Number(e.dr_amount) > 0 ? fmt(e.dr_amount) : '—'}
+                      </td>
+                      <td style={{textAlign:'right', color: Number(e.cr_amount) > 0 ? '#b91c1c' : '#000'}}>
+                        {Number(e.cr_amount) > 0 ? fmt(e.cr_amount) : '—'}
+                      </td>
+                      <td>{e.party_location || '—'}</td>
+                      <td style={{fontSize:'0.75rem'}}>{e.remarks || '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr className={styles.totalRow}>
+                    <td colSpan={5} style={{textAlign:'right'}}><strong>एकूण जमा व नावे (Total Dr & Cr):</strong></td>
+                    <td style={{textAlign:'right', color:'#15803d'}}><strong>{fmt(totalDr)}</strong></td>
+                    <td style={{textAlign:'right', color:'#b91c1c'}}><strong>{fmt(totalCr)}</strong></td>
+                    <td colSpan={2}><strong>निव्वळ शिल्लक: {fmt(netBalance)}</strong></td>
+                  </tr>
+                </tfoot>
+              </table>
+
+              {/* Signatures */}
+              <div className={styles.sigContainer}>
+                <div className={styles.sigBox}>
+                  <div className={styles.sigLine}/>
+                  <span>तयार करणार (लिपीक)<br/>Prepared by Clerk</span>
+                </div>
+                <div className={styles.sigBox}>
+                  <div className={styles.sigLine}/>
+                  <span>साठा प्रमुख / भांडारपाल<br/>Store Keeper</span>
+                </div>
+                <div className={styles.sigBox}>
+                  <div className={styles.sigLine}/>
+                  <span>तपासणीकार / लेखापाल<br/>Verified Accountant</span>
+                </div>
+                <div className={styles.sigBox}>
+                  <div className={styles.sigLine}/>
+                  <span>मुख्याध्यापक / स्वाक्षरी<br/>Headmaster / Principal</span>
+                </div>
+              </div>
             </div>
           </div>
         </div>

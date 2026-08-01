@@ -49,17 +49,31 @@ async def mark_student_attendance(body: BulkAttendanceRequest, current_user: Aut
     count = StudentAttendanceService.mark_bulk(db, body, current_user.user_id)
     return APIResponse.ok(data={"saved": count}, message=f"{count} attendance records saved.")
 
+@router.get("/student/roster", response_model=APIResponse,
+            dependencies=[Depends(require_permission("attendance.read"))])
+async def get_class_roster(current_user: AuthUser, db: DBSession,
+                           att_date: date = Query(...), standard: str = Query(...),
+                           division: Optional[str] = None,
+                           academic_year_id: int = Query(...),
+                           period: str = Query("full_day"),
+                           subject_id: Optional[int] = None):
+    roster_data = StudentAttendanceService.get_class_roster(
+        db, standard, division, att_date, academic_year_id, period, subject_id
+    )
+    return APIResponse.ok(data=roster_data)
+
 @router.get("/student/day", response_model=APIResponse,
             dependencies=[Depends(require_permission("attendance.read"))])
 async def get_day_attendance(current_user: AuthUser, db: DBSession,
                              att_date: date = Query(...), standard: str = Query(...),
                              division: Optional[str] = None,
                              academic_year_id: int = Query(...),
-                             period: str = Query("full_day")):
+                             period: str = Query("full_day"),
+                             subject_id: Optional[int] = None):
     records = StudentAttendanceService.get_day_attendance(
-        db, att_date, standard, division, academic_year_id, period
+        db, att_date, standard, division, academic_year_id, period, subject_id
     )
-    return APIResponse.ok(data=[AttendanceResponse.model_validate(r).model_dump() for r in records])
+    return APIResponse.ok(data=records)
 
 @router.get("/student/{student_id}/month", response_model=APIResponse,
             dependencies=[Depends(require_permission("attendance.read"))])
@@ -72,8 +86,10 @@ async def get_student_month(student_id: int, current_user: AuthUser, db: DBSessi
             dependencies=[Depends(require_permission("attendance.read"))])
 async def get_class_sessions(current_user: AuthUser, db: DBSession,
                               standard: str = Query(...), academic_year_id: int = Query(...),
-                              year: int = Query(...), month: int = Query(...)):
-    sessions = StudentAttendanceService.get_class_sessions(db, standard, academic_year_id, year, month)
+                              year: int = Query(...), month: int = Query(...),
+                              subject_id: Optional[int] = None,
+                              period: Optional[str] = None):
+    sessions = StudentAttendanceService.get_class_sessions(db, standard, academic_year_id, year, month, subject_id, period)
     return APIResponse.ok(data=[SessionResponse.model_validate(s).model_dump() for s in sessions])
 
 @router.get("/defaulters", response_model=APIResponse,

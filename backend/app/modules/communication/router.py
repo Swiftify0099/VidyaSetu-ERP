@@ -1,5 +1,5 @@
 """
-VidyaSetu ERP — Communication Router
+VidyaSetu ERP — Communication & Notification Router
 """
 from typing import Optional
 from fastapi import APIRouter, Depends, Query
@@ -13,10 +13,129 @@ from app.modules.communication.service import (
     AnnouncementRequest, AnnouncementResponse,
     NoticeService, TemplateService, MessageService,
     AnnouncementService, CommStatsService,
+    NotificationService, NotificationResponse, NotificationCenterResponse,
 )
 from app.shared.responses import APIResponse
 
 router = APIRouter(prefix="/communication", tags=["Communication"])
+
+
+# ═══════════════════════════════════════════════════════
+# NOTIFICATION ENDPOINTS
+# ═══════════════════════════════════════════════════════
+
+@router.get("/notifications", response_model=APIResponse,
+            summary="My Notification Inbox")
+async def get_my_notifications_v2(
+    current_user: AuthUser,
+    db: DBSession,
+    limit: int = Query(default=30, le=100),
+    offset: int = Query(default=0),
+    category: Optional[str] = None,
+    priority: Optional[str] = None,
+    unread_only: bool = False,
+    search: Optional[str] = None,
+):
+    """Returns role-filtered notification inbox for current user."""
+    notifs = NotificationService.get_for_user(
+        db, current_user.user_id, current_user.roles,
+        limit=limit, offset=offset,
+        category=category, priority=priority,
+        unread_only=unread_only, search=search,
+    )
+    return APIResponse.ok(data=[NotificationResponse.model_validate(n).model_dump() for n in notifs])
+
+
+@router.get("/notifications/unread-count", response_model=APIResponse,
+            summary="Fast unread badge count")
+async def get_unread_count(current_user: AuthUser, db: DBSession):
+    """Returns unread notification count for bell badge. Optimised for frequent polling."""
+    count = NotificationService.get_unread_count(db, current_user.user_id, current_user.roles)
+    return APIResponse.ok(data={"unread_count": count})
+
+
+@router.get("/notifications/center", response_model=APIResponse,
+            summary="Full Notification Center with analytics")
+async def get_notification_center(
+    current_user: AuthUser,
+    db: DBSession,
+    limit: int = Query(default=50, le=200),
+    offset: int = Query(default=0),
+    category: Optional[str] = None,
+    priority: Optional[str] = None,
+    unread_only: bool = False,
+    search: Optional[str] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+):
+    """Full notification center with history, search, filter, category breakdown."""
+    result = NotificationService.get_center(
+        db, current_user.user_id, current_user.roles,
+        limit=limit, offset=offset,
+        category=category, priority=priority,
+        unread_only=unread_only, search=search,
+        date_from=date_from, date_to=date_to,
+    )
+    return APIResponse.ok(data=result)
+
+
+@router.post("/notifications/{notification_id}/read", response_model=APIResponse,
+             summary="Mark notification as read")
+async def mark_notification_read_v2(notification_id: int, current_user: AuthUser, db: DBSession):
+    NotificationService.mark_read(db, notification_id, current_user.user_id)
+    return APIResponse.ok(message="Notification marked as read.")
+
+
+@router.post("/notifications/{notification_id}/clicked", response_model=APIResponse,
+             summary="Track notification click (for deep-link analytics)")
+async def mark_notification_clicked(notification_id: int, current_user: AuthUser, db: DBSession):
+    NotificationService.mark_clicked(db, notification_id, current_user.user_id)
+    return APIResponse.ok(message="Click tracked.")
+
+
+@router.post("/notifications/read-all", response_model=APIResponse,
+             summary="Mark all notifications as read")
+async def mark_all_notifications_read_v2(current_user: AuthUser, db: DBSession):
+    count = NotificationService.mark_all_read(db, current_user.user_id, current_user.roles)
+    return APIResponse.ok(message=f"{count} notifications marked as read.")
+
+
+@router.delete("/notifications/{notification_id}", response_model=APIResponse,
+               summary="Delete / archive a notification")
+async def delete_notification(notification_id: int, current_user: AuthUser, db: DBSession):
+    NotificationService.delete(db, notification_id, current_user.user_id)
+    return APIResponse.ok(message="Notification deleted.")
+
+
+@router.get("/notifications/analytics", response_model=APIResponse,
+            dependencies=[Depends(require_permission("admin.read", "analytics.view_analytics"))],
+            summary="Notification analytics (admin)")
+async def notification_analytics(current_user: AuthUser, db: DBSession):
+    analytics = NotificationService.get_analytics(db)
+    return APIResponse.ok(data=analytics)
+
+
+@router.post("/notifications/fcm-token", response_model=APIResponse,
+             summary="Register or refresh FCM token for current user")
+async def register_fcm_token(
+    current_user: AuthUser,
+    db: DBSession,
+    fcm_token: str = Query(..., description="Firebase Cloud Messaging device token"),
+):
+    """Stores FCM token on User record. Call from mobile/web app on launch."""
+    NotificationService.register_fcm_token(db, current_user.user_id, fcm_token)
+    return APIResponse.ok(message="FCM token registered.")
+
+
+@router.post("/notifications/test-push", response_model=APIResponse,
+             summary="Send a real FCM test push to yourself (diagnostic)")
+async def test_push_notification(current_user: AuthUser, db: DBSession):
+    """
+    Sends a real Firebase push notification to the currently logged-in user.
+    Returns detailed diagnostics: Firebase status, token info, message ID, error details.
+    """
+    result = NotificationService.send_test_push(db, current_user.user_id)
+    return APIResponse.ok(data=result, message=result.get("message", "Test push attempted."))
 
 
 # ── Stats ─────────────────────────────────────────────────────

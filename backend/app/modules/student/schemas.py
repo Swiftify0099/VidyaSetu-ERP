@@ -93,6 +93,10 @@ class StudentCreateRequest(BaseModel):
     transfer_certificate_no: Optional[str] = None
     house: Optional[str] = None
 
+    # Credentials & Notification
+    password: Optional[str] = None
+    send_email_notification: bool = True
+
     @field_validator("standard")
     @classmethod
     def validate_standard(cls, v: str) -> str:

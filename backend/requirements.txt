@@ -26,7 +26,7 @@ openai==1.51.2           # OpenRouter uses OpenAI-compatible API
 httpx==0.27.2
 
 # ── Firebase / FCM ────────────────────────────────────────────
-firebase-admin==6.5.0
+firebase-admin>=6.5.0
 
 # ── PDF Generation ────────────────────────────────────────────
 reportlab==4.2.5

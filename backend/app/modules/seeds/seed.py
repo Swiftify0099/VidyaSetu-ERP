@@ -61,11 +61,33 @@ DEFAULT_ROLES = [
 
 # ── Permissions ───────────────────────────────────────────────
 MODULES = [
-    "auth", "student", "teacher", "clerk", "admission",
-    "finance", "inventory", "office", "library", "principal",
-    "admin", "communication", "analytics", "transport",
-    "examination", "attendance", "timetable", "ai_assistant",
+    # System
+    "auth", "admin",
+    # People
+    "student", "teacher",
+    # Academic
+    "attendance", "examination", "exam", "timetable",
+    "lesson_plan", "behaviour",
+    # Office & Admin
+    "clerk", "admission", "office", "principal",
+    # Finance
+    "finance",
+    # Library
+    "library",
+    # Communication
+    "communication",
+    # Inventory
+    "inventory",
+    # Analytics
+    "analytics",
+    # Transport
+    "transport",
+    # Leave
+    "leave",
+    # QR & AI
+    "qr", "ai_assistant",
 ]
+
 ACTIONS = [
     ("create",          "Create new records"),
     ("read",            "View records"),
@@ -80,46 +102,228 @@ ACTIONS = [
     ("view_analytics",  "View analytics and reports"),
     ("manage_settings", "Manage system settings"),
     ("manage_users",    "Manage users and roles"),
+    # Extended workflow actions
+    ("send",            "Send messages/notifications"),
+    ("manage",          "Full manage access for module"),
+    ("marks_enter",     "Enter exam marks"),
+    ("results_compile", "Compile exam results"),
+    ("apply",           "Apply/submit requests (leave, etc.)"),
+    ("issue",           "Issue items (books, assets, etc.)"),
+    ("publish",         "Publish notices and announcements"),
 ]
 
-# Role → permission restrictions (what each role CAN do)
+# ── Role → Permission Matrix (Complete Enterprise Blueprint) ───
 ROLE_PERMISSIONS = {
-    "super_admin":    "*",   # all
-    "admin":          "*",   # all
-    "principal":      ["student.read","student.export","teacher.read","attendance.read",
-                       "examination.read","examination.approve","finance.read","finance.export",
-                       "communication.create","analytics.view_analytics","office.read","office.approve"],
-    "vice_principal": ["student.read","teacher.read","attendance.read","examination.read",
-                       "communication.create","analytics.view_analytics","office.read"],
-    "teacher":        ["student.read","attendance.create","attendance.read","attendance.update",
-                       "examination.create","examination.update","examination.read",
-                       "communication.create","timetable.read","library.read",
-                       "leave.read","leave.create","lesson_plan.create","lesson_plan.read","lesson_plan.update",
-                       "behaviour.create","behaviour.read"],
-    "class_teacher":  ["student.read","attendance.create","attendance.read","attendance.update",
-                       "examination.create","examination.update","examination.read",
-                       "communication.create","timetable.read","library.read",
-                       "leave.read","leave.create","lesson_plan.create","lesson_plan.read","lesson_plan.update",
-                       "behaviour.create","behaviour.read","behaviour.update"],
-    "clerk":          ["student.read","student.create","student.update","admission.create",
-                       "admission.read","admission.update","office.create","office.read",
-                       "office.update","communication.create","library.read"],
-    "accountant":     ["finance.create","finance.read","finance.update","finance.export",
-                       "finance.print","student.read","analytics.view_analytics"],
-    "librarian":      ["library.create","library.read","library.update","library.delete",
-                       "library.export","student.read","teacher.read"],
-    "receptionist":   ["office.create","office.read","student.read","teacher.read",
-                       "communication.read"],
-    "office_staff":   ["office.read","student.read","communication.read"],
-    "student":        ["student.read","attendance.read","examination.read","library.read",
-                       "timetable.read","communication.read","finance.read"],
-    "parent":         ["student.read","attendance.read","examination.read","finance.read",
-                       "communication.read"],
-    "exam_coordinator": ["examination.create","examination.read","examination.update",
-                         "examination.export","student.read","analytics.view_analytics"],
-    "transport_incharge": ["student.read","office.read"],
-    "support_staff":  ["office.read"],
+    "super_admin": "*",  # Unrestricted — owns the system
+    "admin":       "*",  # Unrestricted — school system admin
+
+    # ── Principal ──────────────────────────────────────────────
+    "principal": [
+        # Students (read only + export)
+        "student.read", "student.export",
+        # Teachers (read only)
+        "teacher.read", "teacher.export",
+        # Attendance (read + export)
+        "attendance.read", "attendance.export",
+        # Exam / Marks (read + approve publication)
+        "examination.read", "examination.approve", "examination.export",
+        "exam.read", "exam.approve", "exam.export",
+        "exam.results_compile",
+        # Finance (read + approve waivers + export)
+        "finance.read", "finance.approve", "finance.export", "finance.print",
+        # Communication (full — principal broadcasts to all)
+        "communication.create", "communication.read", "communication.send", "communication.manage",
+        # Analytics (full view)
+        "analytics.view_analytics",
+        # Office (read + approve — certificates, admissions)
+        "office.read", "office.approve",
+        # Admission (read + approve)
+        "admission.read", "admission.approve",
+        # Library (read only)
+        "library.read",
+        # Inventory (read + approve purchases)
+        "inventory.read", "inventory.approve",
+        # Leave (read + final approval)
+        "leave.read", "leave.approve",
+        # Behaviour (read)
+        "behaviour.read",
+        # Lesson Plan (read)
+        "lesson_plan.read",
+        # AI assistant (read)
+        "ai_assistant.read",
+        # Admin audit log read
+        "admin.read",
+    ],
+
+    # ── Vice Principal ─────────────────────────────────────────
+    "vice_principal": [
+        "student.read",
+        "teacher.read",
+        "attendance.read", "attendance.export",
+        "examination.read", "examination.approve",
+        "exam.read", "exam.approve",
+        "communication.create", "communication.read", "communication.send",
+        "analytics.view_analytics",
+        "office.read",
+        "behaviour.read", "behaviour.update",
+        "leave.read", "leave.approve",
+        "lesson_plan.read", "lesson_plan.update",
+        "ai_assistant.read",
+        "timetable.read",
+    ],
+
+    # ── Exam Coordinator ───────────────────────────────────────
+    "exam_coordinator": [
+        "examination.create", "examination.read", "examination.update",
+        "examination.approve", "examination.export",
+        "exam.create", "exam.read", "exam.update", "exam.approve", "exam.export",
+        "exam.marks_enter", "exam.results_compile",
+        "student.read",
+        "analytics.view_analytics",
+        "communication.read", "communication.create",
+        "timetable.read",
+    ],
+
+    # ── Class Teacher ──────────────────────────────────────────
+    "class_teacher": [
+        "student.read",
+        "attendance.create", "attendance.read", "attendance.update",
+        "examination.create", "examination.update", "examination.read",
+        "exam.read", "exam.marks_enter",
+        "communication.create", "communication.read", "communication.send",
+        "timetable.read",
+        "library.read",
+        "leave.read", "leave.create", "leave.approve",
+        "lesson_plan.create", "lesson_plan.read", "lesson_plan.update",
+        "behaviour.create", "behaviour.read", "behaviour.update",
+        "ai_assistant.read",
+        "qr.read",
+    ],
+
+    # ── Teacher ────────────────────────────────────────────────
+    "teacher": [
+        "student.read",
+        "attendance.create", "attendance.read", "attendance.update",
+        "examination.create", "examination.update", "examination.read",
+        "exam.read", "exam.marks_enter",
+        "communication.create", "communication.read",
+        "timetable.read",
+        "library.read",
+        "leave.read", "leave.create",
+        "lesson_plan.create", "lesson_plan.read", "lesson_plan.update",
+        "behaviour.create", "behaviour.read",
+        "ai_assistant.read",
+        "qr.read",
+    ],
+
+    # ── Clerk ──────────────────────────────────────────────────
+    "clerk": [
+        # Students
+        "student.read", "student.create", "student.update",
+        "student.export", "student.print",
+        # Admission
+        "admission.create", "admission.read", "admission.update",
+        "admission.export", "admission.print",
+        # Office — Full CRUD (Notices, Enquiries, Visitors, Events, Complaints, Inward/Outward)
+        "office.create", "office.read", "office.update", "office.delete",
+        "office.export", "office.print", "office.approve",
+        "office.notice.create", "office.notice.update",
+        # Communication — Create, Read, Send for notices & messages
+        "communication.create", "communication.read", "communication.send",
+        "communication.manage", "communication.update", "communication.delete",
+        # Library — Full CRUD + Issue
+        "library.read", "library.create", "library.update", "library.delete",
+        "library.manage", "library.issue", "library.export", "library.print",
+        # Finance — Full Collection & Read/Print
+        "finance.read", "finance.collect", "finance.create", "finance.manage", "finance.print",
+        # Leave — Full: apply, manage, view, add holidays
+        "leave.read", "leave.create", "leave.apply",
+        "leave.manage", "leave.approve",
+        # Inventory — Full CRUD for stock and assets
+        "inventory.read", "inventory.create", "inventory.update",
+        "inventory.manage", "inventory.export",
+        # QR reading
+        "qr.read",
+    ],
+
+    # ── Accountant ─────────────────────────────────────────────
+    "accountant": [
+        "finance.create", "finance.read", "finance.update",
+        "finance.export", "finance.print", "finance.approve",
+        "student.read",   # Lookup student fee records
+        "analytics.view_analytics",
+        "office.read",
+        "communication.read",
+    ],
+
+    # ── Librarian ──────────────────────────────────────────────
+    "librarian": [
+        "library.create", "library.read", "library.update", "library.delete",
+        "library.export", "library.print",
+        "student.read",
+        "teacher.read",
+        "qr.read", "qr.create",   # QR-based book tracking
+        "communication.read",
+    ],
+
+    # ── Receptionist ───────────────────────────────────────────
+    "receptionist": [
+        "office.create", "office.read", "office.update",
+        "student.read",
+        "teacher.read",
+        "communication.read",
+        "admission.read",   # View admission inquiries only
+    ],
+
+    # ── Office Staff ───────────────────────────────────────────
+    "office_staff": [
+        "office.read",
+        "student.read",
+        "communication.read",
+    ],
+
+    # ── Student ────────────────────────────────────────────────
+    "student": [
+        "student.read",
+        "attendance.read",
+        "examination.read",
+        "exam.read",
+        "library.read",
+        "timetable.read",
+        "communication.read",
+        "finance.read",     # Own fee status only
+        "leave.create", "leave.read",
+        "ai_assistant.read",
+        "qr.read",
+    ],
+
+    # ── Parent ─────────────────────────────────────────────────
+    "parent": [
+        "student.read",     # Only own child
+        "attendance.read",
+        "examination.read",
+        "exam.read",
+        "finance.read",     # Child fee status
+        "library.read",     # Child library status
+        "communication.read",
+        "leave.create", "leave.read",
+    ],
+
+    # ── Transport Incharge ─────────────────────────────────────
+    "transport_incharge": [
+        "transport.create", "transport.read", "transport.update", "transport.export",
+        "student.read",
+        "office.read",
+        "communication.read", "communication.create",
+    ],
+
+    # ── Support Staff ──────────────────────────────────────────
+    "support_staff": [
+        "office.read",
+        "communication.read",
+    ],
 }
+
 
 # ── Demo Users ────────────────────────────────────────────────
 DEMO_USERS = [
@@ -605,7 +809,102 @@ def seed_database(db: Session) -> None:
         db.flush()
         print("        [OK] Seeded sample active announcements.")
 
+    # ── Timetable Seeding ─────────────────────────────────────────
+    seed_timetable(db)
+
     db.commit()
+
+def seed_timetable(db: Session):
+    from app.modules.timetable.models import Subject, PeriodConfig, TimetableEntry, TeacherSubjectAssignment
+    from app.modules.teacher.models import Teacher
+
+    # 1. Seed Subjects
+    existing_subj = db.query(Subject).first()
+    subjects_map = {}
+    if not existing_subj:
+        subjs_data = [
+            {"name": "Mathematics", "name_marathi": "गणित", "code": "MATH", "subject_type": "theory", "applicable_standards": "All", "color": "#6366f1"},
+            {"name": "Science & Technology", "name_marathi": "विज्ञान व तंत्रज्ञान", "code": "SCI", "subject_type": "theory", "applicable_standards": "All", "color": "#10b981"},
+            {"name": "English Language", "name_marathi": "इंग्रजी भाषा", "code": "ENG", "subject_type": "language", "applicable_standards": "All", "color": "#3b82f6"},
+            {"name": "Marathi Literature", "name_marathi": "मराठी साहित्य", "code": "MAR", "subject_type": "language", "applicable_standards": "All", "color": "#f59e0b"},
+            {"name": "Hindi Language", "name_marathi": "हिंदी भाषा", "code": "HIN", "subject_type": "language", "applicable_standards": "All", "color": "#ec4899"},
+            {"name": "Social Studies", "name_marathi": "सामाजिक शास्त्रे", "code": "SS", "subject_type": "theory", "applicable_standards": "All", "color": "#8b5cf6"},
+            {"name": "Information Technology", "name_marathi": "माहिती तंत्रज्ञान", "code": "IT", "subject_type": "practical", "applicable_standards": "All", "color": "#06b6d4"},
+            {"name": "Physical Education", "name_marathi": "शारीरिक शिक्षण", "code": "PE", "subject_type": "activity", "applicable_standards": "All", "color": "#ef4444"},
+            {"name": "Art & Craft", "name_marathi": "कला व हस्तकला", "code": "ART", "subject_type": "activity", "applicable_standards": "All", "color": "#14b8a6"},
+        ]
+        for s in subjs_data:
+            subj_obj = Subject(**s)
+            db.add(subj_obj)
+        db.flush()
+        print("        [OK] Seeded 9 standard subjects.")
+
+    all_subjects = db.query(Subject).all()
+    for s in all_subjects:
+        subjects_map[s.code or s.name] = s.id
+
+    # 2. Seed Period Configurations
+    existing_periods = db.query(PeriodConfig).filter(PeriodConfig.academic_year_id == 1).all()
+    if not existing_periods:
+        periods_data = [
+            (0, "Assembly",   "07:30", "07:45",  15, "assembly"),
+            (1, "Period 1",   "07:45", "08:30",  45, "class"),
+            (2, "Period 2",   "08:30", "09:15",  45, "class"),
+            (3, "Period 3",   "09:15", "10:00",  45, "class"),
+            (4, "Short Break","10:00", "10:15",  15, "break"),
+            (5, "Period 4",   "10:15", "11:00",  45, "class"),
+            (6, "Period 5",   "11:00", "11:45",  45, "class"),
+            (7, "Lunch",      "11:45", "12:15",  30, "lunch"),
+            (8, "Period 6",   "12:15", "13:00",  45, "class"),
+            (9, "Period 7",   "13:00", "13:45",  45, "class"),
+        ]
+        for i, (num, name, st, et, dur, ptype) in enumerate(periods_data):
+            p = PeriodConfig(
+                academic_year_id=1,
+                period_number=num, period_name=name,
+                start_time=st, end_time=et,
+                duration_minutes=dur, period_type=ptype,
+                sort_order=i
+            )
+            db.add(p)
+        db.flush()
+        print("        [OK] Seeded 10 default period configurations.")
+
+    # 3. Seed Teacher Allocations & Timetable Entries
+    teachers = db.query(Teacher).all()
+    t_ids = [t.id for t in teachers] if teachers else [1, 2, 3, 4]
+    
+    existing_assignments = db.query(TeacherSubjectAssignment).filter(TeacherSubjectAssignment.academic_year_id == 1).first()
+    if not existing_assignments and t_ids and all_subjects:
+        stds = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10']
+        divs = ['A', 'B']
+        for std in stds:
+            for div in divs:
+                for idx, subj in enumerate(all_subjects[:6]):
+                    t_id = t_ids[idx % len(t_ids)]
+                    db.add(TeacherSubjectAssignment(
+                        teacher_id=t_id,
+                        subject_id=subj.id,
+                        standard=std,
+                        division=div,
+                        academic_year_id=1,
+                        periods_per_week=5,
+                        is_class_teacher=(idx == 0)
+                    ))
+        db.flush()
+        print("        [OK] Seeded teacher-subject allocations.")
+
+        from app.modules.timetable.service import TimetableService, AutoGenerateRequest
+        for std in ['8', '9', '10']:
+            for div in ['A', 'B']:
+                try:
+                    TimetableService.auto_generate_timetable(
+                        db, AutoGenerateRequest(standard=std, division=div, academic_year_id=1, overwrite=True), 1
+                    )
+                except Exception as ex:
+                    pass
+        print("        [OK] Pre-generated timetable entries for Std 8-10.")
+
 
     # ── Summary ──────────────────────────────────────────────────
     print("\n" + "-" * 52)

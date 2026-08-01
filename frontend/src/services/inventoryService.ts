@@ -39,6 +39,23 @@ export interface InventoryStats {
   total_stock_items: number; low_stock_items: number; total_stock_value: number;
 }
 
+export interface RegisterEntry {
+  id: string;
+  entry_date: string;
+  entry_type: string;
+  code: string;
+  particulars: string;
+  particulars_marathi?: string;
+  category: string;
+  reference?: string;
+  dr_qty?: number;
+  dr_amount: number;
+  cr_qty?: number;
+  cr_amount: number;
+  party_location?: string;
+  remarks?: string;
+}
+
 const inventoryService = {
   async getStats(): Promise<InventoryStats> { return (await api.get('/inventory/stats')).data.data; },
 
@@ -61,5 +78,10 @@ const inventoryService = {
   async createStockItem(d: Partial<StockItem>): Promise<StockItem> { return (await api.post('/inventory/stock', d)).data.data; },
   async transact(d: { stock_item_id: number; transaction_type: string; quantity: number; unit_cost?: number; reference?: string; issued_to?: string; purpose?: string; transaction_date: string }): Promise<StockTransaction> { return (await api.post('/inventory/stock/transactions', d)).data.data; },
   async getTransactions(itemId: number): Promise<StockTransaction[]> { return (await api.get(`/inventory/stock/${itemId}/transactions`)).data.data; },
+
+  // Register (Date-wise Dr / Cr)
+  async getRegister(p?: { from_date?: string; to_date?: string; register_type?: string; search?: string }): Promise<RegisterEntry[]> {
+    return (await api.get('/inventory/register', { params: p })).data.data;
+  },
 };
 export default inventoryService;

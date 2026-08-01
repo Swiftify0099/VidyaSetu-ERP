@@ -35,7 +35,7 @@ async def office_stats(current_user: AuthUser, db: DBSession):
 
 # ── Notices ───────────────────────────────────────────────────
 @router.post("/notices", response_model=APIResponse, status_code=201,
-             dependencies=[Depends(require_permission("office.notice.create"))])
+             dependencies=[Depends(require_permission("office.notice.create", "office.create"))])
 async def create_notice(body: NoticeCreateRequest, current_user: AuthUser, db: DBSession):
     n = NoticeService.create(db, body, current_user.user_id)
     return APIResponse.created(data=NoticeResponse.model_validate(n).model_dump(),
@@ -68,14 +68,14 @@ async def get_notice(notice_id: int, current_user: AuthUser, db: DBSession):
 
 
 @router.put("/notices/{notice_id}", response_model=APIResponse,
-            dependencies=[Depends(require_permission("office.notice.update"))])
+            dependencies=[Depends(require_permission("office.notice.update", "office.update"))])
 async def update_notice(notice_id: int, body: NoticeUpdateRequest, current_user: AuthUser, db: DBSession):
     n = NoticeService.update(db, notice_id, body, current_user.user_id)
     return APIResponse.ok(data=NoticeResponse.model_validate(n).model_dump())
 
 
 @router.post("/notices/{notice_id}/attachment", response_model=APIResponse,
-             dependencies=[Depends(require_permission("office.notice.update"))])
+             dependencies=[Depends(require_permission("office.notice.update", "office.update"))])
 async def upload_notice_attachment(notice_id: int, current_user: AuthUser,
                                    db: DBSession, file: UploadFile = File(...)):
     path = await NoticeService.upload_attachment(db, notice_id, file, current_user.user_id)
@@ -83,7 +83,7 @@ async def upload_notice_attachment(notice_id: int, current_user: AuthUser,
 
 
 @router.delete("/notices/{notice_id}", response_model=APIResponse,
-               dependencies=[Depends(require_permission("office.notice.delete"))])
+               dependencies=[Depends(require_permission("office.notice.delete", "office.delete"))])
 async def delete_notice(notice_id: int, current_user: AuthUser, db: DBSession):
     NoticeService.delete(db, notice_id, current_user.user_id)
     return APIResponse.ok(message="Notice deleted.")
@@ -91,7 +91,7 @@ async def delete_notice(notice_id: int, current_user: AuthUser, db: DBSession):
 
 # ── Enquiries ─────────────────────────────────────────────────
 @router.post("/enquiries", response_model=APIResponse, status_code=201,
-             dependencies=[Depends(require_permission("office.enquiry.create"))])
+             dependencies=[Depends(require_permission("office.enquiry.create", "office.create"))])
 async def create_enquiry(body: EnquiryCreateRequest, current_user: AuthUser, db: DBSession):
     e = EnquiryService.create(db, body, current_user.user_id)
     return APIResponse.created(data=EnquiryResponse.model_validate(e).model_dump(),
@@ -121,14 +121,14 @@ async def get_enquiry(enq_id: int, current_user: AuthUser, db: DBSession):
 
 
 @router.put("/enquiries/{enq_id}", response_model=APIResponse,
-            dependencies=[Depends(require_permission("office.enquiry.update"))])
+            dependencies=[Depends(require_permission("office.enquiry.update", "office.update"))])
 async def update_enquiry(enq_id: int, body: EnquiryUpdateRequest, current_user: AuthUser, db: DBSession):
     e = EnquiryService.update(db, enq_id, body, current_user.user_id)
     return APIResponse.ok(data=EnquiryResponse.model_validate(e).model_dump())
 
 
 @router.delete("/enquiries/{enq_id}", response_model=APIResponse,
-               dependencies=[Depends(require_permission("office.enquiry.delete"))])
+               dependencies=[Depends(require_permission("office.enquiry.delete", "office.delete"))])
 async def delete_enquiry(enq_id: int, current_user: AuthUser, db: DBSession):
     EnquiryService.delete(db, enq_id, current_user.user_id)
     return APIResponse.ok(message="Enquiry deleted.")
@@ -136,7 +136,7 @@ async def delete_enquiry(enq_id: int, current_user: AuthUser, db: DBSession):
 
 # ── Visitors ──────────────────────────────────────────────────
 @router.post("/visitors/checkin", response_model=APIResponse, status_code=201,
-             dependencies=[Depends(require_permission("office.visitor.create"))])
+             dependencies=[Depends(require_permission("office.visitor.create", "office.create"))])
 async def visitor_checkin(body: VisitorCreateRequest, current_user: AuthUser, db: DBSession):
     v = VisitorService.check_in(db, body, current_user.user_id)
     return APIResponse.created(data=VisitorResponse.model_validate(v).model_dump(),
@@ -144,7 +144,7 @@ async def visitor_checkin(body: VisitorCreateRequest, current_user: AuthUser, db
 
 
 @router.put("/visitors/{visitor_id}/checkout", response_model=APIResponse,
-            dependencies=[Depends(require_permission("office.visitor.create"))])
+            dependencies=[Depends(require_permission("office.visitor.create", "office.update", "office.create"))])
 async def visitor_checkout(visitor_id: int, body: VisitorCheckOutRequest,
                            current_user: AuthUser, db: DBSession):
     v = VisitorService.check_out(db, visitor_id, body, current_user.user_id)
@@ -165,7 +165,7 @@ async def list_visitors(current_user: AuthUser, db: DBSession,
 
 # ── Events ────────────────────────────────────────────────────
 @router.post("/events", response_model=APIResponse, status_code=201,
-             dependencies=[Depends(require_permission("office.event.create"))])
+             dependencies=[Depends(require_permission("office.event.create", "office.create"))])
 async def create_event(body: EventCreateRequest, current_user: AuthUser, db: DBSession):
     ev = EventService.create(db, body, current_user.user_id)
     return APIResponse.created(data=EventResponse.model_validate(ev).model_dump(),
@@ -188,7 +188,7 @@ async def list_events(current_user: AuthUser, db: DBSession,
 
 
 @router.delete("/events/{event_id}", response_model=APIResponse,
-               dependencies=[Depends(require_permission("office.event.delete"))])
+               dependencies=[Depends(require_permission("office.event.delete", "office.delete"))])
 async def delete_event(event_id: int, current_user: AuthUser, db: DBSession):
     EventService.delete(db, event_id, current_user.user_id)
     return APIResponse.ok(message="Event removed.")
@@ -196,7 +196,7 @@ async def delete_event(event_id: int, current_user: AuthUser, db: DBSession):
 
 # ── Complaints ────────────────────────────────────────────────
 @router.post("/complaints", response_model=APIResponse, status_code=201,
-             dependencies=[Depends(require_permission("office.complaint.create"))])
+             dependencies=[Depends(require_permission("office.complaint.create", "office.create"))])
 async def create_complaint(body: ComplaintCreateRequest, current_user: AuthUser, db: DBSession):
     c = ComplaintService.create(db, body, current_user.user_id)
     return APIResponse.created(data=ComplaintResponse.model_validate(c).model_dump(),
@@ -213,12 +213,12 @@ async def list_complaints(current_user: AuthUser, db: DBSession,
     total_pages = max(1, (total + per_page - 1) // per_page)
     return APIResponse.ok(data={
         "items": [ComplaintResponse.model_validate(c).model_dump() for c in items],
-        "meta": {"total": total, "page": page, "total_pages": total_pages},
+        "meta": {"total": total, "page": page, "per_page": per_page},
     })
 
 
 @router.put("/complaints/{complaint_id}", response_model=APIResponse,
-            dependencies=[Depends(require_permission("office.complaint.update"))])
+            dependencies=[Depends(require_permission("office.complaint.update", "office.update"))])
 async def update_complaint(complaint_id: int, body: ComplaintUpdateRequest,
                            current_user: AuthUser, db: DBSession):
     c = ComplaintService.update(db, complaint_id, body, current_user.user_id)
@@ -227,7 +227,7 @@ async def update_complaint(complaint_id: int, body: ComplaintUpdateRequest,
 
 # ── Inward/Outward Register ────────────────────────────────────
 @router.post("/register", response_model=APIResponse, status_code=201,
-             dependencies=[Depends(require_permission("office.register.create"))])
+             dependencies=[Depends(require_permission("office.register.create", "office.create"))])
 async def create_register_entry(body: RegisterCreateRequest, current_user: AuthUser, db: DBSession):
     r = RegisterService.create(db, body, current_user.user_id)
     return APIResponse.created(data=RegisterResponse.model_validate(r).model_dump(),

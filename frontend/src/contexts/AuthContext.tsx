@@ -2,6 +2,7 @@ import { createContext, useContext, useState, useEffect, ReactNode, useCallback 
 import { useNavigate } from 'react-router-dom';
 import authService, { type LoginCredentials, type AuthUser } from '../services/authService';
 import { getPortalPath } from '../utils/rolePortals';
+import notificationService from '../services/notificationService';
 
 interface AuthContextType {
   user: AuthUser | null;
@@ -35,6 +36,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           const freshUser = await authService.getMe();
           setUser(freshUser);
           authService.storeUser(freshUser);
+          // FCM token is registered when user clicks the bell (user gesture required by browser)
         } catch {
           authService.clearStorage();
           setUser(null);
@@ -49,6 +51,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = useCallback(async (credentials: LoginCredentials) => {
     const response = await authService.login(credentials);
     setUser(response.user);
+    // FCM token is registered when user clicks the bell (user gesture required by browser)
     const roleCode = response.user.roles?.[0]?.code;
     navigate(getPortalPath(roleCode ?? ''), { replace: true });
   }, [navigate]);

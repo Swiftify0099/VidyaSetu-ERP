@@ -19,6 +19,15 @@ class FeeCategoryRequest(BaseModel):
     sort_order: int = 0
 
 
+class StudentInstallmentRequest(BaseModel):
+    academic_year_id: int = 1
+    installment_name: str
+    amount: Decimal
+    due_date: date
+    remarks: Optional[str] = None
+
+
+
 class FeeCategoryResponse(BaseModel):
     model_config = {"from_attributes": True}
     id: int

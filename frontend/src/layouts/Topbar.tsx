@@ -1,12 +1,19 @@
-import { Bell, Search, Sun, Moon, Globe, ChevronDown, User, Settings, LogOut, Key, Menu, CheckCheck } from 'lucide-react';
+import { Bell, Search, Sun, Moon, Globe, ChevronDown, User, Settings, LogOut, Key, Menu, CheckCheck, ExternalLink } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import toast from 'react-hot-toast';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import api from '../services/api';
-import communicationService, { CommLog } from '../services/communicationService';
+import notificationService, { AppNotification } from '../services/notificationService';
+import communicationService from '../services/communicationService';
+import { useNotifications } from '../hooks/useNotifications';
+import { handleNotificationClick } from '../utils/notificationUtils';
 import styles from './Topbar.module.css';
+
+// Module-level flag: only log FCM tokens once per browser session
+let _fcmTokensLogged = false;
 
 interface SearchResult {
   id: number;
@@ -38,10 +45,18 @@ export default function Topbar({
   const { resolvedTheme, toggleTheme } = useTheme();
   const navigate = useNavigate();
 
+  const {
+    notifications,
+    unreadCount,
+    permission: notifPermission,
+    requestPermission: requestNotifPermission,
+    markAsRead,
+    markAllAsRead: handleMarkAllRead,
+  } = useNotifications();
+
   const [profileOpen, setProfileOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
   const [langOpen, setLangOpen] = useState(false);
-  const [notifications, setNotifications] = useState<CommLog[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<SearchResults | null>(null);
   const [searchLoading, setSearchLoading] = useState(false);
@@ -53,21 +68,35 @@ export default function Topbar({
   const searchRef = useRef<HTMLDivElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Load user notifications
-  const loadNotifications = useCallback(async () => {
-    try {
-      const logs = await communicationService.getMyNotifications();
-      setNotifications(logs);
-    } catch {
-      setNotifications([]);
-    }
-  }, []);
-
+  // Log all FCM tokens grouped by role — once per browser session
   useEffect(() => {
-    loadNotifications();
-    const interval = setInterval(loadNotifications, 15000); // refresh every 15s
-    return () => clearInterval(interval);
-  }, [loadNotifications]);
+    if (_fcmTokensLogged) return;
+    _fcmTokensLogged = true;
+    (async () => {
+      try {
+        const tokens = await communicationService.getAllFcmTokens();
+        const grouped: Record<string, typeof tokens> = {};
+        tokens.forEach(t => {
+          if (!grouped[t.role]) grouped[t.role] = [];
+          grouped[t.role].push(t);
+        });
+        console.group('%c🔥 VidyaSetu — FCM Token Registry (%d users)', 'color:#f97316;font-weight:bold;font-size:14px', tokens.length);
+        Object.entries(grouped).forEach(([role, list]) => {
+          console.group(`%c${role} (${list.length})`, 'color:#6366f1;font-weight:bold');
+          console.table(list.map(t => ({
+            Name:       t.name,
+            Identifier: t.identifier,
+            'FCM Token': t.fcm_token ?? `[No token — Topic: ${t.topic}]`,
+            Topic:      t.topic,
+          })));
+          console.groupEnd();
+        });
+        console.groupEnd();
+      } catch {
+        console.warn('[VidyaSetu] Could not load FCM token registry');
+      }
+    })();
+  }, []);
 
   // Close dropdowns on outside click
   useEffect(() => {
@@ -89,21 +118,16 @@ export default function Topbar({
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
-  const handleMarkRead = async (id: number) => {
+  const handleNotifClick = async (notif: AppNotification) => {
     try {
-      await communicationService.markNotificationRead(id);
-      setNotifications(prev => prev.map(n => n.id === id ? { ...n, is_read: true } : n));
-    } catch {}
+      await notificationService.markClicked(notif.id);
+    } catch { /* fire-and-forget */ }
+    await markAsRead(notif.id);
+    setNotifOpen(false);
+    if (notif.action_url) {
+      handleNotificationClick(notif.action_url, (path) => navigate(path));
+    }
   };
-
-  const handleMarkAllRead = async () => {
-    try {
-      await communicationService.markAllNotificationsRead();
-      setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
-    } catch {}
-  };
-
-  const unreadCount = notifications.filter(n => !n.is_read).length;
 
   const runSearch = useCallback(async (q: string) => {
     if (q.trim().length < 2) {
@@ -274,12 +298,25 @@ export default function Topbar({
         <div className={styles.notifWrap} ref={notifRef}>
           <button
             className={styles.iconBtn}
-            onClick={() => setNotifOpen(v => !v)}
-            title="Notifications Center"
+            onClick={async () => {
+              if (notifPermission !== 'granted') {
+                await requestNotifPermission();
+              }
+              setNotifOpen((v) => !v);
+            }}
+            title={notifPermission !== 'granted' ? 'Click to enable push notifications' : 'Notifications Center'}
             id="notifications-btn"
           >
             <Bell size={17} />
             {unreadCount > 0 && <span className={styles.badge}>{unreadCount > 99 ? '99+' : unreadCount}</span>}
+            {notifPermission === 'default' && (
+              <span title="Click to enable notifications" style={{
+                position: 'absolute', top: 4, right: 4,
+                width: 7, height: 7, borderRadius: '50%',
+                background: '#f59e0b', border: '1.5px solid var(--color-surface)',
+                pointerEvents: 'none',
+              }} />
+            )}
           </button>
 
           {notifOpen && (
@@ -288,12 +325,14 @@ export default function Topbar({
                 <span className={styles.notifTitle}>
                   🔔 Notifications {unreadCount > 0 && `(${unreadCount})`}
                 </span>
-                {unreadCount > 0 && (
-                  <button className={styles.markAllBtn} onClick={handleMarkAllRead}>
-                    <CheckCheck size={14} style={{ verticalAlign: 'middle', marginRight: 4 }} />
-                    Mark all read
-                  </button>
-                )}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  {unreadCount > 0 && (
+                    <button className={styles.markAllBtn} onClick={handleMarkAllRead}>
+                      <CheckCheck size={14} style={{ verticalAlign: 'middle', marginRight: 4 }} />
+                      Mark all read
+                    </button>
+                  )}
+                </div>
               </div>
 
               <div className={styles.notifList}>
@@ -302,23 +341,60 @@ export default function Topbar({
                     No notifications yet. You are all caught up! ✨
                   </div>
                 ) : (
-                  notifications.map(n => (
+                  notifications.slice(0, 10).map(n => (
                     <button
                       key={n.id}
                       className={`${styles.notifItem} ${!n.is_read ? styles.notifUnread : ''}`}
-                      onClick={() => handleMarkRead(n.id)}
+                      onClick={() => handleNotifClick(n)}
                     >
-                      <div className={styles.notifMeta}>
-                        <span className={`${styles.notifBadge} ${n.channel === 'firebase_fcm' ? styles.notifBadgeFCM : n.channel === 'sms' ? styles.notifBadgeSMS : styles.notifBadgeNotice}`}>
-                          {n.channel === 'firebase_fcm' ? '🔥 FCM PUSH' : n.channel?.toUpperCase()}
-                        </span>
-                        <span>{n.sent_at ? new Date(n.sent_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Just now'}</span>
+                      {/* Priority dot */}
+                      <span style={{
+                        display: 'inline-block',
+                        width: 7, height: 7, borderRadius: '50%',
+                        marginRight: 6, flexShrink: 0, marginTop: 2,
+                        background: n.priority === 'critical' ? '#ef4444'
+                          : n.priority === 'high' ? '#f59e0b'
+                          : n.priority === 'medium' ? '#3b82f6'
+                          : '#9ca3af',
+                      }} />
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div className={styles.notifMeta}>
+                          <span className={`${styles.notifBadge} ${styles.notifBadgeNotice}`}>
+                            {notificationService.getCategoryIcon(n.category)} {n.category}
+                          </span>
+                          <span>{notificationService.formatRelativeTime(n.created_at)}</span>
+                        </div>
+                        <div className={styles.notifSubject}>{n.title}</div>
+                        <div className={styles.notifBody}>{n.body}</div>
                       </div>
-                      <div className={styles.notifSubject}>{n.subject || n.recipient_name || 'System Notification'}</div>
-                      <div className={styles.notifBody}>{n.message_body}</div>
                     </button>
                   ))
                 )}
+              </div>
+
+              {/* View All link */}
+              <div style={{ borderTop: '1px solid var(--color-border)', padding: '0.5rem 0.75rem' }}>
+                <button
+                  id="notif-view-all-btn"
+                  onClick={() => { setNotifOpen(false); navigate('/notifications'); }}
+                  style={{
+                    width: '100%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '0.4rem',
+                    padding: '0.4rem',
+                    background: 'transparent',
+                    border: 'none',
+                    color: 'var(--color-primary)',
+                    fontSize: '0.8rem',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    borderRadius: 'var(--radius-sm)',
+                  }}
+                >
+                  <ExternalLink size={13} /> View All Notifications
+                </button>
               </div>
             </div>
           )}

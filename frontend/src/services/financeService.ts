@@ -148,6 +148,12 @@ const financeService = {
     await api.delete(`/finance/structure/${id}`);
   },
 
+  // Student Search
+  async searchStudents(query: string): Promise<any[]> {
+    const res = await api.get('/finance/student/search', { params: { query } });
+    return res.data.data;
+  },
+
   // Student Fees
   async getStudentFees(studentId: number, academic_year_id: number): Promise<StudentFeeSummary> {
     const res = await api.get(`/finance/student/${studentId}/fees`, { params: { academic_year_id } });
@@ -190,6 +196,31 @@ const financeService = {
     const res = await api.get('/finance/defaulters', { params: { academic_year_id, standard } });
     return res.data.data;
   },
+
+  // Student Installments
+  async getStudentInstallments(studentId: number, academic_year_id?: number): Promise<any[]> {
+    const res = await api.get(`/finance/student/${studentId}/installments`, {
+      params: academic_year_id ? { academic_year_id } : {},
+    });
+    return res.data.data;
+  },
+
+  async createStudentInstallment(studentId: number, data: {
+    academic_year_id?: number;
+    installment_name: string;
+    amount: number;
+    due_date: string;
+    remarks?: string;
+  }): Promise<any> {
+    const res = await api.post(`/finance/student/${studentId}/installments`, data);
+    return res.data;
+  },
+
+  async deleteStudentInstallment(instId: number): Promise<any> {
+    const res = await api.delete(`/finance/installments/${instId}`);
+    return res.data;
+  },
+
 
   // Expenses
   async getExpenses(params?: { category?: string; from_date?: string; to_date?: string; page?: number; academic_year_id?: number }): Promise<{ items: Expense[]; meta: any }> {

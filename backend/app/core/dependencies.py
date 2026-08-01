@@ -45,6 +45,11 @@ class CurrentUser:
         """Check if user has a specific role."""
         return role_code in self.role_codes
 
+    @property
+    def roles(self) -> list[str]:
+        """Alias for role_codes."""
+        return self.role_codes
+
     def is_super_admin(self) -> bool:
         """Check if user is Super Admin or Admin."""
         return "super_admin" in self.role_codes or "admin" in self.role_codes

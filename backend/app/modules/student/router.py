@@ -37,11 +37,29 @@ async def create_student(
     current_user: AuthUser,
     db: DBSession,
 ):
-    """Admit a new student. GR number is auto-generated."""
+    """Admit a new student. Auto-generates GR number, user login account, and emails credentials."""
     student = StudentService.create(db, body, created_by=current_user.user_id)
+    username = getattr(student, "_generated_username", student.gr_number)
+    password = getattr(student, "_generated_password", None)
+    email_sent = getattr(student, "_email_sent", False)
+    target_email = getattr(student, "_target_email", None)
+
+    msg = f"Student '{student.full_name}' admitted. GR: {student.gr_number}."
+    if email_sent:
+        msg += f" Login credentials emailed to {target_email}."
+
     return APIResponse.created(
-        data={"id": student.id, "gr_number": student.gr_number, "full_name": student.full_name},
-        message=f"Student '{student.full_name}' admitted. GR: {student.gr_number}",
+        data={
+            "id": student.id,
+            "gr_number": student.gr_number,
+            "full_name": student.full_name,
+            "username": username,
+            "initial_password": password,
+            "user_id": student.user_id,
+            "email_sent": email_sent,
+            "target_email": target_email,
+        },
+        message=msg,
     )
 
 

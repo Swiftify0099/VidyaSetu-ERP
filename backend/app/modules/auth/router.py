@@ -63,7 +63,7 @@ async def get_me(current_user: AuthUser, db: DBSession):
     """Get current user profile with permissions."""
     from sqlalchemy import select
     from sqlalchemy.orm import selectinload
-    from app.modules.auth.models import User, UserRole, Role
+    from app.modules.auth.models import User, UserRole, Role, RolePermission
     from app.modules.auth.service import AuthService
 
     user = db.scalar(
@@ -74,6 +74,7 @@ async def get_me(current_user: AuthUser, db: DBSession):
             selectinload(User.user_roles)
             .selectinload(UserRole.role)
             .selectinload(Role.role_permissions)
+            .selectinload(RolePermission.permission)
         )
     )
     if not user:

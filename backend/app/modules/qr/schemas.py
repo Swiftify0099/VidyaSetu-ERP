@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field
 
 class QRGenerateRequest(BaseModel):
     type: str = Field(..., pattern="^(student|library|attendance|fee|learning|certificate)$")
-    reference_id: int = Field(..., ge=1)
+    reference_id: Any = Field(...)
     label: Optional[str] = None
 
 

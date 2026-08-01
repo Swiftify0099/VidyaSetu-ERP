@@ -22,8 +22,9 @@ api.interceptors.response.use(
   response => response,
   async error => {
     const original = error.config;
+    const isAuthRequest = original?.url?.includes('/auth/login') || original?.url?.includes('/auth/refresh');
 
-    if (error.response?.status === 401 && !original._retry) {
+    if (error.response?.status === 401 && !original?._retry && !isAuthRequest) {
       if (isRefreshing) {
         return new Promise(resolve => {
           refreshQueue.push(token => {
@@ -42,11 +43,12 @@ api.interceptors.response.use(
         refreshQueue = [];
         original.headers.Authorization = `Bearer ${newToken}`;
         return api(original);
-      } catch {
-        // Refresh failed — redirect to login
+      } catch (refreshErr) {
         authService.clearStorage();
-        window.location.href = '/login';
-        return Promise.reject(error);
+        if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
+          window.location.href = '/login';
+        }
+        return Promise.reject(refreshErr);
       } finally {
         isRefreshing = false;
       }

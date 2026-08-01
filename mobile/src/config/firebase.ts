@@ -1,4 +1,5 @@
 import firebase from '@react-native-firebase/app';
+import messaging from '@react-native-firebase/messaging';
 
 // Mobile Firebase configuration object
 export const firebaseConfig = {
@@ -12,9 +13,7 @@ export const firebaseConfig = {
 };
 
 /**
- * Initialize Firebase App for React Native.
- * If native google-services.json / GoogleService-Info.plist is configured, @react-native-firebase initializes automatically.
- * Otherwise, secondary app initialization can be performed using firebaseConfig.
+ * Initialize Firebase App for React Native and setup live background push notifications.
  */
 export const initializeMobileFirebase = async () => {
   try {
@@ -23,6 +22,26 @@ export const initializeMobileFirebase = async () => {
       console.log('Firebase initialized successfully in Mobile app');
     } else {
       console.log('Firebase already initialized');
+    }
+
+    // Request Notification permission for live on-screen popups
+    const authStatus = await messaging().requestPermission();
+    const enabled =
+      authStatus === messaging.AuthorizationStatus.AUTHORIZED ||
+      authStatus === messaging.AuthorizationStatus.PROVISIONAL;
+
+    if (enabled) {
+      console.log('FCM Push Notification permission granted');
+
+      // Foreground message listener (when app is open and active)
+      messaging().onMessage(async remoteMessage => {
+        console.log('🔔 Live foreground push notification received in mobile:', remoteMessage);
+      });
+
+      // Set background handler for live notifications outside app / on home screen
+      messaging().setBackgroundMessageHandler(async remoteMessage => {
+        console.log('Live background push notification received:', remoteMessage?.notification?.title);
+      });
     }
   } catch (error) {
     console.error('Error initializing Firebase in Mobile app:', error);

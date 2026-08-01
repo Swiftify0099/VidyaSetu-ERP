@@ -6,8 +6,8 @@ Separated from service.py for clean architecture.
 """
 from datetime import date
 from decimal import Decimal
-from typing import Optional
-from pydantic import BaseModel, Field, field_validator
+from typing import Optional, Any
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 
 # ── Exam Type ─────────────────────────────────────────────────
@@ -143,9 +143,27 @@ class MarkEntry(BaseModel):
 
 
 class BulkMarkEntryRequest(BaseModel):
-    exam_id: int
-    exam_subject_id: int
-    entries: list[MarkEntry] = Field(..., min_length=1)
+    exam_id: Optional[int] = None
+    exam_subject_id: Optional[int] = None
+    marks: Optional[list[MarkEntry]] = None
+    entries: Optional[list[MarkEntry]] = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def populate_marks_or_entries(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            items = data.get("marks") or data.get("entries") or []
+            if "marks" not in data or data["marks"] is None:
+                data["marks"] = items
+            if "entries" not in data or data["entries"] is None:
+                data["entries"] = items
+            if items and isinstance(items, list) and len(items) > 0 and isinstance(items[0], dict):
+                if not data.get("exam_id") and items[0].get("exam_id"):
+                    data["exam_id"] = items[0]["exam_id"]
+                if not data.get("exam_subject_id") and items[0].get("exam_subject_id"):
+                    data["exam_subject_id"] = items[0]["exam_subject_id"]
+        return data
+
 
 
 class MarkResponse(BaseModel):

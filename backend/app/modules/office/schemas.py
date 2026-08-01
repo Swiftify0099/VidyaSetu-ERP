@@ -3,7 +3,7 @@ VidyaSetu ERP — Office Module Schemas
 """
 from datetime import date, datetime
 from typing import Optional
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 
 # ── Notice ────────────────────────────────────────────────────
@@ -22,6 +22,13 @@ class NoticeCreateRequest(BaseModel):
     is_published: bool = True
     notice_number: Optional[str] = None
 
+    @field_validator("publish_date", "expiry_date", mode="before")
+    @classmethod
+    def sanitize_dates(cls, v):
+        if v == "" or v is None:
+            return None
+        return v
+
 
 class NoticeUpdateRequest(BaseModel):
     title: Optional[str] = None
@@ -34,6 +41,13 @@ class NoticeUpdateRequest(BaseModel):
     expiry_date: Optional[date] = None
     is_pinned: Optional[bool] = None
     is_published: Optional[bool] = None
+
+    @field_validator("expiry_date", mode="before")
+    @classmethod
+    def sanitize_dates(cls, v):
+        if v == "" or v is None:
+            return None
+        return v
 
 
 class NoticeResponse(BaseModel):

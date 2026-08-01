@@ -67,6 +67,20 @@ class TeacherCreateRequest(BaseModel):
     emergency_contact_mobile: Optional[str] = None
     emergency_contact_relation: Optional[str] = None
 
+    @field_validator("date_of_joining", "dob", mode="before")
+    @classmethod
+    def sanitize_dates(cls, v):
+        if v == "" or v is None:
+            return None
+        return v
+
+    @field_validator("b_ed_year", "d_ed_year", "basic_salary", "grade_pay", mode="before")
+    @classmethod
+    def sanitize_numbers(cls, v):
+        if v == "" or v is None:
+            return None
+        return v
+
 
 class TeacherUpdateRequest(BaseModel):
     first_name: Optional[str] = None

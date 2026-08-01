@@ -37,7 +37,7 @@ class Teacher(BaseModel):
     first_name: Mapped[str] = mapped_column(String(100), nullable=False)
     middle_name: Mapped[str | None] = mapped_column(String(100), nullable=True)
     last_name: Mapped[str] = mapped_column(String(100), nullable=False)
-    salutation: Mapped[str | None] = mapped_column(String(10), nullable=True)  # Mr./Mrs./Dr./Prof.
+    salutation: Mapped[str | None] = mapped_column(String(50), nullable=True)  # Mr./Mrs./Dr./Prof.
 
     # ── Photo ─────────────────────────────────────────────────
     photo_path: Mapped[str | None] = mapped_column(String(500), nullable=True)
@@ -62,27 +62,27 @@ class Teacher(BaseModel):
 
     # ── Personal Information ──────────────────────────────────
     dob: Mapped[date | None] = mapped_column(Date, nullable=True)
-    gender: Mapped[str | None] = mapped_column(String(10), nullable=True)
-    blood_group: Mapped[str | None] = mapped_column(String(5), nullable=True)
+    gender: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    blood_group: Mapped[str | None] = mapped_column(String(20), nullable=True)
     nationality: Mapped[str] = mapped_column(String(50), nullable=False, default="Indian")
     religion: Mapped[str | None] = mapped_column(String(50), nullable=True)
     caste: Mapped[str | None] = mapped_column(String(100), nullable=True)
-    category: Mapped[str | None] = mapped_column(String(20), nullable=True)  # SC/ST/OBC/NT/SBC/Open
-    marital_status: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    category: Mapped[str | None] = mapped_column(String(50), nullable=True)  # SC/ST/OBC/NT/SBC/Open
+    marital_status: Mapped[str | None] = mapped_column(String(50), nullable=True)
     mother_tongue: Mapped[str | None] = mapped_column(String(50), nullable=True)
 
     # ── Aadhaar / PAN / Other IDs ─────────────────────────────
-    aadhaar_number: Mapped[str | None] = mapped_column(String(12), nullable=True)
-    pan_number: Mapped[str | None] = mapped_column(String(10), nullable=True)
+    aadhaar_number: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    pan_number: Mapped[str | None] = mapped_column(String(50), nullable=True)
     pf_number: Mapped[str | None] = mapped_column(String(50), nullable=True)        # PF / EPF
     gpf_number: Mapped[str | None] = mapped_column(String(50), nullable=True)       # GPF
     dcps_account: Mapped[str | None] = mapped_column(String(50), nullable=True)     # DCPS / NPS
-    pran_number: Mapped[str | None] = mapped_column(String(20), nullable=True)      # PRAN (pension)
+    pran_number: Mapped[str | None] = mapped_column(String(50), nullable=True)      # PRAN (pension)
     teacher_saral_id: Mapped[str | None] = mapped_column(String(50), nullable=True)
 
     # ── Contact ───────────────────────────────────────────────
-    mobile: Mapped[str | None] = mapped_column(String(15), nullable=True, index=True)
-    mobile_alt: Mapped[str | None] = mapped_column(String(15), nullable=True)
+    mobile: Mapped[str | None] = mapped_column(String(50), nullable=True, index=True)
+    mobile_alt: Mapped[str | None] = mapped_column(String(50), nullable=True)
     email: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
     email_official: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
@@ -93,11 +93,10 @@ class Teacher(BaseModel):
     taluka: Mapped[str | None] = mapped_column(String(100), nullable=True)
     district: Mapped[str | None] = mapped_column(String(100), nullable=True)
     state: Mapped[str] = mapped_column(String(100), nullable=False, default="Maharashtra")
-    pincode: Mapped[str | None] = mapped_column(String(10), nullable=True)
+    pincode: Mapped[str | None] = mapped_column(String(20), nullable=True)
 
     # ── Qualification ─────────────────────────────────────────
     highest_qualification: Mapped[str | None] = mapped_column(String(100), nullable=True)
-    # e.g. B.A., M.A., B.Ed., D.Ed., M.Sc., Ph.D.
     specialization: Mapped[str | None] = mapped_column(String(255), nullable=True)
     b_ed_year: Mapped[int | None] = mapped_column(Integer, nullable=True)
     d_ed_year: Mapped[int | None] = mapped_column(Integer, nullable=True)
@@ -108,7 +107,7 @@ class Teacher(BaseModel):
     grade_pay: Mapped[float | None] = mapped_column(Numeric(12, 2), nullable=True)
     bank_name: Mapped[str | None] = mapped_column(String(200), nullable=True)
     bank_account_number: Mapped[str | None] = mapped_column(String(50), nullable=True)
-    bank_ifsc: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    bank_ifsc: Mapped[str | None] = mapped_column(String(30), nullable=True)
     bank_branch: Mapped[str | None] = mapped_column(String(200), nullable=True)
 
     # ── Family ────────────────────────────────────────────────
@@ -117,7 +116,7 @@ class Teacher(BaseModel):
     father_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     mother_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     emergency_contact_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
-    emergency_contact_mobile: Mapped[str | None] = mapped_column(String(15), nullable=True)
+    emergency_contact_mobile: Mapped[str | None] = mapped_column(String(50), nullable=True)
     emergency_contact_relation: Mapped[str | None] = mapped_column(String(100), nullable=True)
 
     # ── Leave Balances ────────────────────────────────────────

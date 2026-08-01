@@ -2,16 +2,16 @@
  * VidyaSetu ERP — QR Scan Center Page (Phase 8)
  * ================================================
  * Generate and manage QR codes for:
- *  - Student ID cards
+ *  - Student ID cards (with Printable Badge Preview)
  *  - Library book tracking
  *  - Attendance marking via QR
  *  - Fee payment verification
  */
-import { useState, useCallback } from 'react';
-import { QrCode, Search, Download, RefreshCw, Copy, CheckCircle, Book, GraduationCap, CreditCard, CalendarCheck } from 'lucide-react';
+import { useState, useCallback, useEffect } from 'react';
+import { QrCode, Search, Download, Copy, CheckCircle, Book, GraduationCap, CreditCard, CalendarCheck, Printer, User } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../../services/api';
-import { PageHeader, SearchBar, EmptyState, StatusBadge } from '../../components/shared';
+import { PageHeader, StatusBadge } from '../../components/shared';
 import styles from './QRScanCenterPage.module.css';
 
 // ── Types ─────────────────────────────────────────────────────
@@ -37,6 +37,13 @@ interface ScanResult {
   message: string;
 }
 
+interface EntitySuggestion {
+  id: number;
+  code: string;
+  label: string;
+  sub: string;
+}
+
 const TYPE_CONFIG: Record<QRType, { icon: React.ReactNode; label: string; color: string; desc: string }> = {
   student:    { icon: <GraduationCap size={20} />, label: 'Student ID', color: '#4f46e5', desc: 'Generate QR for student identity card' },
   library:    { icon: <Book size={20} />,          label: 'Library Book', color: '#059669', desc: 'Track books with QR codes' },
@@ -55,25 +62,55 @@ export default function QRScanCenterPage() {
   const [copied, setCopied] = useState(false);
   const [recentQRs, setRecentQRs] = useState<QRRecord[]>([]);
 
+  // Suggestions state
+  const [suggestions, setSuggestions] = useState<EntitySuggestion[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+
+  // Fetch search suggestions as user types
+  useEffect(() => {
+    if (activeType === 'attendance' || !referenceId.trim() || referenceId.length < 1) {
+      setSuggestions([]);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      try {
+        const res = await api.get('/qr/entities/search', {
+          params: { type: activeType, q: referenceId }
+        });
+        setSuggestions(res.data?.data || []);
+      } catch {
+        setSuggestions([]);
+      }
+    }, 200);
+
+    return () => clearTimeout(timer);
+  }, [activeType, referenceId]);
+
   // ── Generate QR ───────────────────────────────────────────
-  const generateQR = useCallback(async () => {
-    if (!referenceId.trim()) {
-      toast.error('Please enter the reference ID');
+  const generateQR = useCallback(async (customRef?: string) => {
+    const refToUse = (customRef || referenceId).trim();
+    if (!refToUse) {
+      toast.error('Please select or enter the Student ID / GR Number');
       return;
     }
     setGenerating(true);
+    setShowSuggestions(false);
     try {
       const res = await api.post('/qr/generate', {
         type: activeType,
-        reference_id: Number(referenceId),
+        reference_id: refToUse,
       });
       const data = res.data?.data;
       setGeneratedQR(data);
-      setRecentQRs(prev => [data, ...prev.slice(0, 9)]);
-      toast.success('QR Code generated!');
-    } catch {
-      toast.error('Failed to generate QR code');
-    } finally { setGenerating(false); }
+      setRecentQRs(prev => [data, ...prev.filter(r => r.id !== data.id).slice(0, 8)]);
+      toast.success('QR Code generated successfully!');
+    } catch (err: any) {
+      const msg = err?.response?.data?.detail || err?.response?.data?.message || 'Failed to generate QR code';
+      toast.error(msg);
+    } finally {
+      setGenerating(false);
+    }
   }, [activeType, referenceId]);
 
   // ── Scan / Verify QR ─────────────────────────────────────
@@ -112,6 +149,10 @@ export default function QRScanCenterPage() {
     a.click();
   };
 
+  const printIDCard = () => {
+    window.print();
+  };
+
   const cfg = TYPE_CONFIG[activeType];
 
   return (
@@ -140,7 +181,12 @@ export default function QRScanCenterPage() {
                 key={type}
                 className={`${styles.typeCard} ${activeType === type ? styles.typeCardActive : ''}`}
                 style={activeType === type ? { borderColor: c.color, backgroundColor: `${c.color}12` } : {}}
-                onClick={() => { setActiveType(type); setGeneratedQR(null); setReferenceId(''); }}
+                onClick={() => {
+                  setActiveType(type);
+                  setGeneratedQR(null);
+                  setReferenceId('');
+                  setSuggestions([]);
+                }}
               >
                 <span style={{ color: activeType === type ? c.color : 'var(--color-text-secondary)' }}>
                   {c.icon}
@@ -152,35 +198,61 @@ export default function QRScanCenterPage() {
 
           <p className={styles.typeDesc}>{cfg.desc}</p>
 
-          {/* Reference Input */}
+          {/* Reference Input with Suggestions */}
           <div className={styles.formGroup}>
             <label className={styles.formLabel}>
-              {activeType === 'student' ? 'Student ID' :
-               activeType === 'library' ? 'Book ID / Accession No.' :
-               activeType === 'attendance' ? 'Class ID (Standard-Division)' :
-               'Receipt ID'}
+              {activeType === 'student' ? 'Search Student (Name / GR No / Roll)' :
+               activeType === 'library' ? 'Book Title / Accession No' :
+               activeType === 'attendance' ? 'Class (Standard-Division)' :
+               'Receipt Number'}
             </label>
-            <div className={styles.inputRow}>
-              <input
-                className={styles.formInput}
-                value={referenceId}
-                onChange={e => setReferenceId(e.target.value)}
-                placeholder={
-                  activeType === 'student' ? 'e.g. 1042' :
-                  activeType === 'library' ? 'e.g. 5501' :
-                  activeType === 'attendance' ? 'e.g. 8-A' :
-                  'e.g. 2300'
-                }
-                onKeyDown={e => e.key === 'Enter' && generateQR()}
-              />
-              <button
-                className={styles.generateBtn}
-                style={{ backgroundColor: cfg.color }}
-                onClick={generateQR}
-                disabled={generating}
-              >
-                {generating ? '...' : 'Generate'}
-              </button>
+            <div className={styles.suggestWrapper}>
+              <div className={styles.inputRow}>
+                <input
+                  className={styles.formInput}
+                  value={referenceId}
+                  onChange={e => {
+                    setReferenceId(e.target.value);
+                    setShowSuggestions(true);
+                  }}
+                  onFocus={() => setShowSuggestions(true)}
+                  placeholder={
+                    activeType === 'student' ? 'Search Student name or GR No (e.g. GR2024001)...' :
+                    activeType === 'library' ? 'e.g. Mathematics Vol 1 or 5501' :
+                    activeType === 'attendance' ? 'e.g. 8-A' :
+                    'e.g. REC-2024-001'
+                  }
+                  onKeyDown={e => e.key === 'Enter' && generateQR()}
+                />
+                <button
+                  className={styles.generateBtn}
+                  style={{ backgroundColor: cfg.color }}
+                  onClick={() => generateQR()}
+                  disabled={generating}
+                >
+                  {generating ? '...' : 'Generate'}
+                </button>
+              </div>
+
+              {/* Suggestions Dropdown */}
+              {showSuggestions && suggestions.length > 0 && (
+                <div className={styles.suggestionsBox}>
+                  {suggestions.map(s => (
+                    <div
+                      key={s.id}
+                      className={styles.suggestItem}
+                      onClick={() => {
+                        setReferenceId(s.code || String(s.id));
+                        setShowSuggestions(false);
+                        generateQR(s.code || String(s.id));
+                      }}
+                    >
+                      <span className={styles.suggestTitle}>{s.label}</span>
+                      <span className={styles.suggestSub}>{s.sub}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 
@@ -190,7 +262,7 @@ export default function QRScanCenterPage() {
               {generatedQR.qr_image_url ? (
                 <img
                   src={generatedQR.qr_image_url}
-                  alt="QR Code"
+                  alt="Scannable QR Code"
                   className={styles.qrImage}
                 />
               ) : (
@@ -199,11 +271,13 @@ export default function QRScanCenterPage() {
                   <span className={styles.qrPlaceholderText}>QR Code Generated</span>
                 </div>
               )}
+
               <div className={styles.qrMeta}>
                 <p className={styles.qrLabel}>{generatedQR.label}</p>
                 {generatedQR.sub_label && <p className={styles.qrSub}>{generatedQR.sub_label}</p>}
-                <p className={styles.qrCode}>{generatedQR.reference_code}</p>
+                <p className={styles.qrCode}>Ref: {generatedQR.reference_code}</p>
               </div>
+
               <div className={styles.qrActions}>
                 <button className={styles.qrActionBtn} onClick={copyQRData}>
                   {copied ? <CheckCircle size={14} color="#059669" /> : <Copy size={14} />}
@@ -212,7 +286,38 @@ export default function QRScanCenterPage() {
                 <button className={styles.qrActionBtn} onClick={downloadQR}>
                   <Download size={14} /> Download PNG
                 </button>
+                {generatedQR.type === 'student' && (
+                  <button className={styles.qrActionBtn} onClick={printIDCard}>
+                    <Printer size={14} /> Print ID Card
+                  </button>
+                )}
               </div>
+
+              {/* Professional Student ID Card Preview Badge */}
+              {generatedQR.type === 'student' && (
+                <div className={`${styles.idCardContainer} ${styles.printableCard}`}>
+                  <div className={styles.idCardHeader}>
+                    <span className={styles.idCardSchool}>VidyaSetu Academy</span>
+                    <span className={styles.idCardBadge}>Student Pass</span>
+                  </div>
+                  <div className={styles.idCardBody}>
+                    <div className={styles.idCardPhoto}>
+                      <User size={40} />
+                    </div>
+                    <div className={styles.idCardDetails}>
+                      <h4 className={styles.idCardName}>{generatedQR.label}</h4>
+                      <p className={styles.idCardInfo}>{generatedQR.sub_label}</p>
+                      <span className={styles.idCardCode}>GR No: {generatedQR.reference_code}</span>
+                    </div>
+                  </div>
+                  <div className={styles.idCardFooter}>
+                    <span style={{ fontSize: '0.68rem', opacity: 0.85 }}>Valid Academic Year 2024-25</span>
+                    {generatedQR.qr_image_url && (
+                      <img src={generatedQR.qr_image_url} alt="ID QR" className={styles.idCardQR} />
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -223,15 +328,15 @@ export default function QRScanCenterPage() {
             <Search size={18} /> Verify / Scan QR
           </h2>
           <p className={styles.typeDesc}>
-            Paste or type the QR code data to verify and look up the associated record.
+            Paste or scan the QR code data string to verify and look up the associated student or entity record.
           </p>
 
           <div className={styles.formGroup}>
-            <label className={styles.formLabel}>QR Code Data</label>
+            <label className={styles.formLabel}>QR Code Data Payload</label>
             <textarea
               className={`${styles.formInput} ${styles.textarea}`}
               rows={4}
-              placeholder="Paste QR code data or scan output here..."
+              placeholder="Paste QR code JSON payload or scan output here..."
               value={scanInput}
               onChange={e => setScanInput(e.target.value)}
             />
@@ -272,9 +377,17 @@ export default function QRScanCenterPage() {
             <div className={styles.recentSection}>
               <h3 className={styles.recentTitle}>Recently Generated</h3>
               {recentQRs.map((qr, i) => {
-                const qcfg = TYPE_CONFIG[qr.type];
+                const qcfg = TYPE_CONFIG[qr.type] || TYPE_CONFIG.student;
                 return (
-                  <div key={i} className={styles.recentItem}>
+                  <div
+                    key={i}
+                    className={styles.recentItem}
+                    style={{ cursor: 'pointer' }}
+                    onClick={() => {
+                      setGeneratedQR(qr);
+                      setActiveType(qr.type);
+                    }}
+                  >
                     <span style={{ color: qcfg.color }}>{qcfg.icon}</span>
                     <div className={styles.recentMeta}>
                       <span className={styles.recentLabel}>{qr.label}</span>

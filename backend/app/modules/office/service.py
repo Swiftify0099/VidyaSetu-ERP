@@ -49,12 +49,12 @@ def _auto_number(db: Session, model, field_name: str, prefix: str, date_part: st
 class NoticeService:
     @staticmethod
     def create(db: Session, data: NoticeCreateRequest, created_by: int) -> Notice:
-        notice = Notice(
-            **data.model_dump(),
-            published_by=created_by,
-            publish_date=data.publish_date or date.today(),
-            created_by=created_by,
-        )
+        notice_data = data.model_dump()
+        notice_data["publish_date"] = data.publish_date or date.today()
+        notice_data["published_by"] = created_by
+        notice_data["created_by"] = created_by
+
+        notice = Notice(**notice_data)
         db.add(notice)
         AuditService.log(db, action="NOTICE_CREATED", module="office", user_id=created_by,
                          description=f"Notice published: {data.title}")

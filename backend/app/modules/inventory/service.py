@@ -136,6 +136,23 @@ class InventoryStatsResponse(PydanticBase):
     total_stock_value: Decimal
 
 
+class RegisterEntryResponse(PydanticBase):
+    id: str
+    entry_date: date
+    entry_type: str
+    code: str
+    particulars: str
+    particulars_marathi: Optional[str] = None
+    category: str
+    reference: Optional[str] = None
+    dr_qty: Optional[Decimal] = Decimal("0")
+    dr_amount: Decimal = Decimal("0")
+    cr_qty: Optional[Decimal] = Decimal("0")
+    cr_amount: Decimal = Decimal("0")
+    party_location: Optional[str] = None
+    remarks: Optional[str] = None
+
+
 # ═══════════════════════════════════════════════════
 # SERVICES
 # ═══════════════════════════════════════════════════
@@ -320,3 +337,120 @@ class InventoryStatsService:
             total_stock_items=total_stock, low_stock_items=low_stock,
             total_stock_value=Decimal(str(round(stock_val, 2))),
         )
+
+
+class RegisterService:
+    @staticmethod
+    def get_register(db: Session, from_date: Optional[date] = None, to_date: Optional[date] = None,
+                     register_type: Optional[str] = None, search: Optional[str] = None) -> list[RegisterEntryResponse]:
+        entries: list[RegisterEntryResponse] = []
+        cats = {c.id: c.name for c in db.scalars(select(AssetCategory)).all()}
+
+        # 1. Assets
+        if not register_type or register_type in ("all", "asset"):
+            q_asset = select(Asset).where(Asset.is_deleted == False)
+            if from_date: q_asset = q_asset.where(Asset.purchase_date >= from_date)
+            if to_date: q_asset = q_asset.where(Asset.purchase_date <= to_date)
+            assets = db.scalars(q_asset).all()
+            for a in assets:
+                cat_name = cats.get(a.category_id, "Asset") if a.category_id else "Asset"
+                if search:
+                    st = search.lower()
+                    if st not in a.name.lower() and st not in a.asset_code.lower() and (not a.vendor or st not in a.vendor.lower()):
+                        continue
+                entries.append(RegisterEntryResponse(
+                    id=f"ast_{a.id}",
+                    entry_date=a.purchase_date or date.today(),
+                    entry_type="asset_addition",
+                    code=a.asset_code,
+                    particulars=a.name,
+                    particulars_marathi=a.name_marathi,
+                    category=cat_name,
+                    reference=a.serial_number or a.brand,
+                    dr_qty=Decimal("1"),
+                    dr_amount=a.purchase_price or Decimal("0"),
+                    cr_qty=Decimal("0"),
+                    cr_amount=Decimal("0"),
+                    party_location=a.vendor or a.location,
+                    remarks=f"Condition: {a.condition}, Status: {a.status}",
+                ))
+
+        # 2. Stock Transactions
+        if not register_type or register_type in ("all", "stock"):
+            q_txn = select(StockTransaction).where(StockTransaction.is_deleted == False)
+            if from_date: q_txn = q_txn.where(StockTransaction.transaction_date >= from_date)
+            if to_date: q_txn = q_txn.where(StockTransaction.transaction_date <= to_date)
+            txns = db.scalars(q_txn).all()
+            
+            stock_ids = {t.stock_item_id for t in txns}
+            stock_items = {s.id: s for s in db.scalars(select(StockItem).where(StockItem.id.in_(stock_ids))).all()} if stock_ids else {}
+
+            for t in txns:
+                item = stock_items.get(t.stock_item_id)
+                item_name = item.name if item else "Stock Item"
+                item_code = item.item_code if item else f"STK-{t.stock_item_id}"
+                item_cat = item.category if item else "Stock"
+                item_mr = item.name_marathi if item else None
+
+                if search:
+                    st = search.lower()
+                    if st not in item_name.lower() and st not in item_code.lower() and (not t.reference or st not in t.reference.lower()):
+                        continue
+
+                is_inward = t.transaction_type in ("receipt", "return", "opening")
+                cost = t.total_cost or ((t.unit_cost or Decimal("0")) * t.quantity)
+
+                entries.append(RegisterEntryResponse(
+                    id=f"stk_{t.id}",
+                    entry_date=t.transaction_date,
+                    entry_type=f"stock_{t.transaction_type}",
+                    code=item_code,
+                    particulars=item_name,
+                    particulars_marathi=item_mr,
+                    category=item_cat,
+                    reference=t.reference,
+                    dr_qty=t.quantity if is_inward else Decimal("0"),
+                    dr_amount=cost if is_inward else Decimal("0"),
+                    cr_qty=t.quantity if not is_inward else Decimal("0"),
+                    cr_amount=cost if not is_inward else Decimal("0"),
+                    party_location=t.issued_to or t.purpose,
+                    remarks=t.purpose,
+                ))
+
+        # 3. Maintenance Records
+        if not register_type or register_type in ("all", "asset"):
+            q_maint = select(MaintenanceRecord).where(MaintenanceRecord.is_deleted == False)
+            if from_date: q_maint = q_maint.where(MaintenanceRecord.maintenance_date >= from_date)
+            if to_date: q_maint = q_maint.where(MaintenanceRecord.maintenance_date <= to_date)
+            maints = db.scalars(q_maint).all()
+
+            asset_ids = {m.asset_id for m in maints}
+            maint_assets = {a.id: a for a in db.scalars(select(Asset).where(Asset.id.in_(asset_ids))).all()} if asset_ids else {}
+
+            for m in maints:
+                ast = maint_assets.get(m.asset_id)
+                ast_name = ast.name if ast else "Asset"
+                ast_code = ast.asset_code if ast else f"AST-{m.asset_id}"
+                if search:
+                    st = search.lower()
+                    if st not in ast_name.lower() and st not in ast_code.lower() and (not m.vendor or st not in m.vendor.lower()):
+                        continue
+
+                entries.append(RegisterEntryResponse(
+                    id=f"mnt_{m.id}",
+                    entry_date=m.maintenance_date,
+                    entry_type="maintenance",
+                    code=ast_code,
+                    particulars=f"{ast_name} ({m.maintenance_type})",
+                    category="Maintenance",
+                    reference=m.vendor,
+                    dr_qty=Decimal("0"),
+                    dr_amount=Decimal("0"),
+                    cr_qty=Decimal("1"),
+                    cr_amount=m.cost or Decimal("0"),
+                    party_location=m.vendor,
+                    remarks=m.description,
+                ))
+
+        entries.sort(key=lambda x: x.entry_date, reverse=True)
+        return entries

@@ -215,16 +215,22 @@ export default function OfficePage() {
     if (!newNotice.title) { toast.error('Title is required.'); return; }
     setSaving(true);
     try {
+      const payload: any = { ...newNotice };
+      if (!payload.expiry_date) delete payload.expiry_date;
+      if (!payload.notice_number) delete payload.notice_number;
+
       if (editNotice) {
-        await officeService.updateNotice(editNotice.id, newNotice);
+        await officeService.updateNotice(editNotice.id, payload);
         toast.success('Notice updated.');
       } else {
-        await officeService.createNotice(newNotice);
+        await officeService.createNotice(payload);
         toast.success('Notice published!');
       }
       setShowNoticeModal(false); setEditNotice(null);
       resetNoticeForm(); loadSection(); loadStats();
-    } catch { toast.error('Failed to save notice.'); }
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || err?.response?.data?.detail || 'Failed to save notice.');
+    }
     finally { setSaving(false); }
   };
 

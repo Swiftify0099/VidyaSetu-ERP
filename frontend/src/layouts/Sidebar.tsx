@@ -6,7 +6,7 @@ import {
   Package, Library, FileText, Building2, Bell,
   BarChart3, Settings, Shield, ChevronDown, ChevronRight,
   LogOut, Menu, X, CalendarDays, ClipboardList, Palmtree, NotebookPen, ScanLine, ShieldAlert,
-  Video, Bot, QrCode, Ticket, Award, Download, CreditCard, HelpCircle, UserCheck, CheckSquare, Sparkles, FolderOpen, MessageSquare,
+  Video, Bot, QrCode, Ticket, Award, Download, CreditCard, HelpCircle, UserCheck, CheckSquare, Sparkles, FolderOpen, MessageSquare, Bus,
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import styles from './Sidebar.module.css';
@@ -192,6 +192,7 @@ export default function Sidebar({
       label: t('nav.ai_hub'),
       icon: <NotebookPen size={18} />,
       path: '/ai-hub',
+      permission: 'ai_assistant.read',
     },
     {
       label: t('nav.exams'),
@@ -212,6 +213,12 @@ export default function Sidebar({
       path: '/inventory',
     },
     {
+      label: 'Transport',
+      icon: <Bus size={18} />,
+      permission: 'transport.read',
+      path: '/transport',
+    },
+    {
       label: t('nav.office'),
       icon: <Building2 size={18} />,
       permission: 'office.read',
@@ -222,6 +229,11 @@ export default function Sidebar({
       icon: <Bell size={18} />,
       permission: 'communication.read',
       path: '/communication',
+    },
+    {
+      label: 'Notifications',
+      icon: <MessageSquare size={18} />,
+      path: '/notifications',
     },
     {
       label: t('nav.analytics'),
@@ -293,9 +305,6 @@ export default function Sidebar({
           {collapsed ? <Menu size={18} /> : <X size={18} />}
         </button>
       </div>
-
-      {/* Navigation */}
-
 
       {/* Navigation */}
       <nav className={styles.nav}>

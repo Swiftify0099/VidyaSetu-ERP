@@ -12,6 +12,7 @@ from app.modules.inventory.service import (
     MaintenanceRequest, MaintenanceResponse,
     StockItemRequest, StockItemResponse,
     StockTransactionRequest, StockTransactionResponse,
+    RegisterEntryResponse, RegisterService,
     AssetCategoryService, AssetService, StockService, InventoryStatsService,
 )
 from app.shared.responses import APIResponse
@@ -127,3 +128,18 @@ async def get_stock_transactions(item_id: int, current_user: AuthUser, db: DBSes
                                   limit: int = Query(50, le=200)):
     txns = StockService.get_transactions(db, item_id, limit)
     return APIResponse.ok(data=[StockTransactionResponse.model_validate(t).model_dump() for t in txns])
+
+
+# ── Date-Wise Asset & Stock Register (Dr / Cr) ────────────────
+@router.get("/register", response_model=APIResponse,
+            dependencies=[Depends(require_permission("inventory.read"))])
+async def get_inventory_register(current_user: AuthUser, db: DBSession,
+                                  from_date: Optional[str] = None,
+                                  to_date: Optional[str] = None,
+                                  register_type: Optional[str] = None,
+                                  search: Optional[str] = None):
+    from datetime import datetime
+    fd = datetime.strptime(from_date, "%Y-%m-%d").date() if from_date else None
+    td = datetime.strptime(to_date, "%Y-%m-%d").date() if to_date else None
+    entries = RegisterService.get_register(db, from_date=fd, to_date=td, register_type=register_type, search=search)
+    return APIResponse.ok(data=[RegisterEntryResponse.model_validate(e).model_dump() for e in entries])

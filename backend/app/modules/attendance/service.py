@@ -52,16 +52,21 @@ class BulkAttendanceRequest(PydanticBase):
     division: Optional[str] = None
     academic_year_id: int
     period: str = "full_day"
+    subject_id: Optional[int] = None
     rows: list[AttendanceRow]
 
 class AttendanceResponse(PydanticBase):
     model_config = {"from_attributes": True}
     id: int
     student_id: int
+    student_name: Optional[str] = None
+    gr_number: Optional[str] = None
     date: date
     standard: str
     division: Optional[str] = None
     period: str
+    subject_id: Optional[int] = None
+    subject_name: Optional[str] = None
     status: str
     remarks: Optional[str] = None
 
@@ -73,6 +78,8 @@ class SessionResponse(PydanticBase):
     standard: str
     division: Optional[str] = None
     period: str
+    subject_id: Optional[int] = None
+    subject_name: Optional[str] = None
     total_students: int
     present_count: int
     absent_count: int
@@ -177,14 +184,18 @@ class StudentAttendanceService:
         saved = 0
         counts = {"present": 0, "absent": 0, "late": 0, "leave": 0, "half_day": 0, "medical_leave": 0}
         for row in data.rows:
-            existing = db.scalar(
-                select(StudentAttendance).where(
-                    StudentAttendance.student_id == row.student_id,
-                    StudentAttendance.date == data.date,
-                    StudentAttendance.period == data.period,
-                    StudentAttendance.is_deleted == False,
-                )
+            q_att = select(StudentAttendance).where(
+                StudentAttendance.student_id == row.student_id,
+                StudentAttendance.date == data.date,
+                StudentAttendance.period == data.period,
+                StudentAttendance.is_deleted == False,
             )
+            if data.subject_id is not None:
+                q_att = q_att.where(StudentAttendance.subject_id == data.subject_id)
+            else:
+                q_att = q_att.where(StudentAttendance.subject_id.is_(None))
+
+            existing = db.scalar(q_att)
             if existing:
                 existing.status = row.status
                 existing.remarks = row.remarks
@@ -197,6 +208,7 @@ class StudentAttendanceService:
                     division=data.division,
                     academic_year_id=data.academic_year_id,
                     period=data.period,
+                    subject_id=data.subject_id,
                     status=row.status,
                     marked_by=marked_by,
                     remarks=row.remarks,
@@ -207,15 +219,19 @@ class StudentAttendanceService:
             saved += 1
 
         # Update / create session record
-        session = db.scalar(
-            select(ClassAttendanceSession).where(
-                ClassAttendanceSession.date == data.date,
-                ClassAttendanceSession.standard == data.standard,
-                ClassAttendanceSession.academic_year_id == data.academic_year_id,
-                ClassAttendanceSession.period == data.period,
-                ClassAttendanceSession.is_deleted == False,
-            )
+        q_sess = select(ClassAttendanceSession).where(
+            ClassAttendanceSession.date == data.date,
+            ClassAttendanceSession.standard == data.standard,
+            ClassAttendanceSession.academic_year_id == data.academic_year_id,
+            ClassAttendanceSession.period == data.period,
+            ClassAttendanceSession.is_deleted == False,
         )
+        if data.subject_id is not None:
+            q_sess = q_sess.where(ClassAttendanceSession.subject_id == data.subject_id)
+        else:
+            q_sess = q_sess.where(ClassAttendanceSession.subject_id.is_(None))
+
+        session = db.scalar(q_sess)
         total = len(data.rows)
         if session:
             session.total_students = total
@@ -231,6 +247,7 @@ class StudentAttendanceService:
                 division=data.division,
                 academic_year_id=data.academic_year_id,
                 period=data.period,
+                subject_id=data.subject_id,
                 total_students=total,
                 present_count=counts.get("present", 0) + counts.get("half_day", 0),
                 absent_count=counts.get("absent", 0),
@@ -244,10 +261,10 @@ class StudentAttendanceService:
 
         AuditService.log(db, action="ATTENDANCE_MARKED", module="attendance",
                          user_id=marked_by,
-                         description=f"Std {data.standard} {data.date}: {counts.get('present', 0)}P / {counts.get('absent', 0)}A")
+                         description=f"Std {data.standard} {data.date} (Session: {data.period}): {counts.get('present', 0)}P / {counts.get('absent', 0)}A")
         db.commit()
 
-        # Update monthly summary async-style (update in same transaction)
+        # Update monthly summary
         StudentAttendanceService._update_monthly_summary(
             db, data.standard, data.division, data.academic_year_id,
             data.date.year, data.date.month
@@ -278,14 +295,13 @@ class StudentAttendanceService:
         from app.modules.student.models import Student
         students = db.scalars(
             select(Student).where(
-                Student.current_standard == standard,
+                Student.standard == standard,
                 Student.is_deleted == False,
                 Student.is_active == True,
             )
         ).all()
 
         for student in students:
-            # Get all attendance records for this student this month
             records = db.scalars(
                 select(StudentAttendance).where(
                     StudentAttendance.student_id == student.id,
@@ -333,7 +349,10 @@ class StudentAttendanceService:
     @staticmethod
     def get_day_attendance(db: Session, att_date: date, standard: str,
                            division: Optional[str], academic_year_id: int,
-                           period: str = "full_day") -> list[StudentAttendance]:
+                           period: str = "full_day", subject_id: Optional[int] = None) -> list[dict]:
+        from app.modules.student.models import Student
+        from app.modules.timetable.models import Subject
+
         q = select(StudentAttendance).where(
             StudentAttendance.date == att_date,
             StudentAttendance.standard == standard,
@@ -341,8 +360,106 @@ class StudentAttendanceService:
             StudentAttendance.period == period,
             StudentAttendance.is_deleted == False,
         )
-        if division: q = q.where(StudentAttendance.division == division)
-        return list(db.scalars(q).all())
+        if division:
+            q = q.where(StudentAttendance.division == division)
+        if subject_id:
+            q = q.where(StudentAttendance.subject_id == subject_id)
+
+        records = list(db.scalars(q).all())
+        results = []
+        for r in records:
+            st = db.scalar(select(Student).where(Student.id == r.student_id))
+            sub = db.scalar(select(Subject).where(Subject.id == r.subject_id)) if r.subject_id else None
+            results.append({
+                "id": r.id,
+                "student_id": r.student_id,
+                "student_name": st.full_name if st else f"Student #{r.student_id}",
+                "gr_number": st.gr_number if st else f"GR-{r.student_id}",
+                "date": r.date,
+                "standard": r.standard,
+                "division": r.division,
+                "period": r.period,
+                "subject_id": r.subject_id,
+                "subject_name": sub.name if sub else None,
+                "status": r.status,
+                "remarks": r.remarks,
+            })
+        return results
+
+    @staticmethod
+    def get_class_roster(db: Session, standard: str, division: Optional[str],
+                         att_date: date, academic_year_id: int,
+                         period: str = "full_day", subject_id: Optional[int] = None) -> dict:
+        """Fetch all enrolled students in class with current day attendance status & headcount summary."""
+        from app.modules.student.models import Student
+        from app.modules.timetable.models import Subject
+
+        q_students = select(Student).where(
+            Student.standard == standard,
+            Student.is_deleted == False,
+            Student.is_active == True,
+        )
+        if division:
+            q_students = q_students.where(Student.division == division)
+        students = list(db.scalars(q_students.order_by(Student.roll_number, Student.first_name)).all())
+
+        # Existing attendance records for this slot
+        existing_list = StudentAttendanceService.get_day_attendance(
+            db, att_date, standard, division, academic_year_id, period, subject_id
+        )
+        att_map = {r["student_id"]: r for r in existing_list}
+
+        roster = []
+        counts = {"present": 0, "absent": 0, "late": 0, "half_day": 0, "leave": 0, "medical_leave": 0}
+
+        for st in students:
+            if st.id in att_map:
+                st_att = att_map[st.id]
+                status = st_att["status"]
+                remarks = st_att.get("remarks") or ""
+            else:
+                status = "present"
+                remarks = ""
+
+            counts[status] = counts.get(status, 0) + 1
+            roster.append({
+                "student_id": st.id,
+                "student_name": st.full_name,
+                "gr_number": st.gr_number,
+                "roll_number": st.roll_number,
+                "status": status,
+                "remarks": remarks,
+            })
+
+        total = len(roster)
+        present_total = counts["present"] + counts["half_day"]
+        pct = round((present_total / total * 100), 1) if total > 0 else 0.0
+
+        subject_name = None
+        if subject_id:
+            sub = db.scalar(select(Subject).where(Subject.id == subject_id))
+            if sub: subject_name = sub.name
+
+        return {
+            "standard": standard,
+            "division": division,
+            "date": att_date,
+            "period": period,
+            "subject_id": subject_id,
+            "subject_name": subject_name,
+            "already_marked": len(existing_list) > 0,
+            "headcount": {
+                "total": total,
+                "present": counts["present"],
+                "absent": counts["absent"],
+                "late": counts["late"],
+                "half_day": counts["half_day"],
+                "leave": counts["leave"],
+                "medical_leave": counts["medical_leave"],
+                "percentage": pct,
+            },
+            "students": roster,
+        }
 
     @staticmethod
     def get_student_month_attendance(db: Session, student_id: int,
@@ -360,17 +477,21 @@ class StudentAttendanceService:
 
     @staticmethod
     def get_class_sessions(db: Session, standard: str, academic_year_id: int,
-                           year: int, month: int) -> list[ClassAttendanceSession]:
+                           year: int, month: int, subject_id: Optional[int] = None,
+                           period: Optional[str] = None) -> list[ClassAttendanceSession]:
         _, last_day = monthrange(year, month)
-        return list(db.scalars(
-            select(ClassAttendanceSession).where(
-                ClassAttendanceSession.standard == standard,
-                ClassAttendanceSession.academic_year_id == academic_year_id,
-                ClassAttendanceSession.date >= date(year, month, 1),
-                ClassAttendanceSession.date <= date(year, month, last_day),
-                ClassAttendanceSession.is_deleted == False,
-            ).order_by(ClassAttendanceSession.date)
-        ).all())
+        q = select(ClassAttendanceSession).where(
+            ClassAttendanceSession.standard == standard,
+            ClassAttendanceSession.academic_year_id == academic_year_id,
+            ClassAttendanceSession.date >= date(year, month, 1),
+            ClassAttendanceSession.date <= date(year, month, last_day),
+            ClassAttendanceSession.is_deleted == False,
+        )
+        if subject_id:
+            q = q.where(ClassAttendanceSession.subject_id == subject_id)
+        if period:
+            q = q.where(ClassAttendanceSession.period == period)
+        return list(db.scalars(q.order_by(ClassAttendanceSession.date)).all())
 
     @staticmethod
     def get_defaulters(db: Session, academic_year_id: int, standard: Optional[str],
@@ -390,14 +511,14 @@ class StudentAttendanceService:
         for s in summaries:
             student = db.scalar(select(Student).where(Student.id == s.student_id))
             if not student: continue
-            if standard and student.current_standard != standard: continue
+            if standard and student.standard != standard: continue
             pct = float(s.attendance_percentage)
             status = "danger" if pct < 60 else "warning"
             result.append(StudentAttendanceSummary(
                 student_id=s.student_id, student_name=student.full_name,
                 gr_number=student.gr_number,
-                standard=student.current_standard or "-",
-                division=student.current_division,
+                standard=student.standard or "-",
+                division=student.division,
                 working_days=s.working_days, present_days=s.present_days,
                 absent_days=s.absent_days, late_days=s.late_days,
                 leave_days=s.leave_days, attendance_percentage=s.attendance_percentage,

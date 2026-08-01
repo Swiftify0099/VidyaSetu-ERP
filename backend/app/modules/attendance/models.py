@@ -17,6 +17,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database.base import BaseModel
+from app.modules.timetable.models import Subject  # noqa: F401
 
 
 class Holiday(BaseModel):
@@ -37,12 +38,9 @@ class Holiday(BaseModel):
 class StudentAttendance(BaseModel):
     """
     Daily student attendance record.
-    One row per student per day per period/session.
+    One row per student per day per period/session (and optionally subject).
     """
     __tablename__ = "student_attendance"
-    __table_args__ = (
-        UniqueConstraint("student_id", "date", "period", name="uq_student_attendance"),
-    )
 
     student_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("students.id"), nullable=False, index=True)
     date: Mapped[date] = mapped_column(Date, nullable=False, index=True)
@@ -51,6 +49,7 @@ class StudentAttendance(BaseModel):
     academic_year_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
     period: Mapped[str] = mapped_column(String(20), nullable=False, default="full_day")
     # full_day / morning / afternoon / period_1 … period_8
+    subject_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("subjects.id"), nullable=True, index=True)
 
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="present")
     # present / absent / late / half_day / leave / medical_leave
@@ -59,24 +58,22 @@ class StudentAttendance(BaseModel):
     remarks: Mapped[str | None] = mapped_column(String(300), nullable=True)
 
     student: Mapped["Student"] = relationship("Student", lazy="select")  # type: ignore
+    subject: Mapped["Subject | None"] = relationship("Subject", lazy="select")  # type: ignore
 
 
 class ClassAttendanceSession(BaseModel):
     """
     Tracks whether attendance has been marked for a class on a given day.
-    Prevents double-marking and provides completion tracking.
+    Prevents double-marking and provides completion tracking per session/subject.
     """
     __tablename__ = "class_attendance_sessions"
-    __table_args__ = (
-        UniqueConstraint("date", "standard", "division", "academic_year_id",
-                         "period", name="uq_class_session"),
-    )
 
     date: Mapped[date] = mapped_column(Date, nullable=False, index=True)
     standard: Mapped[str] = mapped_column(String(10), nullable=False)
     division: Mapped[str | None] = mapped_column(String(5), nullable=True)
     academic_year_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
     period: Mapped[str] = mapped_column(String(20), nullable=False, default="full_day")
+    subject_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("subjects.id"), nullable=True, index=True)
     total_students: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     present_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     absent_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
@@ -84,6 +81,8 @@ class ClassAttendanceSession(BaseModel):
     leave_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     marked_by: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
     is_holiday: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+
+    subject: Mapped["Subject | None"] = relationship("Subject", lazy="select")  # type: ignore
 
 
 class TeacherAttendance(BaseModel):

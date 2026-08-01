@@ -49,11 +49,11 @@ const schema = z.object({
   pincode: z.string().optional(),
   highest_qualification: z.string().optional(),
   specialization: z.string().optional(),
-  b_ed_year: z.number().optional(),
-  d_ed_year: z.number().optional(),
+  b_ed_year: z.union([z.number(), z.string(), z.undefined()]).optional(),
+  d_ed_year: z.union([z.number(), z.string(), z.undefined()]).optional(),
   pay_scale: z.string().optional(),
-  basic_salary: z.number().optional(),
-  grade_pay: z.number().optional(),
+  basic_salary: z.union([z.number(), z.string(), z.undefined()]).optional(),
+  grade_pay: z.union([z.number(), z.string(), z.undefined()]).optional(),
   bank_name: z.string().optional(),
   bank_account_number: z.string().optional(),
   bank_ifsc: z.string().optional(),
@@ -69,18 +69,18 @@ const schema = z.object({
 type FormData = z.infer<typeof schema>;
 
 const STEPS = [
-  { id: 1, label: 'Basic Info',   icon: <User size={16}/> },
-  { id: 2, label: 'Employment',   icon: <Briefcase size={16}/> },
-  { id: 3, label: 'Address',      icon: <MapPin size={16}/> },
+  { id: 1, label: 'Basic Info',     icon: <User size={16}/> },
+  { id: 2, label: 'Employment',     icon: <Briefcase size={16}/> },
+  { id: 3, label: 'Address',        icon: <MapPin size={16}/> },
   { id: 4, label: 'Qualifications', icon: <BookOpen size={16}/> },
-  { id: 5, label: 'Bank / Govt',  icon: <CreditCard size={16}/> },
+  { id: 5, label: 'Bank / Govt',    icon: <CreditCard size={16}/> },
 ];
 
 const BLOOD_GROUPS = ['A+','A-','B+','B-','AB+','AB-','O+','O-'];
 const CATEGORIES   = ['SC','ST','OBC','NT','SBC','VJ','Open'];
 const RELIGIONS    = ['Hindu','Muslim','Christian','Buddhist','Jain','Sikh','Other'];
 const EMP_TYPES    = ['teaching','non_teaching','contract','part_time','visiting'];
-const DESIGNATIONS = ['Head Master','Assistant Teacher','Senior Teacher','Lab Assistant','Clerk','Librarian','Peon','Computer Teacher','PT Teacher','Art Teacher','Music Teacher','Other'];
+const DESIGNATIONS = ['Assistant Teacher','Head Master','Senior Teacher','Lab Assistant','Clerk','Librarian','Peon','Computer Teacher','PT Teacher','Art Teacher','Music Teacher','Other'];
 const QUALIFS      = ['B.A.','M.A.','B.Sc.','M.Sc.','B.Com.','M.Com.','B.Ed.','M.Ed.','D.Ed.','Ph.D.','Diploma','Other'];
 
 export default function AddTeacherPage() {
@@ -89,30 +89,63 @@ export default function AddTeacherPage() {
   const [saving, setSaving] = useState(false);
   const isLast = step === STEPS.length;
 
-  const { register, handleSubmit, formState: { errors } } = useForm<FormData>({
+  const { register, handleSubmit, trigger, formState: { errors } } = useForm<FormData>({
     resolver: zodResolver(schema),
     defaultValues: {
       state: 'Maharashtra',
       nationality: 'Indian',
       employee_type: 'teaching',
+      designation: 'Assistant Teacher',
     },
   });
 
+  const handleNext = async () => {
+    if (step === 1) {
+      const isValid = await trigger(['first_name', 'last_name']);
+      if (isValid) setStep(2);
+      else toast.error('First Name and Last Name are required.');
+    } else if (step === 2) {
+      const isValid = await trigger(['employee_type', 'designation']);
+      if (isValid) setStep(3);
+      else toast.error('Employee Type and Designation are required.');
+    } else if (step < STEPS.length) {
+      setStep(s => s + 1);
+    }
+  };
+
   const onSubmit = async (data: FormData) => {
-    if (!isLast) { setStep(s => s + 1); return; }
     setSaving(true);
     try {
-      const result = await teacherService.create({
-        ...data,
-        b_ed_year: data.b_ed_year ? Number(data.b_ed_year) : undefined,
-        d_ed_year: data.d_ed_year ? Number(data.d_ed_year) : undefined,
-        basic_salary: data.basic_salary ? Number(data.basic_salary) : undefined,
-        grade_pay: data.grade_pay ? Number(data.grade_pay) : undefined,
+      const payload: any = {};
+      Object.entries(data).forEach(([key, val]) => {
+        if (val !== '' && val !== null && val !== undefined && !Number.isNaN(val)) {
+          payload[key] = val;
+        }
       });
+
+      if (payload.b_ed_year) payload.b_ed_year = Number(payload.b_ed_year);
+      if (payload.d_ed_year) payload.d_ed_year = Number(payload.d_ed_year);
+      if (payload.basic_salary) payload.basic_salary = Number(payload.basic_salary);
+      if (payload.grade_pay) payload.grade_pay = Number(payload.grade_pay);
+
+      const result = await teacherService.create(payload);
       toast.success(`✅ Staff added! Employee ID: ${result.employee_id}`);
       navigate(`/teachers/${result.id}`);
     } catch (err: any) {
-      toast.error(err?.response?.data?.detail || 'Failed to add staff.');
+      const resp = err?.response?.data;
+      let errMsg = 'Failed to add staff.';
+      if (resp) {
+        if (resp.message) {
+          errMsg = resp.message;
+        } else if (resp.detail) {
+          errMsg = typeof resp.detail === 'string' ? resp.detail : JSON.stringify(resp.detail);
+        }
+        if (Array.isArray(resp.errors) && resp.errors.length > 0) {
+          const errList = resp.errors.map((e: any) => `${e.field || 'field'}: ${e.message || e.msg}`).join(', ');
+          errMsg += ` (${errList})`;
+        }
+      }
+      toast.error(errMsg);
     } finally { setSaving(false); }
   };
 
@@ -151,7 +184,7 @@ export default function AddTeacherPage() {
       {/* Step Bar */}
       <div className={styles.stepBar}>
         {STEPS.map((s, i) => (
-          <div key={s.id} className={styles.stepItem}>
+          <div key={s.id} className={styles.stepItem} onClick={() => setStep(s.id)} style={{ cursor: 'pointer' }}>
             <div className={`${styles.stepDot} ${step > s.id ? styles.stepDone : step === s.id ? styles.stepActive : ''}`}>
               {step > s.id ? '✓' : s.icon}
             </div>
@@ -200,7 +233,7 @@ export default function AddTeacherPage() {
             <div className={styles.stepContent}>
               <h2 className={styles.stepTitle}>Employment Details</h2>
               <div className={styles.grid3}>
-                <F label="Employee Type" id="employee_type" required><Sel id="employee_type"><option value="">Select</option>{EMP_TYPES.map(t=><option key={t} value={t}>{t.replace('_',' ')}</option>)}</Sel></F>
+                <F label="Employee Type" id="employee_type" required error={errors.employee_type?.message}><Sel id="employee_type"><option value="">Select</option>{EMP_TYPES.map(t=><option key={t} value={t}>{t.replace('_',' ')}</option>)}</Sel></F>
                 <F label="Designation" id="designation" required error={errors.designation?.message}><Sel id="designation"><option value="">Select</option>{DESIGNATIONS.map(d=><option key={d}>{d}</option>)}</Sel></F>
                 <F label="Department" id="department"><Inp id="department" placeholder="e.g. Science, Commerce"/></F>
               </div>
@@ -273,7 +306,7 @@ export default function AddTeacherPage() {
           {/* Step 5 — Bank / Govt IDs */}
           {step === 5 && (
             <div className={styles.stepContent}>
-              <h2 className={styles.stepTitle}>Bank & Government Details</h2>
+              <h2 className={styles.stepTitle}>Bank &amp; Government Details</h2>
               <div className={styles.sectionTitle}>Government IDs</div>
               <div className={styles.grid3}>
                 <F label="Aadhaar Number" id="aadhaar_number"><Inp id="aadhaar_number" placeholder="12-digit Aadhaar" maxLength={12}/></F>
@@ -285,7 +318,7 @@ export default function AddTeacherPage() {
                 <F label="DCPS / NPS Account" id="dcps_account"><Inp id="dcps_account" placeholder="DCPS account"/></F>
                 <F label="PRAN Number" id="pran_number"><Inp id="pran_number" placeholder="Pension PRAN"/></F>
               </div>
-              <div className={styles.sectionTitle}>Salary & Bank</div>
+              <div className={styles.sectionTitle}>Salary &amp; Bank</div>
               <div className={styles.grid3}>
                 <F label="Pay Scale" id="pay_scale"><Inp id="pay_scale" placeholder="e.g. Level 7, PB-2"/></F>
                 <F label="Basic Salary (₹)" id="basic_salary"><Inp id="basic_salary" type="number" placeholder="Monthly basic"/></F>
@@ -314,10 +347,15 @@ export default function AddTeacherPage() {
           <div className={styles.stepDots}>
             {STEPS.map(s => <div key={s.id} className={`${styles.dot} ${step === s.id ? styles.dotActive : step > s.id ? styles.dotDone : ''}`} />)}
           </div>
-          <button type="submit" className={styles.nextBtn} disabled={saving} id="teacher-form-next">
-            {saving ? <span className={styles.spinner}/> : null}
-            {isLast ? saving ? 'Saving...' : <><Save size={16}/> Save Staff</> : <>Next <ChevronRight size={16}/></>}
-          </button>
+          {isLast ? (
+            <button type="submit" className={styles.nextBtn} disabled={saving} id="teacher-form-next">
+              {saving ? <span className={styles.spinner}/> : <><Save size={16}/> Save Staff</>}
+            </button>
+          ) : (
+            <button type="button" className={styles.nextBtn} onClick={handleNext} id="teacher-form-next">
+              Next <ChevronRight size={16}/>
+            </button>
+          )}
         </div>
       </form>
     </div>

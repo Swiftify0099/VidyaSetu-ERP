@@ -10,8 +10,10 @@ export default defineConfig({
         },
     },
     server: {
+        allowedHosts: true,
         port: 5173,
         host: true,
+        hmr: false,
         proxy: {
             '/api': {
                 target: 'http://127.0.0.1:8000',

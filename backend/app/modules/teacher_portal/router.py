@@ -465,3 +465,487 @@ def get_notices(
             for n in notices
         ]
     })
+
+
+# ─────────────────────────────────────────────────────────────
+# ASSESSMENTS / QUIZ CREATION — Teacher Portal
+# ─────────────────────────────────────────────────────────────
+
+# Import the shared assessment store from student_portal.router
+from app.modules.student_portal.router import _ASSESSMENTS_STORE, _ASSESSMENT_RESULTS
+
+
+class QuestionCreate(BaseModel):
+    question: str
+    options: List[str]
+    correct_index: int
+    marks: int = 1
+
+
+class AssessmentCreate(BaseModel):
+    title: str
+    title_marathi: Optional[str] = None
+    subject: str
+    topic: Optional[str] = None
+    class_standard: str
+    division: Optional[str] = None
+    duration_minutes: int = 15
+    passing_marks: int
+    instructions: Optional[str] = None
+    start_date: str
+    end_date: str
+    questions: List[QuestionCreate]
+
+
+@router.get("/assessments", response_model=APIResponse)
+def get_teacher_assessments(current_user: AuthUser, db: DBSession):
+    """List all assessments created by this teacher."""
+    teacher = _get_teacher(db, current_user)
+    teacher_assessments = [
+        a for a in _ASSESSMENTS_STORE
+        if a.get("created_by_teacher") == teacher.id or a.get("teacher") == teacher.full_name
+    ]
+    if not teacher_assessments:
+        teacher_assessments = list(_ASSESSMENTS_STORE)
+
+    result = []
+    for asm in teacher_assessments:
+        attempted_count = sum(1 for k in _ASSESSMENT_RESULTS if k.endswith(f":{asm['id']}"))
+        scores = [v["percentage"] for k, v in _ASSESSMENT_RESULTS.items() if k.endswith(f":{asm['id']}")]
+        avg_score = round(sum(scores) / len(scores), 1) if scores else 0
+
+        result.append({
+            "id": asm["id"],
+            "title": asm["title"],
+            "title_marathi": asm.get("title_marathi"),
+            "subject": asm["subject"],
+            "topic": asm.get("topic"),
+            "class_standard": asm["class_standard"],
+            "division": asm.get("division"),
+            "total_questions": len(asm["questions"]),
+            "total_marks": asm["total_marks"],
+            "passing_marks": asm["passing_marks"],
+            "duration_minutes": asm["duration_minutes"],
+            "status": asm["status"],
+            "start_date": asm["start_date"],
+            "end_date": asm["end_date"],
+            "attempted_count": attempted_count,
+            "avg_score": avg_score,
+            "created_at": asm.get("created_at"),
+        })
+
+    return APIResponse.ok(data={"assessments": result, "total": len(result)})
+
+
+@router.post("/assessments", response_model=APIResponse, status_code=201)
+def create_assessment(body: AssessmentCreate, current_user: AuthUser, db: DBSession):
+    """Create a new assessment/quiz for a class."""
+    teacher = _get_teacher(db, current_user)
+
+    if not body.questions or len(body.questions) < 1:
+        raise HTTPException(status_code=400, detail="At least 1 question is required.")
+
+    total_marks = sum(q.marks for q in body.questions)
+    new_id = max((a["id"] for a in _ASSESSMENTS_STORE), default=1000) + 1
+
+    from datetime import datetime as _dt
+    new_asm = {
+        "id": new_id,
+        "title": body.title,
+        "title_marathi": body.title_marathi,
+        "subject": body.subject,
+        "topic": body.topic,
+        "class_standard": body.class_standard,
+        "division": body.division,
+        "teacher": teacher.full_name,
+        "created_by_teacher": teacher.id,
+        "duration_minutes": body.duration_minutes,
+        "total_marks": total_marks,
+        "passing_marks": body.passing_marks,
+        "instructions": body.instructions or "Select the correct option for each question.",
+        "status": "active",
+        "start_date": body.start_date,
+        "end_date": body.end_date,
+        "created_at": _dt.now().isoformat(),
+        "questions": [
+            {
+                "id": i + 1,
+                "question": q.question,
+                "options": q.options,
+                "correct_index": q.correct_index,
+                "marks": q.marks,
+            }
+            for i, q in enumerate(body.questions)
+        ],
+    }
+    _ASSESSMENTS_STORE.append(new_asm)
+
+    return APIResponse.created(
+        data={"id": new_id, "title": body.title, "total_marks": total_marks, "total_questions": len(body.questions)},
+        message=f"Assessment '{body.title}' created successfully for Std {body.class_standard}!",
+    )
+
+
+@router.get("/assessments/{assessment_id}/results", response_model=APIResponse)
+def get_assessment_results(assessment_id: int, current_user: AuthUser, db: DBSession):
+    """Get all student results for a specific assessment."""
+    teacher = _get_teacher(db, current_user)
+    asm = next((a for a in _ASSESSMENTS_STORE if a["id"] == assessment_id), None)
+    if not asm:
+        raise HTTPException(status_code=404, detail="Assessment not found.")
+
+    results = [
+        v for k, v in _ASSESSMENT_RESULTS.items()
+        if k.endswith(f":{assessment_id}")
+    ]
+
+    total_attempted = len(results)
+    passed_count = sum(1 for r in results if r.get("passed"))
+    avg_score = round(sum(r["percentage"] for r in results) / total_attempted, 1) if total_attempted > 0 else 0
+
+    return APIResponse.ok(data={
+        "assessment": {
+            "id": asm["id"],
+            "title": asm["title"],
+            "subject": asm["subject"],
+            "class_standard": asm["class_standard"],
+            "total_marks": asm["total_marks"],
+            "passing_marks": asm["passing_marks"],
+        },
+        "stats": {
+            "total_attempted": total_attempted,
+            "passed_count": passed_count,
+            "failed_count": total_attempted - passed_count,
+            "avg_score": avg_score,
+        },
+        "student_results": results,
+    })
+
+
+@router.delete("/assessments/{assessment_id}", response_model=APIResponse)
+def delete_assessment(assessment_id: int, current_user: AuthUser, db: DBSession):
+    """Deactivate/delete an assessment."""
+    asm = next((a for a in _ASSESSMENTS_STORE if a["id"] == assessment_id), None)
+    if not asm:
+        raise HTTPException(status_code=404, detail="Assessment not found.")
+    asm["status"] = "inactive"
+    return APIResponse.ok(message=f"Assessment '{asm['title']}' has been deactivated.")
+
+
+# ─────────────────────────────────────────────────────────────
+# HOMEWORK & ASSIGNMENTS (Teacher Portal)
+# ─────────────────────────────────────────────────────────────
+
+from app.modules.student_portal.router import _HOMEWORK_STORE
+
+
+class TeacherHomeworkCreateRequest(BaseModel):
+    standard: str
+    division: Optional[str] = None
+    subject: str
+    title: str
+    description: str
+    due_date: str
+    priority: Optional[str] = "Normal"
+
+
+@router.get("/homework", response_model=APIResponse)
+def get_teacher_homework(current_user: AuthUser, db: DBSession):
+    """Get all active homework created by or assigned to teacher's classes."""
+    teacher = _get_teacher(db, current_user)
+    items = [h for h in _HOMEWORK_STORE if h.get("is_active", True)]
+    return APIResponse.ok(data={"homework": items, "total": len(items)})
+
+
+@router.post("/homework", response_model=APIResponse, status_code=201)
+def create_teacher_homework(body: TeacherHomeworkCreateRequest, current_user: AuthUser, db: DBSession):
+    """Assign new homework to a class standard/division."""
+    teacher = _get_teacher(db, current_user)
+    new_id = max((h["id"] for h in _HOMEWORK_STORE), default=100) + 1
+    
+    new_hw = {
+        "id": new_id,
+        "standard": body.standard,
+        "division": body.division or "A",
+        "subject": body.subject,
+        "title": body.title,
+        "description": body.description,
+        "teacher": teacher.full_name,
+        "teacher_id": teacher.id,
+        "assigned_date": date.today().isoformat(),
+        "due_date": body.due_date,
+        "priority": body.priority or "Normal",
+        "status": "pending",
+        "attachment_url": None,
+        "teacher_remarks": None,
+        "submitted_at": None,
+        "is_active": True,
+        "created_at": datetime.now().isoformat(),
+    }
+    _HOMEWORK_STORE.insert(0, new_hw)
+
+    # Push notification to students
+    try:
+        from app.shared.notifications import push_notification_to_role
+        push_notification_to_role(
+            db,
+            role_code="student",
+            category="homework",
+            notification_type="homework.assigned",
+            title=f"📚 New Homework: {body.title}",
+            body=f"{body.subject} homework assigned by {teacher.full_name}. Due: {body.due_date}",
+            priority="high",
+            action_url="/student-portal/homework",
+            sender_id=current_user.user_id,
+        )
+    except Exception as e:
+        print("Failed to dispatch homework notification:", e)
+
+    return APIResponse.created(
+        data=new_hw,
+        message=f"Homework '{body.title}' assigned successfully for Std {body.standard}{body.division or ''}!",
+    )
+
+
+@router.delete("/homework/{homework_id}", response_model=APIResponse)
+def delete_teacher_homework(homework_id: int, current_user: AuthUser, db: DBSession):
+    """Delete / deactivate homework assignment."""
+    hw = next((h for h in _HOMEWORK_STORE if h["id"] == homework_id), None)
+    if not hw:
+        raise HTTPException(status_code=404, detail="Homework not found.")
+    hw["is_active"] = False
+    return APIResponse.ok(message="Homework deleted successfully.")
+
+
+# ─────────────────────────────────────────────────────────────
+# STUDY MATERIALS & VIDEOS (Teacher Portal)
+# ─────────────────────────────────────────────────────────────
+
+_MATERIALS_STORE = [
+    {
+        "id": 1,
+        "standard": "9",
+        "subject": "Mathematics",
+        "title": "Algebraic Formula Reference Sheet",
+        "description": "Complete summary of formulas for Polynomials and Quadratic equations.",
+        "material_type": "notes",
+        "file_url": "/downloads/algebra_formulas.pdf",
+        "teacher": "Shri. Ramesh Jadhav",
+        "created_at": "2026-07-20T10:00:00",
+        "is_active": True,
+    },
+    {
+        "id": 2,
+        "standard": "9",
+        "subject": "Science & Tech",
+        "title": "Periodic Table & Valency Chart",
+        "description": "Quick reference for atomic numbers, elements, and valency rules.",
+        "material_type": "notes",
+        "file_url": "/downloads/periodic_table.pdf",
+        "teacher": "Smt. Kavita Shinde",
+        "created_at": "2026-07-22T11:00:00",
+        "is_active": True,
+    }
+]
+
+_VIDEOS_STORE = [
+    {
+        "id": 1,
+        "standard": "9",
+        "subject": "Mathematics",
+        "title": "Understanding Quadratic Equations Step by Step",
+        "video_url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+        "description": "Comprehensive video lecture breaking down factoring and formula method.",
+        "teacher": "Shri. Ramesh Jadhav",
+        "duration": "18:45",
+        "created_at": "2026-07-25T09:00:00",
+        "is_active": True,
+    }
+]
+
+
+class MaterialCreateRequest(BaseModel):
+    standard: str
+    subject: str
+    title: str
+    description: Optional[str] = None
+    material_type: str = "notes"
+    file_url: Optional[str] = None
+
+
+class VideoCreateRequest(BaseModel):
+    standard: str
+    subject: str
+    title: str
+    video_url: str
+    description: Optional[str] = None
+
+
+@router.get("/materials", response_model=APIResponse)
+def get_teacher_materials(current_user: AuthUser, db: DBSession):
+    items = [m for m in _MATERIALS_STORE if m.get("is_active", True)]
+    return APIResponse.ok(data={"materials": items, "total": len(items)})
+
+
+@router.post("/materials", response_model=APIResponse, status_code=201)
+def create_teacher_material(body: MaterialCreateRequest, current_user: AuthUser, db: DBSession):
+    teacher = _get_teacher(db, current_user)
+    new_id = max((m["id"] for m in _MATERIALS_STORE), default=0) + 1
+    new_mat = {
+        "id": new_id,
+        "standard": body.standard,
+        "subject": body.subject,
+        "title": body.title,
+        "description": body.description or "",
+        "material_type": body.material_type or "notes",
+        "file_url": body.file_url or "/downloads/sample_notes.pdf",
+        "teacher": teacher.full_name,
+        "created_at": datetime.now().isoformat(),
+        "is_active": True,
+    }
+    _MATERIALS_STORE.insert(0, new_mat)
+    return APIResponse.created(data=new_mat, message="Study material uploaded successfully!")
+
+
+@router.get("/videos", response_model=APIResponse)
+def get_teacher_videos(current_user: AuthUser, db: DBSession):
+    items = [v for v in _VIDEOS_STORE if v.get("is_active", True)]
+    return APIResponse.ok(data={"videos": items, "total": len(items)})
+
+
+@router.post("/videos", response_model=APIResponse, status_code=201)
+def create_teacher_video(body: VideoCreateRequest, current_user: AuthUser, db: DBSession):
+    teacher = _get_teacher(db, current_user)
+    new_id = max((v["id"] for v in _VIDEOS_STORE), default=0) + 1
+    new_vid = {
+        "id": new_id,
+        "standard": body.standard,
+        "subject": body.subject,
+        "title": body.title,
+        "video_url": body.video_url,
+        "description": body.description or "",
+        "teacher": teacher.full_name,
+        "duration": "15:00",
+        "created_at": datetime.now().isoformat(),
+        "is_active": True,
+    }
+    _VIDEOS_STORE.insert(0, new_vid)
+    return APIResponse.created(data=new_vid, message="Video lecture added successfully!")
+
+
+# ─────────────────────────────────────────────────────────────
+# EXAMS & MARKS ENTRY (Teacher Portal)
+# ─────────────────────────────────────────────────────────────
+
+from decimal import Decimal
+from sqlalchemy.orm import joinedload
+from app.modules.exam.service import compute_grade
+
+class MarksEntryItem(BaseModel):
+    student_id: int
+    marks_obtained: float
+
+class MarksEntryRequest(BaseModel):
+    exam_id: int
+    subject_name: str
+    entries: List[MarksEntryItem]
+
+
+@router.get("/exams", response_model=APIResponse)
+def get_teacher_exams(current_user: AuthUser, db: DBSession):
+    """Get active exams list for marks entry."""
+    teacher = _get_teacher(db, current_user)
+    ac_year = _get_current_year(db)
+    
+    from app.modules.exam.models import Exam
+    
+    q = select(Exam).options(joinedload(Exam.exam_type), joinedload(Exam.subjects)).where(Exam.is_deleted == False)
+    if ac_year:
+        q = q.where(Exam.academic_year_id == ac_year.id)
+    
+    exams_db = list(db.scalars(q.order_by(Exam.id.desc())).unique().all())
+    
+    exams_list = []
+    for ex in exams_db:
+        exams_list.append({
+            "id": ex.id,
+            "name": ex.exam_type.name if ex.exam_type else f"Exam #{ex.id}",
+            "exam_type_name": ex.exam_type.name if ex.exam_type else "",
+            "standard": ex.standard,
+            "division": "A",
+            "subjects": [s.subject_name for s in ex.subjects],
+            "status": "active" if not ex.result_declared else "declared"
+        })
+    
+    if not exams_list:
+        exams_list = [
+            {"id": 1, "name": "First Unit Test 2026", "standard": "9", "division": "A", "subjects": ["Mathematics", "Science", "English"], "status": "active"},
+            {"id": 2, "name": "Mid-Term Examination 2026", "standard": "10", "division": "A", "subjects": ["Mathematics", "Science", "Marathi"], "status": "active"},
+        ]
+        
+    return APIResponse.ok(data={"exams": exams_list})
+
+
+@router.post("/marks", response_model=APIResponse)
+def save_teacher_marks(body: MarksEntryRequest, current_user: AuthUser, db: DBSession):
+    """Save student exam marks."""
+    teacher = _get_teacher(db, current_user)
+    from app.modules.exam.models import ExamSubject, StudentMark
+    
+    subj = db.scalar(
+        select(ExamSubject).where(
+            ExamSubject.exam_id == body.exam_id,
+            func.lower(ExamSubject.subject_name) == body.subject_name.lower().strip()
+        )
+    )
+    
+    if not subj:
+        subj = db.scalar(select(ExamSubject).where(ExamSubject.exam_id == body.exam_id))
+    if not subj:
+        subj = ExamSubject(
+            exam_id=body.exam_id,
+            subject_name=body.subject_name,
+            max_marks=100,
+            passing_marks=35,
+            created_by=current_user.user_id
+        )
+        db.add(subj)
+        db.flush()
+        
+    saved = 0
+    for entry in body.entries:
+        existing = db.scalar(
+            select(StudentMark).where(
+                StudentMark.exam_id == body.exam_id,
+                StudentMark.exam_subject_id == subj.id,
+                StudentMark.student_id == entry.student_id,
+                StudentMark.is_deleted == False
+            )
+        )
+        marks_val = Decimal(str(entry.marks_obtained))
+        max_m = Decimal(str(subj.max_marks or 100))
+        pct = (marks_val / max_m) * 100
+        grade = compute_grade(pct)
+        
+        if existing:
+            existing.marks_obtained = marks_val
+            existing.grade = grade
+            existing.entered_by = current_user.user_id
+        else:
+            m = StudentMark(
+                exam_id=body.exam_id,
+                exam_subject_id=subj.id,
+                student_id=entry.student_id,
+                marks_obtained=marks_val,
+                grade=grade,
+                entered_by=current_user.user_id,
+                created_by=current_user.user_id,
+            )
+            db.add(m)
+        saved += 1
+        
+    db.commit()
+    return APIResponse.ok(message=f"Saved marks for {saved} students in {body.subject_name}.")
+
+
+

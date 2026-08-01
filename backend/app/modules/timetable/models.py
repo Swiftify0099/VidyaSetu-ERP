@@ -15,6 +15,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database.base import BaseModel
+from app.modules.teacher.models import Teacher  # noqa: F401
 
 
 class Subject(BaseModel):
@@ -124,6 +125,9 @@ class SubstituteEntry(BaseModel):
     reason: Mapped[str | None] = mapped_column(String(300), nullable=True)
     marked_by: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
 
+    timetable_entry: Mapped["TimetableEntry"] = relationship(
+        "TimetableEntry", foreign_keys=[timetable_entry_id]
+    )
     substitute_teacher: Mapped["Teacher"] = relationship(  # type: ignore
         "Teacher", foreign_keys=[substitute_teacher_id]
     )

@@ -9,12 +9,13 @@ import toast from 'react-hot-toast';
 import examService, {
   ExamType, Exam, ExamSubject, ClassResultSummary, StudentResultDetail, ExamStats, MarkRow,
 } from '../../services/examService';
+import timetableService from '../../services/timetableService';
 import PermissionGate from '../../components/ui/PermissionGate';
 import styles from './ExamPage.module.css';
 
 type Section = 'dashboard' | 'exams' | 'marks' | 'results' | 'types';
 
-const STANDARDS = ['1','2','3','4','5','6','7','8','9','10','11','12'];
+const STANDARDS = ['All', '1','2','3','4','5','6','7','8','9','10','11','12'];
 const DIVISIONS = ['All', 'A', 'B', 'C', 'D'];
 const CURRENT_AY = 1;
 
@@ -134,6 +135,71 @@ export default function ExamPage() {
     finally { setSavingType(false); }
   };
 
+  const loadStandardSubjects = useCallback(async (std: string, typeId?: string) => {
+    try {
+      const selectedType = examTypes.find(t => String(t.id) === typeId);
+      const defMax = selectedType ? String(selectedType.max_marks) : '100';
+      const defPass = selectedType ? String(selectedType.passing_marks) : '35';
+
+      const assignments = await timetableService.getAssignments(CURRENT_AY);
+      const stdAssignments = assignments.filter(a => a.standard === std);
+      if (stdAssignments.length > 0) {
+        const subjs: Array<{ subject_name: string; max_marks: string; passing_marks: string; theory_max: string; practical_max: string }> = [];
+        const seen = new Set<string>();
+        stdAssignments.forEach(a => {
+          const name = a.subject?.name;
+          if (name && !seen.has(name)) {
+            seen.add(name);
+            subjs.push({ subject_name: name, max_marks: defMax, passing_marks: defPass, theory_max: '', practical_max: '' });
+          }
+        });
+        if (subjs.length > 0) {
+          setExamSubjects(subjs);
+          return;
+        }
+      }
+
+      const masterSubjs = await timetableService.getSubjects();
+      if (masterSubjs.length > 0) {
+        const subjs: Array<{ subject_name: string; max_marks: string; passing_marks: string; theory_max: string; practical_max: string }> = [];
+        const seen = new Set<string>();
+        masterSubjs.forEach(ms => {
+          if (ms.name && !seen.has(ms.name)) {
+            if (!ms.applicable_standards || ms.applicable_standards === 'All' || ms.applicable_standards.split(',').includes(std)) {
+              seen.add(ms.name);
+              subjs.push({ subject_name: ms.name, max_marks: defMax, passing_marks: defPass, theory_max: '', practical_max: '' });
+            }
+          }
+        });
+        if (subjs.length > 0) {
+          setExamSubjects(subjs);
+          return;
+        }
+      }
+    } catch {}
+
+    const defaultList = ['Marathi', 'English', 'Hindi', 'Mathematics', 'Science', 'Social Studies'];
+    const selectedType = examTypes.find(t => String(t.id) === typeId);
+    const defMax = selectedType ? String(selectedType.max_marks) : '100';
+    const defPass = selectedType ? String(selectedType.passing_marks) : '35';
+    setExamSubjects(defaultList.map(name => ({
+      subject_name: name, max_marks: defMax, passing_marks: defPass, theory_max: '', practical_max: ''
+    })));
+  }, [examTypes]);
+
+  const openCreateExamModal = (std: string) => {
+    const targetStd = std === 'All' ? '8' : std;
+    const initialTypeId = examTypes.length > 0 ? String(examTypes[0].id) : '';
+    setNewExam({
+      exam_type_id: initialTypeId,
+      standard: targetStd,
+      exam_date_from: '',
+      exam_date_to: ''
+    });
+    setShowExamModal(true);
+    loadStandardSubjects(targetStd, initialTypeId);
+  };
+
   const addSubjectRow = () => setExamSubjects(p => [...p, { subject_name: '', max_marks: '100', passing_marks: '35', theory_max: '', practical_max: '' }]);
   const removeSubjectRow = (i: number) => setExamSubjects(p => p.filter((_, idx) => idx !== i));
   const updateSubjectRow = (i: number, field: string, val: string) => setExamSubjects(p => p.map((r, idx) => idx === i ? { ...r, [field]: val } : r));
@@ -215,16 +281,18 @@ export default function ExamPage() {
         marksExam.id, marksSubject.id,
         validRows.map(r => ({
           student_id: r.student_id,
-          marks_obtained: r.is_absent ? undefined : (r.marks ? Number(r.marks) : undefined),
-          theory_marks: r.theory_marks ? Number(r.theory_marks) : undefined,
-          practical_marks: r.practical_marks ? Number(r.practical_marks) : undefined,
+          marks_obtained: r.is_absent ? undefined : (r.marks !== '' && r.marks !== null && r.marks !== undefined ? Number(r.marks) : undefined),
+          theory_marks: r.theory_marks !== '' && r.theory_marks !== null && r.theory_marks !== undefined ? Number(r.theory_marks) : undefined,
+          practical_marks: r.practical_marks !== '' && r.practical_marks !== null && r.practical_marks !== undefined ? Number(r.practical_marks) : undefined,
           is_absent: r.is_absent,
           is_exempted: r.is_exempted,
           remarks: r.remarks,
         }))
       );
       toast.success(`${saved} marks saved successfully!`);
-    } catch { toast.error('Failed to save marks.'); }
+    } catch (err: any) {
+      toast.error(err?.response?.data?.detail || err?.response?.data?.message || 'Failed to save marks.');
+    }
     finally { setSavingMarks(false); }
   };
 
@@ -357,7 +425,7 @@ export default function ExamPage() {
               <div className={styles.stdTabs}>
                 {STANDARDS.map(s => (
                   <button key={s} className={`${styles.stdTab} ${selStd === s ? styles.stdTabActive : ''}`}
-                    onClick={() => setSelStd(s)}>Std {s}</button>
+                    onClick={() => setSelStd(s)}>{s === 'All' ? 'All Standards' : `Std ${s}`}</button>
                 ))}
               </div>
             </div>
@@ -365,15 +433,7 @@ export default function ExamPage() {
             <div className={styles.toolbar}>
               <button className={styles.iconBtn} onClick={loadExams} title="Refresh"><RefreshCw size={14}/></button>
               <PermissionGate permission="exam.manage">
-                <button className={styles.addBtn} onClick={() => {
-                  setNewExam({
-                    exam_type_id: examTypes.length > 0 ? String(examTypes[0].id) : '',
-                    standard: selStd,
-                    exam_date_from: '',
-                    exam_date_to: ''
-                  });
-                  setShowExamModal(true);
-                }}>
+                <button className={styles.addBtn} onClick={() => openCreateExamModal(selStd)}>
                   <Plus size={15}/> Create Exam
                 </button>
               </PermissionGate>
@@ -709,7 +769,11 @@ export default function ExamPage() {
               <div className={styles.mfRow}>
                 <div className={styles.mf}>
                   <label className={styles.ml}>Exam Type *</label>
-                  <select className={styles.mi} value={newExam.exam_type_id} onChange={e => setNewExam(p=>({...p,exam_type_id:e.target.value}))}>
+                  <select className={styles.mi} value={newExam.exam_type_id} onChange={e => {
+                    const val = e.target.value;
+                    setNewExam(p => ({ ...p, exam_type_id: val }));
+                    loadStandardSubjects(newExam.standard || selStd, val);
+                  }}>
                     <option value="">-- Select Exam Type --</option>
                     {examTypes.map(t=>(
                       <option key={t.id} value={t.id}>
@@ -723,8 +787,12 @@ export default function ExamPage() {
                 </div>
                 <div className={styles.mf}>
                   <label className={styles.ml}>Standard</label>
-                  <select className={styles.mi} value={newExam.standard} onChange={e => setNewExam(p=>({...p,standard:e.target.value}))}>
-                    {STANDARDS.map(s=><option key={s} value={s}>Std {s}</option>)}
+                  <select className={styles.mi} value={newExam.standard} onChange={e => {
+                    const val = e.target.value;
+                    setNewExam(p => ({ ...p, standard: val }));
+                    loadStandardSubjects(val, newExam.exam_type_id);
+                  }}>
+                    {STANDARDS.filter(s => s !== 'All').map(s=><option key={s} value={s}>Std {s}</option>)}
                   </select>
                 </div>
               </div>
@@ -735,8 +803,15 @@ export default function ExamPage() {
 
               <div className={styles.subjectsSection}>
                 <div className={styles.subjectsSectionHeader}>
-                  <span className={styles.ml}>Subjects Configuration</span>
-                  <button className={styles.miniBtn} onClick={addSubjectRow}><Plus size={12}/> Add Subject</button>
+                  <span className={styles.ml}>Subjects Configuration ({examSubjects.length})</span>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <button className={styles.miniBtn} type="button" onClick={() => loadStandardSubjects(newExam.standard || selStd, newExam.exam_type_id)}>
+                      <RefreshCw size={12}/> Auto-fill Standard Subjects
+                    </button>
+                    <button className={styles.miniBtn} type="button" onClick={addSubjectRow}>
+                      <Plus size={12}/> Add Subject
+                    </button>
+                  </div>
                 </div>
                 <div className={styles.subjectRows}>
                   <div className={styles.subjectRowHeader}>

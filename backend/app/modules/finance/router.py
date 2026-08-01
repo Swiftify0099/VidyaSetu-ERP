@@ -3,7 +3,7 @@ VidyaSetu ERP — Finance Router
 """
 from datetime import date
 from typing import Optional
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.core.dependencies import AuthUser, DBSession, require_permission
@@ -96,6 +96,14 @@ async def delete_fee_structure(fs_id: int, current_user: AuthUser, db: DBSession
 
 
 # ── Fee Collection ────────────────────────────────────────────
+@router.get("/student/search", response_model=APIResponse,
+            dependencies=[Depends(require_permission("finance.read"))])
+async def search_students_for_fees(current_user: AuthUser, db: DBSession,
+                                    query: str = Query("", description="GR Number, Name, or Mobile")):
+    students = StudentFeeService.lookup_students(db, query)
+    return APIResponse.ok(data=students)
+
+
 @router.get("/student/{student_id}/fees", response_model=APIResponse,
             dependencies=[Depends(require_permission("finance.read"))])
 async def get_student_fees(student_id: int, current_user: AuthUser, db: DBSession,
@@ -113,7 +121,7 @@ async def generate_fee_records(student_id: int, current_user: AuthUser, db: DBSe
 
 
 @router.post("/collect", response_model=APIResponse, status_code=201,
-             dependencies=[Depends(require_permission("finance.collect"))])
+             dependencies=[Depends(require_permission("finance.collect", "finance.manage", "finance.create"))])
 async def collect_fee(body: FeePaymentRequest, current_user: AuthUser, db: DBSession):
     payment = StudentFeeService.collect_fee(db, body, collected_by=current_user.user_id)
     return APIResponse.created(
@@ -141,7 +149,7 @@ async def get_defaulters(current_user: AuthUser, db: DBSession,
 
 # ── Expenses ──────────────────────────────────────────────────
 @router.post("/expenses", response_model=APIResponse, status_code=201,
-             dependencies=[Depends(require_permission("finance.expense.create"))])
+             dependencies=[Depends(require_permission("finance.expense.create", "finance.create", "finance.manage"))])
 async def create_expense(body: ExpenseRequest, current_user: AuthUser, db: DBSession):
     exp = ExpenseService.create(db, body, current_user.user_id)
     return APIResponse.created(data=ExpenseResponse.model_validate(exp).model_dump(),
@@ -165,7 +173,80 @@ async def list_expenses(current_user: AuthUser, db: DBSession,
 
 
 @router.delete("/expenses/{exp_id}", response_model=APIResponse,
-               dependencies=[Depends(require_permission("finance.expense.delete"))])
+               dependencies=[Depends(require_permission("finance.expense.delete", "finance.delete", "finance.manage"))])
 async def delete_expense(exp_id: int, current_user: AuthUser, db: DBSession):
     ExpenseService.delete(db, exp_id, current_user.user_id)
     return APIResponse.ok(message="Expense deleted.")
+
+
+# ── Student Installments ───────────────────────────────────────
+from app.modules.finance.schemas import StudentInstallmentRequest
+from app.modules.finance.models import StudentInstallment
+
+@router.get("/student/{student_id}/installments", response_model=APIResponse,
+            dependencies=[Depends(require_permission("finance.read"))])
+async def get_student_installments(student_id: int, current_user: AuthUser, db: DBSession,
+                                   academic_year_id: Optional[int] = None):
+    q = db.query(StudentInstallment).filter(
+        StudentInstallment.student_id == student_id,
+        StudentInstallment.is_deleted == False
+    )
+    if academic_year_id:
+        q = q.filter(StudentInstallment.academic_year_id == academic_year_id)
+    items = q.order_by(StudentInstallment.due_date.asc()).all()
+    res = []
+    for inst in items:
+        res.append({
+            "id": inst.id,
+            "student_id": inst.student_id,
+            "academic_year_id": inst.academic_year_id,
+            "installment_name": inst.installment_name,
+            "amount": float(inst.amount),
+            "paid_amount": float(inst.paid_amount),
+            "remaining_amount": round(float(inst.amount) - float(inst.paid_amount), 2),
+            "due_date": inst.due_date.isoformat() if inst.due_date else None,
+            "status": inst.status,
+            "remarks": inst.remarks,
+        })
+    return APIResponse.ok(data=res)
+
+
+@router.post("/student/{student_id}/installments", response_model=APIResponse, status_code=201,
+             dependencies=[Depends(require_permission("finance.manage", "finance.create"))])
+async def create_student_installment(student_id: int, body: StudentInstallmentRequest,
+                                     current_user: AuthUser, db: DBSession):
+    inst = StudentInstallment(
+        student_id=student_id,
+        academic_year_id=body.academic_year_id,
+        installment_name=body.installment_name,
+        amount=body.amount,
+        paid_amount=Decimal("0"),
+        due_date=body.due_date,
+        status="pending",
+        remarks=body.remarks
+    )
+    db.add(inst)
+    db.commit()
+    db.refresh(inst)
+    return APIResponse.created(
+        data={
+            "id": inst.id,
+            "installment_name": inst.installment_name,
+            "amount": float(inst.amount),
+            "due_date": inst.due_date.isoformat(),
+            "status": inst.status,
+        },
+        message=f"Installment '{inst.installment_name}' (₹{inst.amount}) created for student.",
+    )
+
+
+@router.delete("/installments/{inst_id}", response_model=APIResponse,
+               dependencies=[Depends(require_permission("finance.manage", "finance.delete"))])
+async def delete_student_installment(inst_id: int, current_user: AuthUser, db: DBSession):
+    inst = db.query(StudentInstallment).filter(StudentInstallment.id == inst_id).first()
+    if not inst:
+        raise HTTPException(status_code=404, detail="Installment record not found.")
+    inst.is_deleted = True
+    db.commit()
+    return APIResponse.ok(message="Installment removed.")
+

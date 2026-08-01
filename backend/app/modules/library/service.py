@@ -249,10 +249,26 @@ def _issue_number(db: Session) -> str:
 class BookService:
     @staticmethod
     def create(db: Session, data: BookRequest, created_by: int) -> Book:
-        acc = data.accession_number or _accession_number(db)
-        book = Book(**data.model_dump(), accession_number=acc,
+        dump = data.model_dump()
+        acc = dump.pop("accession_number", None) or _accession_number(db)
+        if not dump.get("isbn"):
+            dump["isbn"] = None
+        book = Book(**dump, accession_number=acc,
                     available_copies=data.total_copies, created_by=created_by)
         db.add(book)
+        db.flush()
+
+        copies_count = max(1, data.total_copies)
+        for i in range(1, copies_count + 1):
+            copy_acc = f"{acc}-{i}" if copies_count > 1 else acc
+            copy = BookCopy(
+                book_id=book.id,
+                accession_number=copy_acc,
+                status="available",
+                created_by=created_by
+            )
+            db.add(copy)
+
         AuditService.log(db, action="BOOK_ADDED", module="library", user_id=created_by,
                          description=f"Book added: {data.title}")
         db.commit(); db.refresh(book); return book
@@ -288,8 +304,12 @@ class BookService:
     @staticmethod
     def update(db: Session, book_id: int, data: BookRequest, updated_by: int) -> Book:
         b = BookService.get_by_id(db, book_id)
-        for k, v in data.model_dump(exclude_none=True).items():
-            setattr(b, k, v)
+        dump = data.model_dump(exclude_none=True)
+        if "isbn" in dump and not dump["isbn"]:
+            dump["isbn"] = None
+        for k, v in dump.items():
+            if hasattr(b, k):
+                setattr(b, k, v)
         b.updated_by = updated_by; db.commit(); db.refresh(b); return b
 
     @staticmethod
@@ -367,7 +387,20 @@ class IssueService:
 
         AuditService.log(db, action="BOOK_ISSUED", module="library", user_id=issued_by,
                          description=f"Issued '{book.title}' to {member.full_name}")
-        db.commit(); db.refresh(issue); return issue
+        db.commit(); db.refresh(issue)
+        # ── Notify member that book was issued
+        try:
+            from app.shared.notifications import push_event
+            push_event(db, "library.book_issued", {
+                "book_title": book.title,
+                "due_date": str(issue.due_date),
+                "member_user_id": member.user_id if hasattr(member, 'user_id') else None,
+                "issue_id": issue.id,
+                "sender_id": issued_by,
+            })
+        except Exception:
+            pass
+        return issue
 
     @staticmethod
     def return_book(db: Session, issue_id: int, data: ReturnRequest, returned_by: int) -> BookIssue:

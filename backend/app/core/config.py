@@ -98,6 +98,16 @@ class Settings(BaseSettings):
     DATE_FORMAT: str = "DD/MM/YYYY"
     DEFAULT_LANGUAGE: str = "mr"
 
+    # ── SMTP / Email Configuration ────────────────────────────
+    SMTP_HOST: str = "smtp.gmail.com"
+    SMTP_PORT: int = 587
+    SMTP_USER: str = ""
+    SMTP_PASSWORD: str = ""
+    SMTP_FROM_EMAIL: str = "noreply@vidyasetu.com"
+    SMTP_FROM_NAME: str = "VidyaSetu ERP"
+    SMTP_TLS: bool = True
+    FRONTEND_URL: str = "http://localhost:5173"
+
     # ── Computed Properties ───────────────────────────────────
     @property
     def allowed_origins_list(self) -> List[str]:

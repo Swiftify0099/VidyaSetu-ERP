@@ -18,7 +18,7 @@ from app.core.security import (
     create_refresh_token,
     verify_refresh_token,
 )
-from app.modules.auth.models import User, UserRole, UserSession, Role, Permission
+from app.modules.auth.models import User, UserRole, UserSession, Role, RolePermission, Permission
 from app.modules.auth.schemas import (
     LoginRequest,
     TokenResponse,
@@ -53,6 +53,7 @@ class AuthService:
                 selectinload(User.user_roles)
                 .selectinload(UserRole.role)
                 .selectinload(Role.role_permissions)
+                .selectinload(RolePermission.permission)
             )
         )
 

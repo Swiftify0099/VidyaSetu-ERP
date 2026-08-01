@@ -154,14 +154,115 @@ class StudentService:
         db.add(student)
         db.flush()
 
+        # Determine target recipient email
+        target_email = data.email or data.father_email or data.mother_email
+
+        # Generate initial password if not provided
+        if data.password and data.password.strip():
+            raw_password = data.password.strip()
+        else:
+            raw_password = f"Vidya@{gr_number.replace('-', '')[-6:]}"
+
+        # Login username: GR Number
+        username = gr_number
+
+        # Create linked User account for student portal login if not exists
+        from app.core.security import hash_password
+        from app.modules.auth.models import User, Role, UserRole
+
+        existing_user = db.scalar(select(User).where(User.username == username))
+        if not existing_user:
+            user_email = target_email
+            if user_email and db.scalar(select(User.id).where(User.email == user_email)):
+                user_email = None
+
+            user_mobile = data.mobile or data.father_mobile
+            if user_mobile and db.scalar(select(User.id).where(User.mobile == user_mobile)):
+                user_mobile = None
+
+            user = User(
+                username=username,
+                password_hash=hash_password(raw_password),
+                gr_number=gr_number,
+                full_name=full_name,
+                email=user_email,
+                mobile=user_mobile,
+                must_change_password=True,
+            )
+            db.add(user)
+            db.flush()
+
+            # Assign 'student' role
+            student_role = db.scalar(select(Role).where(Role.code == "student"))
+            if student_role:
+                db.add(UserRole(user_id=user.id, role_id=student_role.id, assigned_by=created_by))
+
+            student.user_id = user.id
+
+        # Dispatch email notification with credentials
+        email_sent = False
+        if data.send_email_notification and target_email:
+            try:
+                from app.shared.email import build_admission_credentials_email, send_email_async
+                from app.modules.communication.models import CommunicationLog
+
+                academic_year_name = settings.CURRENT_ACADEMIC_YEAR
+                if data.academic_year_id:
+                    ay = db.scalar(select(AcademicYear).where(AcademicYear.id == data.academic_year_id))
+                    if ay and hasattr(ay, 'name'):
+                        academic_year_name = ay.name
+
+                html_content, text_content = build_admission_credentials_email(
+                    student_name=full_name,
+                    gr_number=gr_number,
+                    username=username,
+                    password=raw_password,
+                    standard=data.standard,
+                    division=data.division,
+                    academic_year=str(academic_year_name),
+                    login_url=f"{settings.FRONTEND_URL}/login",
+                )
+
+                subject = f"Admission Confirmed — Your {settings.SCHOOL_NAME} Login Credentials"
+                send_email_async(
+                    to_email=target_email,
+                    subject=subject,
+                    html_content=html_content,
+                    text_content=text_content,
+                )
+
+                comm_log = CommunicationLog(
+                    channel="email",
+                    recipient_type="specific_student",
+                    recipient_id=student.id,
+                    recipient_name=full_name,
+                    recipient_phone=data.mobile or data.father_mobile,
+                    subject=subject,
+                    message_body=f"Credentials email sent to {target_email} for GR: {gr_number}.",
+                    status="sent",
+                    sent_at=datetime.now(timezone.utc),
+                )
+                db.add(comm_log)
+                email_sent = True
+            except Exception as ex:
+                import logging
+                logging.getLogger("app.student.service").error(f"Failed to process email dispatch: {ex}")
+
         AuditService.log(
             db, action="STUDENT_CREATED", module="student",
             user_id=created_by, entity_type="Student",
             entity_id=student.id,
-            description=f"Student '{full_name}' (GR: {gr_number}) admitted to Std {data.standard}.",
+            description=f"Student '{full_name}' (GR: {gr_number}) admitted to Std {data.standard}. User account created. Email sent: {email_sent}.",
         )
         db.commit()
         db.refresh(student)
+
+        # Attach transient metadata for API response
+        setattr(student, "_generated_username", username)
+        setattr(student, "_generated_password", raw_password)
+        setattr(student, "_email_sent", email_sent)
+        setattr(student, "_target_email", target_email)
+
         return student
 
     @staticmethod

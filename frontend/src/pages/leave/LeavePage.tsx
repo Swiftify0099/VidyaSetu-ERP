@@ -27,14 +27,15 @@ interface Holiday { id: number; holiday_date: string; name: string; holiday_type
 
 const CUR_YEAR = '2025-2026';
 
-const LEAVE_TABS = ['Applications', 'My Balance', 'Holiday Calendar', 'Leave Types'] as const;
+const LEAVE_TABS = ['My Applications', 'All Applications', 'My Balance', 'Holiday Calendar', 'Leave Types'] as const;
 type LeaveTab = typeof LEAVE_TABS[number];
 
 export default function LeavePage() {
-  const [tab, setTab] = useState<LeaveTab>('Applications');
+  const [tab, setTab] = useState<LeaveTab>('My Applications');
   const [leaveTypes, setLeaveTypes] = useState<LeaveType[]>([]);
   const [balances, setBalances] = useState<LeaveBalance[]>([]);
   const [applications, setApplications] = useState<LeaveApplication[]>([]);
+  const [myApplications, setMyApplications] = useState<LeaveApplication[]>([]);
   const [holidays, setHolidays] = useState<Holiday[]>([]);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState('');
@@ -62,15 +63,17 @@ export default function LeavePage() {
   const fetchAll = useCallback(async () => {
     setLoading(true);
     try {
-      const [lt, bal, apps, hols] = await Promise.all([
+      const [lt, bal, apps, myApps, hols] = await Promise.all([
         api.get('/leave/types'),
         api.get('/leave/balance', { params: { academic_year: CUR_YEAR } }),
         api.get('/leave/applications', { params: { academic_year: CUR_YEAR } }),
+        api.get('/leave/my-applications', { params: { academic_year: CUR_YEAR } }).catch(() => ({ data: { data: [] } })),
         api.get('/leave/holidays', { params: { academic_year: CUR_YEAR } }),
       ]);
       setLeaveTypes(lt.data?.data ?? []);
       setBalances(bal.data?.data ?? []);
       setApplications(apps.data?.data ?? []);
+      setMyApplications(myApps.data?.data ?? []);
       setHolidays(hols.data?.data ?? []);
     } catch { toast.error('Failed to load leave data'); }
     finally { setLoading(false); }
@@ -80,21 +83,59 @@ export default function LeavePage() {
 
   const handleApply = async (e: React.FormEvent) => {
     e.preventDefault();
+    // Validate leave type is selected
+    if (!applyForm.leave_type_id || applyForm.leave_type_id === 0) {
+      toast.error('Please select a leave type');
+      return;
+    }
+    if (!applyForm.from_date || !applyForm.to_date) {
+      toast.error('Please select from and to dates');
+      return;
+    }
+    if (!applyForm.reason.trim()) {
+      toast.error('Please provide a reason for leave');
+      return;
+    }
+    if (applyForm.is_half_day && !applyForm.half_day_session) {
+      toast.error('Please select half day session (morning/afternoon)');
+      return;
+    }
     setSaving(true);
     try {
-      await api.post('/leave/apply', applyForm);
-      toast.success('Leave application submitted!');
+      const payload: any = {
+        leave_type_id: applyForm.leave_type_id,
+        academic_year: applyForm.academic_year,
+        from_date: applyForm.from_date,
+        to_date: applyForm.to_date,
+        is_half_day: applyForm.is_half_day,
+        reason: applyForm.reason,
+      };
+      if (applyForm.is_half_day && applyForm.half_day_session) {
+        payload.half_day_session = applyForm.half_day_session;
+      }
+      await api.post('/leave/apply', payload);
+      toast.success('Leave application submitted successfully!');
       setShowApplyModal(false);
       setApplyForm({ leave_type_id: 0, academic_year: CUR_YEAR, from_date: '', to_date: '', is_half_day: false, half_day_session: '', reason: '' });
       fetchAll();
     } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
-      toast.error(msg ?? 'Failed to submit');
+      const errData = (err as any)?.response?.data;
+      const msg = errData?.message || errData?.detail;
+      if (errData?.errors?.length) {
+        const fieldErrors = errData.errors.map((e: any) => `${e.field}: ${e.message}`).join(', ');
+        toast.error(fieldErrors);
+      } else {
+        toast.error(msg ?? 'Could not submit leave application. Please check your leave balance.');
+      }
     } finally { setSaving(false); }
   };
 
   const handleAction = async () => {
     if (!selectedApp) return;
+    if (actionType === 'reject' && !rejectionReason.trim()) {
+      toast.error('Please provide a rejection reason');
+      return;
+    }
     setSaving(true);
     try {
       await api.post(`/leave/applications/${selectedApp.id}/action`, {
@@ -105,7 +146,10 @@ export default function LeavePage() {
       setShowActionModal(false);
       setRejectionReason('');
       fetchAll();
-    } catch { toast.error('Action failed'); }
+    } catch (err: unknown) {
+      const msg = (err as any)?.response?.data?.message || (err as any)?.response?.data?.detail;
+      toast.error(msg ?? 'Action failed');
+    }
     finally { setSaving(false); }
   };
 
@@ -115,28 +159,60 @@ export default function LeavePage() {
       await api.post(`/leave/applications/${id}/cancel`);
       toast.success('Leave cancelled');
       fetchAll();
-    } catch { toast.error('Failed to cancel'); }
+    } catch (err: unknown) {
+      const msg = (err as any)?.response?.data?.message;
+      toast.error(msg ?? 'Failed to cancel');
+    }
   };
 
   const handleAddHoliday = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!holidayForm.holiday_date) { toast.error('Please select a date'); return; }
+    if (!holidayForm.name.trim()) { toast.error('Please enter holiday name'); return; }
     setSaving(true);
     try {
-      await api.post('/leave/holidays', holidayForm);
-      toast.success('Holiday added!');
+      await api.post('/leave/holidays', {
+        holiday_date: holidayForm.holiday_date,
+        name: holidayForm.name,
+        name_marathi: holidayForm.name_marathi || undefined,
+        academic_year: holidayForm.academic_year,
+        holiday_type: holidayForm.holiday_type,
+        is_optional: holidayForm.is_optional,
+      });
+      toast.success('Holiday added successfully!');
       setShowHolidayModal(false);
+      setHolidayForm({ holiday_date: '', name: '', name_marathi: '', academic_year: CUR_YEAR, holiday_type: 'national', is_optional: false });
       fetchAll();
     } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
-      toast.error(msg ?? 'Failed to add holiday');
+      const errData = (err as any)?.response?.data;
+      const msg = errData?.message || errData?.detail;
+      if (errData?.errors?.length) {
+        const fieldErrors = errData.errors.map((e: any) => `${e.field}: ${e.message}`).join(', ');
+        toast.error(fieldErrors);
+      } else {
+        toast.error(msg ?? 'Failed to add holiday. It may already exist for this date.');
+      }
     } finally { setSaving(false); }
   };
 
-  const filteredApps = applications.filter(a => {
-    const matchSearch = !search || a.employee_name.toLowerCase().includes(search.toLowerCase()) || a.application_number.includes(search);
-    const matchStatus = !statusFilter || a.status === statusFilter;
-    return matchSearch && matchStatus;
-  });
+  const handleDeleteHoliday = async (id: number) => {
+    if (!confirm('Delete this holiday?')) return;
+    try {
+      await api.delete(`/leave/holidays/${id}`);
+      toast.success('Holiday deleted');
+      fetchAll();
+    } catch { toast.error('Failed to delete holiday'); }
+  };
+
+  const filterApplications = (apps: LeaveApplication[]) =>
+    apps.filter(a => {
+      const matchSearch = !search || a.employee_name.toLowerCase().includes(search.toLowerCase()) || a.application_number.includes(search);
+      const matchStatus = !statusFilter || a.status === statusFilter;
+      return matchSearch && matchStatus;
+    });
+
+  const filteredApps = filterApplications(applications);
+  const filteredMyApps = filterApplications(myApplications);
 
   const appColumns: TableColumn<LeaveApplication>[] = [
     { key: 'application_number', header: 'Application #', render: (v) => <span className={styles.appNo}>{String(v)}</span> },
@@ -144,7 +220,7 @@ export default function LeavePage() {
     { key: 'from_date', header: 'From', render: (v) => new Date(String(v)).toLocaleDateString('en-IN') },
     { key: 'to_date', header: 'To', render: (v) => new Date(String(v)).toLocaleDateString('en-IN') },
     { key: 'total_days', header: 'Days', align: 'center' },
-    { key: 'reason', header: 'Reason', render: (v) => <span className={styles.reason}>{String(v).substring(0, 40)}...</span> },
+    { key: 'reason', header: 'Reason', render: (v) => <span className={styles.reason}>{String(v).substring(0, 40)}{String(v).length > 40 ? '...' : ''}</span> },
     { key: 'status', header: 'Status', render: (v) => <StatusBadge status={String(v)} /> },
     {
       key: 'id',
@@ -161,6 +237,28 @@ export default function LeavePage() {
               <button className={`${styles.btn} ${styles.neutral}`}
                 onClick={() => handleCancel(row.id)}>Cancel</button>
             </>
+          )}
+        </div>
+      ),
+    },
+  ];
+
+  const myAppColumns: TableColumn<LeaveApplication>[] = [
+    { key: 'application_number', header: 'Application #', render: (v) => <span className={styles.appNo}>{String(v)}</span> },
+    { key: 'from_date', header: 'From', render: (v) => new Date(String(v)).toLocaleDateString('en-IN') },
+    { key: 'to_date', header: 'To', render: (v) => new Date(String(v)).toLocaleDateString('en-IN') },
+    { key: 'total_days', header: 'Days', align: 'center' },
+    { key: 'reason', header: 'Reason', render: (v) => <span className={styles.reason}>{String(v).substring(0, 50)}{String(v).length > 50 ? '...' : ''}</span> },
+    { key: 'status', header: 'Status', render: (v) => <StatusBadge status={String(v)} /> },
+    {
+      key: 'id',
+      header: 'Actions',
+      align: 'center',
+      render: (_, row) => (
+        <div className={styles.actions}>
+          {row.status === 'pending' && (
+            <button className={`${styles.btn} ${styles.neutral}`}
+              onClick={() => handleCancel(row.id)}>Cancel</button>
           )}
         </div>
       ),
@@ -190,8 +288,30 @@ export default function LeavePage() {
         ))}
       </div>
 
-      {/* Applications Tab */}
-      {tab === 'Applications' && (
+      {/* My Applications Tab */}
+      {tab === 'My Applications' && (
+        <div className={styles.section}>
+          <div className={styles.toolbar}>
+            <SearchBar value={search} onChange={setSearch} placeholder="Search application no..."
+              filters={
+                <select className={styles.select} value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
+                  <option value="">All Status</option>
+                  {['pending', 'approved', 'rejected', 'cancelled'].map(s => (
+                    <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>
+                  ))}
+                </select>
+              }
+            />
+          </div>
+          <div className={styles.tableCard}>
+            <DataTable columns={myAppColumns} data={filteredMyApps} loading={loading}
+              keyExtractor={r => r.id} emptyMessage="No leave applications found. Click '+ Apply Leave' to submit your first application." emptyIcon="🏖️" />
+          </div>
+        </div>
+      )}
+
+      {/* All Applications Tab */}
+      {tab === 'All Applications' && (
         <div className={styles.section}>
           <div className={styles.toolbar}>
             <SearchBar value={search} onChange={setSearch} placeholder="Search employee or application no..."
@@ -228,7 +348,7 @@ export default function LeavePage() {
               </div>
               <div className={styles.balanceBar}>
                 <div className={styles.balanceBarFill}
-                  style={{ width: `${Math.min(100, (Number(b.used_days) / Number(b.entitled_days)) * 100)}%` }} />
+                  style={{ width: `${Math.min(100, (Number(b.used_days) / Math.max(1, Number(b.entitled_days))) * 100)}%` }} />
               </div>
             </div>
           ))}
@@ -244,9 +364,15 @@ export default function LeavePage() {
               { key: 'name', header: 'Holiday Name', sortable: true },
               { key: 'holiday_type', header: 'Type', render: (v) => <StatusBadge status={String(v)} variant="info" /> },
               { key: 'is_optional', header: 'Optional', render: (v) => v ? 'Yes' : 'No' },
+              {
+                key: 'id', header: 'Action', align: 'center',
+                render: (_, row) => (
+                  <button className={`${styles.btn} ${styles.danger}`} onClick={() => handleDeleteHoliday(row.id)}>Delete</button>
+                )
+              },
             ] as TableColumn<Holiday>[]}
             data={holidays} loading={loading}
-            keyExtractor={r => r.id} emptyMessage="No holidays defined" emptyIcon="📅"
+            keyExtractor={r => r.id} emptyMessage="No holidays defined. Click '+ Holiday' to add." emptyIcon="📅"
           />
         </div>
       )}
@@ -254,7 +380,9 @@ export default function LeavePage() {
       {/* Leave Types Tab */}
       {tab === 'Leave Types' && (
         <div className={styles.leaveTypesGrid}>
-          {leaveTypes.map(lt => (
+          {leaveTypes.length === 0 ? (
+            <EmptyState icon="📋" title="No leave types found" description="Contact admin to create leave types" size="md" />
+          ) : leaveTypes.map(lt => (
             <div key={lt.id} className={styles.typeCard}>
               <div className={styles.typeHeader}>
                 <div className={styles.typeCode}>{lt.code}</div>
@@ -284,25 +412,38 @@ export default function LeavePage() {
               onChange={e => setApplyForm(f => ({ ...f, leave_type_id: Number(e.target.value) }))}>
               <option value={0} disabled>Select leave type</option>
               {leaveTypes.map(lt => <option key={lt.id} value={lt.id}>{lt.name} ({lt.code})</option>)}
-            </select></div>
+            </select>
+          </div>
+          {leaveTypes.length === 0 && (
+            <p style={{ color: 'var(--color-warning)', fontSize: '0.8rem', margin: '0 0 8px' }}>
+              ⚠️ No leave types available. Ask admin to create leave types first.
+            </p>
+          )}
+          <div className={styles.fg}><label className={styles.lbl}>Academic Year</label>
+            <select className={styles.inp} value={applyForm.academic_year}
+              onChange={e => setApplyForm(f => ({ ...f, academic_year: e.target.value }))}>
+              {['2024-2025', '2025-2026', '2026-2027'].map(y => <option key={y}>{y}</option>)}
+            </select>
+          </div>
           <div className={styles.formRow}>
             <div className={styles.fg}><label className={styles.lbl}>From Date *</label>
               <input type="date" className={styles.inp} required value={applyForm.from_date}
                 onChange={e => setApplyForm(f => ({ ...f, from_date: e.target.value }))} /></div>
             <div className={styles.fg}><label className={styles.lbl}>To Date *</label>
               <input type="date" className={styles.inp} required value={applyForm.to_date}
+                min={applyForm.from_date}
                 onChange={e => setApplyForm(f => ({ ...f, to_date: e.target.value }))} /></div>
           </div>
           <label className={styles.checkRow}>
             <input type="checkbox" checked={applyForm.is_half_day}
-              onChange={e => setApplyForm(f => ({ ...f, is_half_day: e.target.checked }))} />
+              onChange={e => setApplyForm(f => ({ ...f, is_half_day: e.target.checked, half_day_session: '' }))} />
             Half Day Leave
           </label>
           {applyForm.is_half_day && (
-            <div className={styles.fg}><label className={styles.lbl}>Session</label>
+            <div className={styles.fg}><label className={styles.lbl}>Session *</label>
               <select className={styles.inp} value={applyForm.half_day_session}
                 onChange={e => setApplyForm(f => ({ ...f, half_day_session: e.target.value }))}>
-                <option value="">Select</option>
+                <option value="">Select session</option>
                 <option value="morning">Morning</option>
                 <option value="afternoon">Afternoon</option>
               </select></div>
@@ -310,7 +451,7 @@ export default function LeavePage() {
           <div className={styles.fg}><label className={styles.lbl}>Reason *</label>
             <textarea className={styles.textarea} required rows={3} value={applyForm.reason}
               onChange={e => setApplyForm(f => ({ ...f, reason: e.target.value }))}
-              placeholder="State your reason for leave..." /></div>
+              placeholder="State your reason for leave (minimum 5 characters)..." /></div>
         </form>
       </Modal>
 
@@ -334,8 +475,13 @@ export default function LeavePage() {
               ? `Approve leave for ${selectedApp?.employee_name}?`
               : `Reject leave for ${selectedApp?.employee_name}?`}
           </p>
+          {selectedApp && (
+            <div className={styles.fg} style={{ marginTop: '8px', fontSize: '0.85rem', color: 'var(--color-text-secondary)' }}>
+              <strong>Dates:</strong> {new Date(selectedApp.from_date).toLocaleDateString('en-IN')} → {new Date(selectedApp.to_date).toLocaleDateString('en-IN')} ({selectedApp.total_days} days)
+            </div>
+          )}
           {actionType === 'reject' && (
-            <div className={styles.fg}>
+            <div className={styles.fg} style={{ marginTop: '12px' }}>
               <label className={styles.lbl}>Rejection Reason *</label>
               <textarea className={styles.textarea} rows={3} required value={rejectionReason}
                 onChange={e => setRejectionReason(e.target.value)}
@@ -347,7 +493,7 @@ export default function LeavePage() {
 
       {/* Add Holiday Modal */}
       <Modal isOpen={showHolidayModal} onClose={() => setShowHolidayModal(false)}
-             title="Add Holiday" size="md"
+             title="Add Holiday to Calendar" size="md"
              footer={
                <>
                  <button className={styles.cancelBtn} onClick={() => setShowHolidayModal(false)}>Cancel</button>
@@ -368,13 +514,20 @@ export default function LeavePage() {
             <input className={styles.inp} value={holidayForm.name_marathi}
               onChange={e => setHolidayForm(f => ({ ...f, name_marathi: e.target.value }))}
               placeholder="e.g. प्रजासत्ताक दिन" /></div>
-          <div className={styles.fg}><label className={styles.lbl}>Type</label>
-            <select className={styles.inp} value={holidayForm.holiday_type}
-              onChange={e => setHolidayForm(f => ({ ...f, holiday_type: e.target.value }))}>
-              {['national', 'state', 'local', 'school', 'optional'].map(t => (
-                <option key={t} value={t}>{t.charAt(0).toUpperCase() + t.slice(1)}</option>
-              ))}
-            </select></div>
+          <div className={styles.formRow}>
+            <div className={styles.fg}><label className={styles.lbl}>Academic Year</label>
+              <select className={styles.inp} value={holidayForm.academic_year}
+                onChange={e => setHolidayForm(f => ({ ...f, academic_year: e.target.value }))}>
+                {['2024-2025', '2025-2026', '2026-2027'].map(y => <option key={y}>{y}</option>)}
+              </select></div>
+            <div className={styles.fg}><label className={styles.lbl}>Type</label>
+              <select className={styles.inp} value={holidayForm.holiday_type}
+                onChange={e => setHolidayForm(f => ({ ...f, holiday_type: e.target.value }))}>
+                {['national', 'state', 'local', 'school', 'optional'].map(t => (
+                  <option key={t} value={t}>{t.charAt(0).toUpperCase() + t.slice(1)}</option>
+                ))}
+              </select></div>
+          </div>
           <label className={styles.checkRow}>
             <input type="checkbox" checked={holidayForm.is_optional}
               onChange={e => setHolidayForm(f => ({ ...f, is_optional: e.target.checked }))} />

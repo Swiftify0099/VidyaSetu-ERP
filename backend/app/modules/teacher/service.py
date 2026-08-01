@@ -9,6 +9,7 @@ from typing import Optional
 
 from fastapi import HTTPException, UploadFile
 from sqlalchemy import and_, func, select, or_
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
@@ -34,30 +35,32 @@ class EmployeeIDService:
     @staticmethod
     def generate(db: Session, employee_type: str = "teaching") -> str:
         """
-        Generate next employee ID: HMMV-TCH-YYYY-NNNN (teaching)
-                                   HMMV-STF-YYYY-NNNN (non-teaching)
+        Generate next employee ID: HMMV-TCH-YY-NNNN (teaching)
+                                   HMMV-STF-YY-NNNN (non-teaching)
+        Robust integer sequence parsing prevents duplicate ID collision.
         """
         prefix = settings.SCHOOL_CODE or "HMMV"
         type_code = "TCH" if employee_type == "teaching" else "STF"
         year = str(date.today().year)[-2:]
         pattern = f"{prefix}-{type_code}-{year}-%"
 
-        last = db.scalar(
+        existing_ids = list(db.scalars(
             select(Teacher.employee_id)
             .where(Teacher.employee_id.like(pattern))
             .where(Teacher.is_deleted == False)
-            .order_by(Teacher.employee_id.desc())
-        )
+        ).all())
 
-        if last:
+        max_seq = 0
+        for emp_id in existing_ids:
             try:
-                seq = int(last.split("-")[-1]) + 1
+                seq = int(emp_id.split("-")[-1])
+                if seq > max_seq:
+                    max_seq = seq
             except (ValueError, IndexError):
-                seq = 1
-        else:
-            seq = 1
+                pass
 
-        return f"{prefix}-{type_code}-{year}-{seq:04d}"
+        next_seq = max_seq + 1
+        return f"{prefix}-{type_code}-{year}-{next_seq:04d}"
 
 
 class TeacherService:
@@ -73,80 +76,97 @@ class TeacherService:
 
         employee_id = EmployeeIDService.generate(db, data.employee_type)
 
+        def _t(val: Optional[str], max_len: int = 50) -> Optional[str]:
+            return str(val)[:max_len] if val is not None else None
+
         teacher = Teacher(
             employee_id=employee_id,
-            full_name=full_name,
-            first_name=data.first_name,
-            middle_name=data.middle_name,
-            last_name=data.last_name,
-            full_name_marathi=data.full_name_marathi,
-            salutation=data.salutation,
-            employee_type=data.employee_type,
-            designation=data.designation,
-            department=data.department,
-            subjects=data.subjects,
-            classes_assigned=data.classes_assigned,
+            full_name=_t(full_name, 255),
+            first_name=_t(data.first_name, 100),
+            middle_name=_t(data.middle_name, 100),
+            last_name=_t(data.last_name, 100),
+            full_name_marathi=_t(data.full_name_marathi, 255),
+            salutation=_t(data.salutation, 50),
+            employee_type=_t(data.employee_type, 50) or "teaching",
+            designation=_t(data.designation, 100) or "Teacher",
+            department=_t(data.department, 100),
+            subjects=_t(data.subjects, 255),
+            classes_assigned=_t(data.classes_assigned, 255),
             date_of_joining=data.date_of_joining or date.today(),
             dob=data.dob,
-            gender=data.gender,
-            blood_group=data.blood_group,
-            nationality=data.nationality,
-            religion=data.religion,
-            caste=data.caste,
-            category=data.category,
-            marital_status=data.marital_status,
-            mother_tongue=data.mother_tongue,
-            aadhaar_number=data.aadhaar_number,
-            pan_number=data.pan_number,
-            pf_number=data.pf_number,
-            gpf_number=data.gpf_number,
-            dcps_account=data.dcps_account,
-            pran_number=data.pran_number,
-            teacher_saral_id=data.teacher_saral_id,
-            mobile=data.mobile,
-            mobile_alt=data.mobile_alt,
-            email=data.email,
-            email_official=data.email_official,
-            address_line1=data.address_line1,
-            address_line2=data.address_line2,
-            village=data.village,
-            taluka=data.taluka,
-            district=data.district,
-            state=data.state,
-            pincode=data.pincode,
-            highest_qualification=data.highest_qualification,
-            specialization=data.specialization,
+            gender=_t(data.gender, 50),
+            blood_group=_t(data.blood_group, 20),
+            nationality=_t(data.nationality, 50) or "Indian",
+            religion=_t(data.religion, 50),
+            caste=_t(data.caste, 100),
+            category=_t(data.category, 50),
+            marital_status=_t(data.marital_status, 50),
+            mother_tongue=_t(data.mother_tongue, 50),
+            aadhaar_number=_t(data.aadhaar_number, 50),
+            pan_number=_t(data.pan_number, 50),
+            pf_number=_t(data.pf_number, 50),
+            gpf_number=_t(data.gpf_number, 50),
+            dcps_account=_t(data.dcps_account, 50),
+            pran_number=_t(data.pran_number, 50),
+            teacher_saral_id=_t(data.teacher_saral_id, 50),
+            mobile=_t(data.mobile, 50),
+            mobile_alt=_t(data.mobile_alt, 50),
+            email=_t(data.email, 255),
+            email_official=_t(data.email_official, 255),
+            address_line1=_t(data.address_line1, 500),
+            address_line2=_t(data.address_line2, 500),
+            village=_t(data.village, 100),
+            taluka=_t(data.taluka, 100),
+            district=_t(data.district, 100),
+            state=_t(data.state, 100) or "Maharashtra",
+            pincode=_t(data.pincode, 20),
+            highest_qualification=_t(data.highest_qualification, 100),
+            specialization=_t(data.specialization, 255),
             b_ed_year=data.b_ed_year,
             d_ed_year=data.d_ed_year,
-            pay_scale=data.pay_scale,
+            pay_scale=_t(data.pay_scale, 100),
             basic_salary=data.basic_salary,
             grade_pay=data.grade_pay,
-            bank_name=data.bank_name,
-            bank_account_number=data.bank_account_number,
-            bank_ifsc=data.bank_ifsc,
-            bank_branch=data.bank_branch,
-            spouse_name=data.spouse_name,
-            father_name=data.father_name,
-            mother_name=data.mother_name,
-            emergency_contact_name=data.emergency_contact_name,
-            emergency_contact_mobile=data.emergency_contact_mobile,
-            emergency_contact_relation=data.emergency_contact_relation,
+            bank_name=_t(data.bank_name, 200),
+            bank_account_number=_t(data.bank_account_number, 50),
+            bank_ifsc=_t(data.bank_ifsc, 30),
+            bank_branch=_t(data.bank_branch, 200),
+            spouse_name=_t(data.spouse_name, 255),
+            father_name=_t(data.father_name, 255),
+            mother_name=_t(data.mother_name, 255),
+            emergency_contact_name=_t(data.emergency_contact_name, 255),
+            emergency_contact_mobile=_t(data.emergency_contact_mobile, 50),
+            emergency_contact_relation=_t(data.emergency_contact_relation, 100),
             status="active",
             created_by=created_by,
         )
 
-        db.add(teacher)
-        db.flush()
+        try:
+            db.add(teacher)
+            db.flush()
 
-        AuditService.log(
-            db, action="TEACHER_CREATED", module="teacher",
-            user_id=created_by, entity_type="Teacher",
-            entity_id=teacher.id,
-            description=f"Teacher '{full_name}' (Emp: {employee_id}) added as {data.designation}.",
-        )
-        db.commit()
-        db.refresh(teacher)
-        return teacher
+            AuditService.log(
+                db, action="TEACHER_CREATED", module="teacher",
+                user_id=created_by, entity_type="Teacher",
+                entity_id=teacher.id,
+                description=f"Teacher '{full_name}' (Emp: {employee_id}) added as {data.designation}.",
+            )
+            db.commit()
+            db.refresh(teacher)
+            return teacher
+        except IntegrityError as ie:
+            db.rollback()
+            err_str = str(ie.orig) if hasattr(ie, 'orig') else str(ie)
+            raise HTTPException(
+                status_code=400,
+                detail=f"Database constraint error: A staff record with this Employee ID, Aadhaar, or PAN may already exist."
+            )
+        except Exception as e:
+            db.rollback()
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to create staff record: {str(e)}"
+            )
 
     @staticmethod
     def get_by_id(db: Session, teacher_id: int) -> Teacher:

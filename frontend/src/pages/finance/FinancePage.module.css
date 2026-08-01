@@ -195,7 +195,50 @@
 .mi:focus { border-color: var(--color-primary); background: var(--color-surface); }
 .checkRow { display: flex; align-items: center; gap: var(--space-2); font-size: var(--font-size-sm); color: var(--color-text-secondary); cursor: pointer; }
 .cancelBtn { flex: 1; height: 40px; border-radius: var(--radius-md); border: 1.5px solid var(--color-border); background: var(--color-surface-2); color: var(--color-text-secondary); font-family: var(--font-family); font-size: var(--font-size-sm); cursor: pointer; }
-.submitBtn { flex: 1; height: 40px; border-radius: var(--radius-md); background: var(--color-primary); color: white; border: none; font-family: var(--font-family); font-size: var(--font-size-sm); font-weight: var(--font-weight-semibold); cursor: pointer; display: flex; align-items: center; justify-content: center; gap: var(--space-2); transition: all var(--transition-base); }
-.submitBtn:hover:not(:disabled) { background: var(--color-primary-hover); }
-.submitBtn:disabled { opacity: 0.7; }
-.spin { width: 14px; height: 14px; border: 2px solid rgba(255,255,255,.4); border-top-color: white; border-radius: 50%; animation: spin .8s linear infinite; }
+.submitBtn{flex:1;height:40px;border-radius:var(--radius-md);background:var(--color-primary);color:white;border:none;font-family:var(--font-family);font-size:var(--font-size-sm);font-weight:var(--font-weight-semibold);cursor:pointer;display:flex;align-items:center;justify-content:center;gap:var(--space-2);transition:all var(--transition-base)}.submitBtn:hover:not(:disabled){background:var(--color-primary-hover)}.submitBtn:disabled{opacity:0.7}.spin{width:14px;height:14px;border:2px solid rgba(255,255,255,.4);border-top-color:white;border-radius:50%;animation:spin .8s linear infinite}
+
+/* Search Results Dropdown */
+.searchResultsBox { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; background: var(--color-surface-2); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: 8px; max-height: 180px; overflow-y: auto; }
+.searchResultTitle { font-size: 11px; font-weight: var(--font-weight-bold); color: var(--color-text-muted); text-transform: uppercase; margin-bottom: 2px; }
+.searchResultItem { display: flex; align-items: center; justify-content: space-between; padding: 6px 10px; border-radius: var(--radius-sm); background: var(--color-surface); border: 1px solid var(--color-border); cursor: pointer; font-size: var(--font-size-xs); transition: all var(--transition-fast); }
+.searchResultItem:hover { border-color: var(--color-primary); background: var(--color-primary-light); }
+.stdBadge { padding: 1px 6px; border-radius: 4px; background: var(--color-primary); color: white; font-size: 10px; font-weight: bold; }
+
+/* Payment History Table */
+.historyTableWrap { overflow-x: auto; margin-top: 8px; border: 1px solid var(--color-border); border-radius: var(--radius-md); }
+.historyTable { width: 100%; border-collapse: collapse; font-size: var(--font-size-xs); }
+.historyTable th { background: var(--color-surface-2); padding: 8px 12px; text-align: left; font-weight: 600; color: var(--color-text-muted); border-bottom: 1px solid var(--color-border); }
+.historyTable td { padding: 8px 12px; border-bottom: 1px solid var(--color-border); vertical-align: middle; }
+.receiptCode { font-family: monospace; color: var(--color-primary); }
+.modeTag { padding: 2px 6px; border-radius: 4px; background: var(--color-surface-2); font-size: 10px; font-weight: bold; border: 1px solid var(--color-border); }
+.printMiniBtn { height: 26px; padding: 0 10px; border-radius: 4px; border: 1px solid #16a34a; background: #f0fdf4; color: #16a34a; font-size: 11px; font-weight: bold; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; }
+.printMiniBtn:hover { background: #16a34a; color: white; }
+
+/* Fee Receipt Print Modal */
+.receiptModal { width: 680px; max-width: 95vw; max-height: 95vh; overflow-y: auto; }
+.primaryPrintBtn { height: 34px; padding: 0 var(--space-4); border-radius: var(--radius-md); background: #16a34a; color: white; border: none; font-size: var(--font-size-sm); font-weight: var(--font-weight-bold); font-family: var(--font-family); cursor: pointer; display: flex; align-items: center; gap: var(--space-2); }
+.printableReceipt { padding: 24px; background: white; color: #111827; font-family: 'Inter', system-ui, sans-serif; }
+.receiptSchoolHeader { text-align: center; border-bottom: 2px solid #111827; padding-bottom: 10px; margin-bottom: 14px; }
+.rSchoolName { font-size: 1.3rem; font-weight: 800; color: #1e1b4b; margin: 0 0 2px 0; }
+.rSchoolSub { font-size: 0.8rem; color: #4b5563; margin: 0 0 8px 0; }
+.rTitleBox { display: inline-block; padding: 4px 14px; background: #f3f4f6; border: 1px solid #9ca3af; border-radius: 6px; font-size: 0.95rem; font-weight: 700; color: #111827; }
+
+.rMetaGrid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 16px; font-size: 0.82rem; margin-bottom: 16px; background: #f9fafb; padding: 10px 14px; border-radius: 6px; border: 1px solid #e5e7eb; }
+
+.rTable { width: 100%; border-collapse: collapse; font-size: 0.82rem; margin-bottom: 14px; }
+.rTable th, .rTable td { border: 1px solid #9ca3af; padding: 8px 10px; text-align: left; }
+.rTable th { background: #f3f4f6; font-weight: 700; color: #111827; }
+.rTotalRow { background: #f9fafb; font-weight: 700; font-size: 0.9rem; }
+
+.rWordsRow { font-size: 0.8rem; background: #f3f4f6; padding: 8px 12px; border-radius: 4px; border: 1px solid #d1d5db; margin-bottom: 36px; }
+
+.rFooterSign { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; text-align: center; font-size: 0.75rem; color: #374151; }
+.rSigBox { display: flex; flex-direction: column; align-items: center; }
+.rSigLine { width: 80%; height: 1px; background: #4b5563; margin-bottom: 6px; }
+
+@media print {
+  body * { visibility: hidden; }
+  .printableReceipt, .printableReceipt * { visibility: visible; }
+  .printableReceipt { position: absolute; left: 0; top: 0; width: 100%; padding: 0; }
+  .noPrint { display: none !important; }
+}

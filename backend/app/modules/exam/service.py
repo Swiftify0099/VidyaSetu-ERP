@@ -232,12 +232,80 @@ class ExamService:
         exam = Exam(**payload, created_by=created_by)
         db.add(exam); db.flush()
 
-        for i, s in enumerate(data.subjects):
-            s_dict = s.model_dump()
-            if "sort_order" not in s_dict or s_dict["sort_order"] is None:
-                s_dict["sort_order"] = i
-            subj = ExamSubject(**s_dict, exam_id=exam.id, created_by=created_by)
-            db.add(subj)
+        # Fetch exam type defaults
+        exam_type = db.scalar(select(ExamType).where(ExamType.id == data.exam_type_id))
+        def_max = exam_type.max_marks if exam_type else 100
+        def_pass = exam_type.passing_marks if exam_type else 35
+
+        if data.subjects and len(data.subjects) > 0:
+            for i, s in enumerate(data.subjects):
+                s_dict = s.model_dump()
+                if "sort_order" not in s_dict or s_dict["sort_order"] is None:
+                    s_dict["sort_order"] = i
+                if not s_dict.get("max_marks"):
+                    s_dict["max_marks"] = def_max
+                if not s_dict.get("passing_marks"):
+                    s_dict["passing_marks"] = def_pass
+                subj = ExamSubject(**s_dict, exam_id=exam.id, created_by=created_by)
+                db.add(subj)
+        else:
+            # Auto-populate subjects for this standard if none were explicitly provided
+            from app.modules.timetable.models import TeacherSubjectAssignment, Subject
+
+            subjects_to_add = []
+            # 1. Check teacher assignments for this standard
+            assignments = db.scalars(
+                select(TeacherSubjectAssignment)
+                .options(joinedload(TeacherSubjectAssignment.subject))
+                .where(
+                    TeacherSubjectAssignment.standard == data.standard,
+                    TeacherSubjectAssignment.academic_year_id == data.academic_year_id,
+                    TeacherSubjectAssignment.is_deleted == False,
+                )
+            ).all()
+
+            seen_names = set()
+            for a in assignments:
+                if a.subject and a.subject.name and a.subject.name not in seen_names:
+                    seen_names.add(a.subject.name)
+                    subjects_to_add.append({
+                        "subject_name": a.subject.name,
+                        "subject_name_marathi": a.subject.name_marathi,
+                        "subject_code": a.subject.code,
+                        "max_marks": def_max,
+                        "passing_marks": def_pass,
+                    })
+
+            # 2. If no teacher assignments found, check Master Subject table
+            if not subjects_to_add:
+                master_subjs = db.scalars(
+                    select(Subject).where(Subject.is_deleted == False)
+                ).all()
+                for ms in master_subjs:
+                    if ms.name and ms.name not in seen_names:
+                        if not ms.applicable_standards or ms.applicable_standards == "All" or data.standard in ms.applicable_standards.split(","):
+                            seen_names.add(ms.name)
+                            subjects_to_add.append({
+                                "subject_name": ms.name,
+                                "subject_name_marathi": ms.name_marathi,
+                                "subject_code": ms.code,
+                                "max_marks": def_max,
+                                "passing_marks": def_pass,
+                            })
+
+            # 3. Fallback to standard core curriculum subjects
+            if not subjects_to_add:
+                default_names = ["Marathi", "English", "Hindi", "Mathematics", "Science", "Social Studies"]
+                for d_name in default_names:
+                    subjects_to_add.append({
+                        "subject_name": d_name,
+                        "max_marks": def_max,
+                        "passing_marks": def_pass,
+                    })
+
+            for i, s_dict in enumerate(subjects_to_add):
+                subj = ExamSubject(**s_dict, sort_order=i, exam_id=exam.id, created_by=created_by)
+                db.add(subj)
 
         AuditService.log(db, action="EXAM_CREATED", module="exam", user_id=created_by,
                          description=f"Exam created: Std {data.standard}")
@@ -245,17 +313,18 @@ class ExamService:
 
 
     @staticmethod
-    def get_by_standard(db: Session, academic_year_id: int, standard: str) -> list[Exam]:
-        return list(db.scalars(
+    def get_by_standard(db: Session, academic_year_id: int, standard: Optional[str] = None) -> list[Exam]:
+        q = (
             select(Exam)
             .options(joinedload(Exam.exam_type), joinedload(Exam.subjects))
             .where(
                 Exam.academic_year_id == academic_year_id,
-                Exam.standard == standard,
                 Exam.is_deleted == False,
             )
-            .order_by(Exam.id)
-        ).all())
+        )
+        if standard and standard != "All" and standard != "":
+            q = q.where(Exam.standard == standard)
+        return list(db.scalars(q.order_by(Exam.id.desc())).unique().all())
 
     @staticmethod
     def get_by_id(db: Session, exam_id: int) -> Exam:
@@ -276,11 +345,21 @@ class ExamService:
 class MarksService:
     @staticmethod
     def bulk_enter(db: Session, data: BulkMarkEntryRequest, entered_by: int) -> int:
-        subject = db.scalar(select(ExamSubject).where(ExamSubject.id == data.exam_subject_id))
-        if not subject: raise HTTPException(404, "Subject not found.")
+        if not data.exam_subject_id and data.exam_id:
+            first_sub = db.scalar(select(ExamSubject).where(ExamSubject.exam_id == data.exam_id))
+            if first_sub:
+                data.exam_subject_id = first_sub.id
 
+        if not data.exam_subject_id:
+            raise HTTPException(400, "exam_subject_id is required.")
+
+        subject = db.scalar(select(ExamSubject).where(ExamSubject.id == data.exam_subject_id))
+        if not subject:
+            raise HTTPException(404, "Subject not found.")
+
+        rows = data.marks if data.marks is not None else (data.entries if data.entries is not None else [])
         saved = 0
-        for row in data.marks:
+        for row in rows:
             existing = db.scalar(
                 select(StudentMark).where(
                     StudentMark.exam_id == data.exam_id,
@@ -295,10 +374,16 @@ class MarksService:
             if actual is None and row.theory_marks is not None:
                 actual = (row.theory_marks or Decimal("0")) + (row.practical_marks or Decimal("0"))
 
+            if actual is not None and subject.max_marks and actual > Decimal(str(subject.max_marks)):
+                raise HTTPException(
+                    400,
+                    f"Marks obtained ({actual}) cannot exceed max marks ({subject.max_marks}) for {subject.subject_name}."
+                )
+
             # Compute grade
             grade = None
             if actual is not None and not row.is_absent:
-                pct = (actual / subject.max_marks) * 100
+                pct = (actual / Decimal(str(subject.max_marks or 100))) * 100
                 grade = compute_grade(pct)
 
             if existing:
@@ -526,6 +611,16 @@ class ResultService:
         AuditService.log(db, action="RESULTS_COMPILED", module="exam", user_id=compiled_by,
                          description=f"Results compiled for exam #{exam_id}: {len(all_results)} students")
         db.commit()
+        # ── Notify students and parents that results are published
+        try:
+            from app.shared.notifications import push_event
+            push_event(db, "exam.result_published", {
+                "exam_name": exam.name,
+                "standard": exam.standard,
+                "sender_id": compiled_by,
+            })
+        except Exception:
+            pass
         return len(all_results)
 
     @staticmethod

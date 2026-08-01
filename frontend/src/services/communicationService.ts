@@ -139,6 +139,7 @@ const communicationService = {
     recipient_phones?: string[];
     subject?: string;
     message_body: string;
+    image_url?: string;
     template_id?: number;
     notice_id?: number;
   }): Promise<number> {

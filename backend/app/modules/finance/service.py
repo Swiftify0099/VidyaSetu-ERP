@@ -199,6 +199,35 @@ class StudentFeeService:
         return count
 
     @staticmethod
+    def lookup_students(db: Session, query: str) -> list[dict]:
+        from app.modules.student.models import Student
+        from sqlalchemy import or_
+        q = select(Student).where(Student.is_deleted == False)
+        if query:
+            st = f"%{query}%"
+            q = q.where(
+                or_(
+                    Student.full_name.ilike(st),
+                    Student.gr_number.ilike(st),
+                    Student.mobile_number.ilike(st),
+                    Student.roll_number.ilike(st),
+                )
+            )
+        students = db.scalars(q.order_by(Student.full_name).limit(20)).all()
+        return [
+            {
+                "id": s.id,
+                "gr_number": s.gr_number,
+                "full_name": s.full_name,
+                "standard": s.current_standard or getattr(s, "standard", "-") or "-",
+                "division": s.current_division or getattr(s, "division", "A") or "A",
+                "mobile_number": s.mobile_number,
+                "roll_number": s.roll_number,
+            }
+            for s in students
+        ]
+
+    @staticmethod
     def get_student_fee_summary(db: Session, student_id: int,
                                 academic_year_id: int) -> StudentFeeSummary:
         from app.modules.student.models import Student
@@ -216,6 +245,23 @@ class StudentFeeService:
             )
         ).all())
 
+        # Auto-generate fee records from fee structure if empty
+        if not records:
+            std = student.current_standard or getattr(student, "standard", "1")
+            if std:
+                StudentFeeService.generate_fee_records(
+                    db, student_id, academic_year_id, str(std), 1
+                )
+                records = list(db.scalars(
+                    select(StudentFeeRecord)
+                    .options(joinedload(StudentFeeRecord.category))
+                    .where(
+                        StudentFeeRecord.student_id == student_id,
+                        StudentFeeRecord.academic_year_id == academic_year_id,
+                        StudentFeeRecord.is_deleted == False,
+                    )
+                ).all())
+
         total_due = sum(r.amount_due for r in records)
         total_paid = sum(r.amount_paid for r in records)
         total_concession = sum(r.concession_amount for r in records)
@@ -226,8 +272,8 @@ class StudentFeeService:
             student_id=student_id,
             student_name=student.full_name,
             gr_number=student.gr_number,
-            standard=student.current_standard or "-",
-            division=student.current_division,
+            standard=student.current_standard or getattr(student, "standard", "-") or "-",
+            division=student.current_division or getattr(student, "division", "A"),
             total_due=total_due,
             total_paid=total_paid,
             total_concession=total_concession,
@@ -285,6 +331,23 @@ class StudentFeeService:
             description=f"Receipt {receipt_no} — ₹{total_received} from student #{data.student_id}",
         )
         db.commit(); db.refresh(payment)
+        # ── Notify student/parent that fee was received
+        try:
+            from app.shared.notifications import push_event
+            from app.modules.student.models import Student
+            import app.modules.attendance.models  # noqa: F401
+            student = db.scalar(select(Student).where(Student.id == data.student_id, Student.is_deleted == False))
+            push_event(db, "fee.collected", {
+                "student_name": student.full_name if student else f"Student #{data.student_id}",
+                "amount": float(total_received),
+                "receipt_no": receipt_no,
+                "student_user_id": student.user_id if student and hasattr(student, 'user_id') else None,
+                "parent_user_id": None,
+                "receipt_id": payment.id,
+                "sender_id": collected_by,
+            })
+        except Exception:
+            pass
         return payment
 
     @staticmethod

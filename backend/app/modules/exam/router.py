@@ -50,7 +50,7 @@ async def create_exam(body: ExamRequest, current_user: AuthUser, db: DBSession):
 @router.get("", response_model=APIResponse,
             dependencies=[Depends(require_permission("exam.read"))])
 async def list_exams(current_user: AuthUser, db: DBSession,
-                     academic_year_id: int = Query(...), standard: str = Query(...)):
+                     academic_year_id: int = Query(...), standard: Optional[str] = Query(None)):
     exams = ExamService.get_by_standard(db, academic_year_id, standard)
     return APIResponse.ok(data=[ExamResponse.model_validate(e).model_dump() for e in exams])
 
