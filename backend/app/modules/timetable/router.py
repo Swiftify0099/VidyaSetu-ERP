@@ -10,7 +10,7 @@ from app.modules.timetable.service import (
     SubjectRequest, SubjectResponse,
     PeriodConfigRequest, PeriodConfigResponse,
     TimetableEntryRequest, TimetableEntryResponse,
-    AssignmentRequest, AssignmentResponse,
+    AssignmentRequest, AssignmentResponse, BulkAssignmentRequest,
     SubstituteRequest, SubstituteResponse,
     CopyTimetableRequest, AutoGenerateRequest,
     SubjectService, PeriodService, TimetableService, AssignmentService, SubstituteService,
@@ -158,6 +158,14 @@ async def create_assignment(body: AssignmentRequest, current_user: AuthUser, db:
     a = AssignmentService.create(db, body, current_user.user_id)
     return APIResponse.created(data=AssignmentResponse.model_validate(a).model_dump())
 
+@router.post("/assignments/bulk", response_model=APIResponse, status_code=201)
+async def bulk_create_assignments(body: BulkAssignmentRequest, current_user: AuthUser, db: DBSession):
+    created = AssignmentService.bulk_create(db, body, current_user.user_id)
+    return APIResponse.created(
+        data=[AssignmentResponse.model_validate(a).model_dump() for a in created],
+        message=f"{len(created)} teacher subject allocations created successfully."
+    )
+
 @router.get("/assignments", response_model=APIResponse)
 async def list_assignments(current_user: AuthUser, db: DBSession, academic_year_id: int = Query(default=1)):
     assignments = AssignmentService.get_all(db, academic_year_id)
@@ -169,8 +177,14 @@ async def get_teacher_assignments(teacher_id: int, current_user: AuthUser, db: D
     assignments = AssignmentService.get_by_teacher(db, teacher_id, academic_year_id)
     return APIResponse.ok(data=[AssignmentResponse.model_validate(a).model_dump() for a in assignments])
 
+@router.put("/assignments/{assignment_id}", response_model=APIResponse)
+async def update_assignment(assignment_id: int, body: AssignmentRequest, current_user: AuthUser, db: DBSession):
+    a = AssignmentService.update(db, assignment_id, body, current_user.user_id)
+    return APIResponse.ok(data=AssignmentResponse.model_validate(a).model_dump(), message="Assignment updated.")
+
 @router.delete("/assignments/{assignment_id}", response_model=APIResponse)
 async def delete_assignment(assignment_id: int, current_user: AuthUser, db: DBSession):
     AssignmentService.delete(db, assignment_id, current_user.user_id)
     return APIResponse.ok(message="Assignment removed.")
+
 

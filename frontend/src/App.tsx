@@ -38,6 +38,7 @@ const LibraryPage       = lazy(() => import('./pages/library/LibraryPage'));
 const ExamPage          = lazy(() => import('./pages/exam/ExamPage'));
 const AttendancePage    = lazy(() => import('./pages/attendance/AttendancePage'));
 const TimetablePage     = lazy(() => import('./pages/timetable/TimetablePage'));
+const SubjectAssignmentsPage = lazy(() => import('./pages/academics/SubjectAssignmentsPage'));
 const CommunicationPage = lazy(() => import('./pages/communication/CommunicationPage'));
 const InventoryPage     = lazy(() => import('./pages/inventory/InventoryPage'));
 const AnalyticsPage     = lazy(() => import('./pages/analytics/AnalyticsPage'));
@@ -172,6 +173,10 @@ export default function App() {
                     <Route path="/attendance"     element={<RoleGuard allowedRoles={['super_admin','admin','principal','vice_principal','teacher','class_teacher']}><AttendancePage /></RoleGuard>} />
                     {/* Timetable — All staff */}
                     <Route path="/timetable"      element={<TimetablePage />} />
+                    {/* Subject Assignments / Allocations Hub */}
+                    <Route path="/subject-assignments" element={<RoleGuard allowedRoles={['super_admin','admin','principal','vice_principal']}><SubjectAssignmentsPage /></RoleGuard>} />
+                    <Route path="/academics/subject-assignments" element={<RoleGuard allowedRoles={['super_admin','admin','principal','vice_principal']}><SubjectAssignmentsPage /></RoleGuard>} />
+
                     {/* Homework Portal */}
                     <Route path="/homework"       element={<HomeworkPortalPage />} />
                     {/* Communication — All logged-in */}

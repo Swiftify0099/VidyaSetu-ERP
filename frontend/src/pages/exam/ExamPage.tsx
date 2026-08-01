@@ -370,7 +370,7 @@ export default function ExamPage() {
           { id: 'dashboard', label: 'Dashboard',    icon: <BarChart3 size={14}/> },
           { id: 'exams',     label: 'Exams',        icon: <BookOpen size={14}/> },
           { id: 'marks',     label: 'Marks Entry',  icon: <FileText size={14}/> },
-          { id: 'results',   label: 'Results',      icon: <Trophy size={14}/> },
+          { id: 'results',   label: 'Results & Merit List', icon: <Trophy size={14}/> },
           { id: 'types',     label: 'Exam Types',   icon: <GraduationCap size={14}/> },
         ] as const).map(t => (
           <button key={t.id} className={`${styles.tab} ${section === t.id ? styles.tabActive : ''}`}
@@ -378,6 +378,60 @@ export default function ExamPage() {
             {t.icon} {t.label}
           </button>
         ))}
+      </div>
+
+      {/* ── INTERACTIVE WORKFLOW GUIDE BANNER ──────────────────────── */}
+      <div style={{
+        background: 'linear-gradient(135deg, color-mix(in srgb, var(--color-primary) 8%, var(--color-surface)) 0%, color-mix(in srgb, var(--color-info) 6%, var(--color-surface)) 100%)',
+        border: '1px solid color-mix(in srgb, var(--color-primary) 20%, transparent)',
+        borderRadius: 'var(--radius-xl)',
+        padding: '16px 20px',
+        marginBottom: '24px',
+        boxShadow: 'var(--shadow-sm)'
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <span style={{ fontSize: '1.2rem' }}>🎓</span>
+            <strong style={{ fontSize: '0.95rem', color: 'var(--color-text-primary)' }}>
+              How to Use Examination & Results Workflow (परीक्षेचे नियम व टप्पे)
+            </strong>
+          </div>
+          <span className={styles.tagSuccess} style={{ fontSize: '0.75rem', fontWeight: 700 }}>Industrial ERP Grade</span>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px' }}>
+          {[
+            { step: '1', title: 'Create Exam & Subjects', desc: 'Define Exam Type, select Standard & configure Subjects with Max & Passing marks.', icon: <BookOpen size={16}/>, action: () => openCreateExamModal(selStd), btnText: '+ Create Exam' },
+            { step: '2', title: 'Enter Marks (Teachers)', desc: 'Pick Standard, Exam & Subject to load student roster & enter Theory/Practical marks.', icon: <FileText size={16}/>, action: () => setSection('marks'), btnText: 'Go to Marks' },
+            { step: '3', title: 'Compile Results', desc: 'Click "Compile Results" to calculate percentage, grades (A+ to F), pass/fail & ranks.', icon: <RefreshCw size={16}/>, action: () => setSection('results'), btnText: 'Compile Results' },
+            { step: '4', title: 'Merit List & Reports', desc: 'View Class Merit List (🥇 🥈 🥉 Top Rankers) & print official Report Cards.', icon: <Trophy size={16}/>, action: () => setSection('results'), btnText: 'View Merit List' },
+          ].map(s => (
+            <div key={s.step} style={{
+              background: 'var(--color-surface)',
+              borderRadius: 'var(--radius-lg)',
+              padding: '12px 14px',
+              border: '1px solid var(--color-border)',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'space-between',
+              gap: '8px'
+            }}>
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                  <span style={{ fontSize: '0.725rem', fontWeight: 800, padding: '2px 8px', background: 'var(--color-primary-light)', color: 'var(--color-primary)', borderRadius: '999px' }}>
+                    STEP {s.step}
+                  </span>
+                  <span style={{ color: 'var(--color-primary)' }}>{s.icon}</span>
+                </div>
+                <div style={{ fontWeight: 700, fontSize: '0.875rem', color: 'var(--color-text-primary)', marginBottom: '4px' }}>{s.title}</div>
+                <div style={{ fontSize: '0.78rem', color: 'var(--color-text-muted)', lineHeight: '1.4' }}>{s.desc}</div>
+              </div>
+              <button className={styles.miniBtn} onClick={s.action} style={{ width: '100%', justifyContent: 'center', marginTop: '4px', fontSize: '0.75rem' }}>
+                {s.btnText}
+              </button>
+            </div>
+          ))}
+        </div>
       </div>
 
       {/* ── DASHBOARD ──────────────────────────────────────── */}
@@ -403,7 +457,7 @@ export default function ExamPage() {
 
           {/* Grade Scale Reference */}
           <div className={styles.gradeCard}>
-            <h3 className={styles.gradeCardTitle}>Official Grade Scale Reference</h3>
+            <h3 className={styles.gradeCardTitle}>Official Grade Scale Reference (महाराष्ट्र शासन व केंद्रीय बोर्ड)</h3>
             <div className={styles.gradeScale}>
               {[['A+','90–100'],['A','80–89'],['B+','70–79'],['B','60–69'],['C','50–59'],['D','40–49'],['E','35–39'],['F','<35']].map(([g, r]) => (
                 <div key={g} className={styles.gradeItem} style={{ '--gc': gradeColor(g) } as React.CSSProperties}>
@@ -490,11 +544,81 @@ export default function ExamPage() {
       {/* ── MARKS ENTRY ──────────────────────────────────── */}
       {section === 'marks' && (
         <div className={styles.marksContent}>
+          {/* Quick Selection Toolbar */}
+          <div style={{
+            background: 'var(--color-surface)',
+            borderRadius: 'var(--radius-lg)',
+            padding: '14px 18px',
+            marginBottom: '16px',
+            border: '1px solid var(--color-border)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: '12px'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+              <span className={styles.filterLabel}>Select Exam:</span>
+              <select className={styles.searchInput} style={{ width: 'auto', minWidth: '180px' }}
+                value={marksExam?.id || ''}
+                onChange={e => {
+                  const selectedId = Number(e.target.value);
+                  const foundExam = exams.find(ex => ex.id === selectedId);
+                  if (foundExam) {
+                    setMarksExam(foundExam);
+                    if (foundExam.subjects.length > 0) {
+                      openMarksEntry(foundExam, foundExam.subjects[0]);
+                    }
+                  }
+                }}
+              >
+                <option value="">-- Choose Exam (Std {selStd}) --</option>
+                {exams.map(ex => (
+                  <option key={ex.id} value={ex.id}>
+                    {ex.exam_type?.name || `Exam #${ex.id}`} (Std {ex.standard})
+                  </option>
+                ))}
+              </select>
+
+              {marksExam && (
+                <>
+                  <span className={styles.filterLabel}>Select Subject:</span>
+                  <select className={styles.searchInput} style={{ width: 'auto', minWidth: '160px' }}
+                    value={marksSubject?.id || ''}
+                    onChange={e => {
+                      const selectedSubId = Number(e.target.value);
+                      const foundSub = marksExam.subjects.find(s => s.id === selectedSubId);
+                      if (foundSub) {
+                        openMarksEntry(marksExam, foundSub);
+                      }
+                    }}
+                  >
+                    {marksExam.subjects.map(s => (
+                      <option key={s.id} value={s.id}>
+                        {s.subject_name} (Max: {s.max_marks})
+                      </option>
+                    ))}
+                  </select>
+                </>
+              )}
+            </div>
+
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <span className={styles.filterLabel}>Standard:</span>
+              <div className={styles.stdTabs}>
+                {STANDARDS.map(s => (
+                  <button key={s} className={`${styles.stdTab} ${selStd === s ? styles.stdTabActive : ''}`}
+                    onClick={() => { setSelStd(s); loadExams(); }}>{s === 'All' ? 'All' : `Std ${s}`}</button>
+                ))}
+              </div>
+            </div>
+          </div>
+
           {!marksExam || !marksSubject ? (
             <div className={styles.noMarksState}>
               <FileText size={64}/>
-              <p>Select an exam subject from the <strong>Exams</strong> tab to open marks entry.</p>
-              <button className={styles.addBtn} onClick={() => setSection('exams')}>Go to Exams</button>
+              <p>Select an exam and subject above (or from the <strong>Exams</strong> tab) to enter student marks.</p>
+              <button className={styles.addBtn} onClick={() => setSection('exams')}>Go to Exams List</button>
             </div>
           ) : (
             <>
@@ -601,11 +725,56 @@ export default function ExamPage() {
       {/* ── RESULTS & MERIT LIST ──────────────────────────── */}
       {section === 'results' && (
         <div className={styles.resultsContent}>
+          {/* Quick Selection Toolbar */}
+          <div style={{
+            background: 'var(--color-surface)',
+            borderRadius: 'var(--radius-lg)',
+            padding: '14px 18px',
+            marginBottom: '16px',
+            border: '1px solid var(--color-border)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: '12px'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+              <span className={styles.filterLabel}>Select Exam for Merit List:</span>
+              <select className={styles.searchInput} style={{ width: 'auto', minWidth: '220px' }}
+                value={resultExam?.id || ''}
+                onChange={e => {
+                  const selectedId = Number(e.target.value);
+                  const foundExam = exams.find(ex => ex.id === selectedId);
+                  if (foundExam) {
+                    loadResult(foundExam);
+                  }
+                }}
+              >
+                <option value="">-- Choose Exam (Std {selStd}) --</option>
+                {exams.map(ex => (
+                  <option key={ex.id} value={ex.id}>
+                    {ex.exam_type?.name || `Exam #${ex.id}`} (Std {ex.standard}) {ex.result_declared ? '✓ Declared' : '⏳ Pending'}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <span className={styles.filterLabel}>Standard:</span>
+              <div className={styles.stdTabs}>
+                {STANDARDS.map(s => (
+                  <button key={s} className={`${styles.stdTab} ${selStd === s ? styles.stdTabActive : ''}`}
+                    onClick={() => { setSelStd(s); loadExams(); }}>{s === 'All' ? 'All' : `Std ${s}`}</button>
+                ))}
+              </div>
+            </div>
+          </div>
+
           {!resultExam ? (
             <div className={styles.noMarksState}>
               <Trophy size={64}/>
-              <p>Select an exam from the <strong>Exams</strong> tab to view class results & merit list.</p>
-              <button className={styles.addBtn} onClick={() => setSection('exams')}>Go to Exams</button>
+              <p>Select an exam above (or from the <strong>Exams</strong> tab) to view class results & merit list.</p>
+              <button className={styles.addBtn} onClick={() => setSection('exams')}>Go to Exams List</button>
             </div>
           ) : (
             <>

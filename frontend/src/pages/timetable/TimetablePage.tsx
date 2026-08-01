@@ -10,6 +10,7 @@ import timetableService, {
   TimetableStats, ConflictCheck, FreeTeacher, SubstituteEntry, TeacherAssignment,
 } from '../../services/timetableService';
 import api from '../../services/api';
+import SubjectAssignmentsPage from '../academics/SubjectAssignmentsPage';
 import styles from './TimetablePage.module.css';
 
 type Section = 'timetable' | 'teacher' | 'substitutes' | 'assignments' | 'subjects' | 'periods';
@@ -718,50 +719,11 @@ export default function TimetablePage() {
         </div>
       )}
 
-      {/* ── 4. TEACHER ALLOCATIONS ───────────────────────── */}
+      {/* ── 4. TEACHER ALLOCATIONS & SUBJECT ASSIGNMENTS ─────── */}
       {section === 'assignments' && (
-        <div className={styles.teacherContent}>
-          <div className={styles.toolbar}>
-            <span className={styles.muted}>{assignments.length} Total Teacher-Subject Allocations</span>
-            <button className={styles.iconBtn} onClick={loadAssignments}><RefreshCw size={14}/></button>
-            <button className={styles.addBtn} onClick={() => setShowAssignModal(true)}><Plus size={15}/> Add Teacher Assignment</button>
-          </div>
-
-          <div className={styles.teacherGrid}>
-            <table className={styles.table}>
-              <thead><tr>
-                <th>Teacher</th>
-                <th>Subject</th>
-                <th>Standard</th>
-                <th>Division</th>
-                <th>Weekly Target</th>
-                <th>Class Teacher</th>
-                <th>Actions</th>
-              </tr></thead>
-              <tbody>
-                {assignments.map(a => (
-                  <tr key={a.id} className={styles.tr}>
-                    <td style={{ fontWeight: 'bold' }}>👤 {a.teacher?.full_name || `Teacher #${a.teacher_id}`}</td>
-                    <td>{a.subject?.name || `Subject #${a.subject_id}`}</td>
-                    <td>Std {a.standard}</td>
-                    <td>{a.division || 'All'}</td>
-                    <td>{a.periods_per_week} Periods/Wk</td>
-                    <td>{a.is_class_teacher ? <span style={{ color: '#10b981', fontWeight: 'bold' }}>Yes</span> : 'No'}</td>
-                    <td>
-                      <button className={`${styles.miniBtn} ${styles.miniBtnDanger}`} onClick={() => deleteAssignment(a.id)}>
-                        <Trash2 size={12}/> Remove
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-                {assignments.length === 0 && (
-                  <tr><td colSpan={7} className={styles.emptyMsg}>No teacher assignments defined. Click "Add Teacher Assignment" to allocate subjects to teachers.</td></tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
+        <SubjectAssignmentsPage />
       )}
+
 
       {/* ── 5. SUBJECTS ──────────────────────────────────── */}
       {section === 'subjects' && (

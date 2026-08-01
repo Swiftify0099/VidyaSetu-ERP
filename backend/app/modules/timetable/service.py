@@ -101,6 +101,19 @@ class AssignmentRequest(PydanticBase):
     periods_per_week: int = 5
     is_class_teacher: bool = False
 
+class BulkAssignmentItem(PydanticBase):
+    teacher_id: int
+    subject_id: int
+    periods_per_week: int = 5
+    is_class_teacher: bool = False
+
+class BulkAssignmentRequest(PydanticBase):
+    standard: str
+    division: Optional[str] = None
+    academic_year_id: int = 1
+    allocations: list[BulkAssignmentItem]
+
+
 class TeacherShortResponse(PydanticBase):
     model_config = {"from_attributes": True}
     id: int
@@ -795,7 +808,51 @@ class AssignmentService:
         ).all())
 
     @staticmethod
+    def update(db: Session, assignment_id: int, data: AssignmentRequest, updated_by: int) -> TeacherSubjectAssignment:
+        a = db.scalar(select(TeacherSubjectAssignment).where(TeacherSubjectAssignment.id == assignment_id, TeacherSubjectAssignment.is_deleted == False))
+        if not a:
+            raise HTTPException(status_code=404, detail="Assignment not found.")
+        a.teacher_id = data.teacher_id
+        a.subject_id = data.subject_id
+        a.standard = data.standard
+        a.division = data.division
+        a.periods_per_week = data.periods_per_week
+        a.is_class_teacher = data.is_class_teacher
+        a.updated_by = updated_by
+        db.commit()
+        res = db.scalar(
+            select(TeacherSubjectAssignment)
+            .options(
+                joinedload(TeacherSubjectAssignment.subject),
+                joinedload(TeacherSubjectAssignment.teacher),
+            )
+            .where(TeacherSubjectAssignment.id == a.id)
+        )
+        return res or a
+
+    @staticmethod
+    def bulk_create(db: Session, data: BulkAssignmentRequest, created_by: int) -> list[TeacherSubjectAssignment]:
+        results = []
+        for item in data.allocations:
+            req = AssignmentRequest(
+                teacher_id=item.teacher_id,
+                subject_id=item.subject_id,
+                standard=data.standard,
+                division=data.division,
+                academic_year_id=data.academic_year_id,
+                periods_per_week=item.periods_per_week,
+                is_class_teacher=item.is_class_teacher
+            )
+            try:
+                res = AssignmentService.create(db, req, created_by)
+                results.append(res)
+            except HTTPException:
+                pass
+        return results
+
+    @staticmethod
     def delete(db: Session, assignment_id: int, deleted_by: int) -> None:
         a = db.scalar(select(TeacherSubjectAssignment).where(TeacherSubjectAssignment.id == assignment_id))
         if not a: raise HTTPException(404, "Assignment not found.")
         a.soft_delete(deleted_by=deleted_by); db.commit()
+

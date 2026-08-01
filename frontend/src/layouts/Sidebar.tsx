@@ -165,6 +165,13 @@ export default function Sidebar({
       path: '/timetable',
     },
     {
+      label: 'Subject Assignments',
+      icon: <BookOpen size={18} />,
+      permission: 'timetable.read',
+      path: '/subject-assignments',
+    },
+
+    {
       label: t('nav.homework'),
       icon: <BookOpen size={18} />,
       path: '/homework',

@@ -233,9 +233,23 @@ const timetableService = {
     const res = await api.post('/timetable/assignments', data);
     return res.data.data;
   },
+  async updateAssignment(assignmentId: number, data: {
+    teacher_id: number; subject_id: number; standard: string; division?: string; periods_per_week?: number; is_class_teacher?: boolean; academic_year_id?: number;
+  }): Promise<TeacherAssignment> {
+    const res = await api.put(`/timetable/assignments/${assignmentId}`, data);
+    return res.data.data;
+  },
+  async bulkCreateAssignments(data: {
+    standard: string; division?: string; academic_year_id?: number;
+    allocations: Array<{ teacher_id: number; subject_id: number; periods_per_week?: number; is_class_teacher?: boolean }>;
+  }): Promise<TeacherAssignment[]> {
+    const res = await api.post('/timetable/assignments/bulk', data);
+    return res.data.data;
+  },
   async deleteAssignment(assignmentId: number): Promise<void> {
     await api.delete(`/timetable/assignments/${assignmentId}`);
   },
 };
 
 export default timetableService;
+
