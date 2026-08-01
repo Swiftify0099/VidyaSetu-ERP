@@ -81,6 +81,9 @@ const TeacherPortalPage = lazy(() => import('./pages/portals/TeacherPortalPage')
 // ── Parent Portal ──────────────────────────────────────────────
 const ParentPortalPage  = lazy(() => import('./pages/portals/ParentPortalPage'));
 
+// ── Homework Portal ───────────────────────────────────────────
+const HomeworkPortalPage = lazy(() => import('./pages/homework/HomeworkPortalPage'));
+
 // ── Transport Module (Phase 5) ─────────────────────────────────
 const TransportPage = lazy(() => import('./pages/transport/TransportPage'));
 
@@ -169,6 +172,8 @@ export default function App() {
                     <Route path="/attendance"     element={<RoleGuard allowedRoles={['super_admin','admin','principal','vice_principal','teacher','class_teacher']}><AttendancePage /></RoleGuard>} />
                     {/* Timetable — All staff */}
                     <Route path="/timetable"      element={<TimetablePage />} />
+                    {/* Homework Portal */}
+                    <Route path="/homework"       element={<HomeworkPortalPage />} />
                     {/* Communication — All logged-in */}
                     <Route path="/communication"  element={<CommunicationPage />} />
                     {/* Inventory — Admin / Office Staff */}

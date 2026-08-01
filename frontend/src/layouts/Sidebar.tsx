@@ -165,6 +165,11 @@ export default function Sidebar({
       path: '/timetable',
     },
     {
+      label: t('nav.homework'),
+      icon: <BookOpen size={18} />,
+      path: '/homework',
+    },
+    {
       label: t('nav.leave'),
       icon: <Palmtree size={18} />,
       permission: 'leave.read',

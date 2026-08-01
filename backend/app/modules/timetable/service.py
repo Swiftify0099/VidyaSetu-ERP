@@ -320,14 +320,18 @@ class PeriodService:
 class TimetableService:
     @staticmethod
     def upsert_entry(db: Session, data: TimetableEntryRequest, user_id: int) -> TimetableEntry:
+        if data.division:
+            div_clause = (TimetableEntry.division == data.division)
+        else:
+            div_clause = (TimetableEntry.division.is_(None)) | (TimetableEntry.division == "")
+
         existing = db.scalar(
             select(TimetableEntry).where(
-                TimetableEntry.standard == data.standard,
+                TimetableEntry.standard == str(data.standard),
                 TimetableEntry.academic_year_id == data.academic_year_id,
                 TimetableEntry.day_of_week == data.day_of_week,
                 TimetableEntry.period_id == data.period_id,
-                TimetableEntry.is_deleted == False,
-                *([] if not data.division else [TimetableEntry.division == data.division]),
+                div_clause,
             )
         )
         if existing:
@@ -335,10 +339,18 @@ class TimetableService:
             existing.teacher_id = data.teacher_id
             existing.room = data.room
             existing.notes = data.notes
+            existing.is_deleted = False
+            existing.is_active = True
             existing.updated_by = user_id
-            db.commit(); db.refresh(existing); return existing
+            db.commit()
+            db.refresh(existing)
+            return existing
+
         entry = TimetableEntry(**data.model_dump(), created_by=user_id)
-        db.add(entry); db.commit(); db.refresh(entry); return entry
+        db.add(entry)
+        db.commit()
+        db.refresh(entry)
+        return entry
 
     @staticmethod
     def check_teacher_conflict(db: Session, teacher_id: int, day_of_week: int,

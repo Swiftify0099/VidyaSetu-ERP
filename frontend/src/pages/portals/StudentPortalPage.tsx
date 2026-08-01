@@ -19,6 +19,7 @@ import studentPortalService, {
   type StudentProfile, type AttendanceData,
   type ExamResult, type Notice,
 } from '../../services/studentPortalService';
+import HomeworkPortalPage from '../homework/HomeworkPortalPage';
 import officeService, { type BonafidePrintData } from '../../services/officeService';
 import { BonafideCertificatePrint } from '../../components/office/BonafideCertificatePrint';
 import api from '../../services/api';
@@ -1123,26 +1124,7 @@ export default function StudentPortalPage() {
 
           {/* 4. HOMEWORK */}
           {activeTab === 'homework' && (
-            <div className={styles.card}>
-              <div className={styles.cardHeader}>
-                <h3 className={styles.cardTitle}><BookOpen size={20} color="var(--color-primary)" /> Homework Portal</h3>
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                {homework.map(hw => (
-                  <div key={hw.id} style={{ padding: '16px', background: 'var(--color-surface-2)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--color-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                    <div>
-                      <span className={`${styles.tag} ${styles.tagPrimary}`}>{hw.subject} • {hw.teacher}</span>
-                      <h4 style={{ margin: '8px 0 4px', fontSize: '1rem', fontWeight: 700 }}>{hw.title}</h4>
-                      <p style={{ margin: 0, fontSize: '0.875rem', color: 'var(--color-text-secondary)' }}>{hw.description}</p>
-                      <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginTop: 6 }}>Due: {hw.due_date} | Priority: {hw.priority}</div>
-                    </div>
-                    <button className={styles.primaryBtn} onClick={() => setShowHomeworkModal(hw)}>
-                      {hw.status === 'submitted' ? 'Resubmit' : 'Upload Solution'}
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </div>
+            <HomeworkPortalPage />
           )}
 
           {/* 5. ASSIGNMENTS */}
@@ -2433,28 +2415,213 @@ export default function StudentPortalPage() {
           )}
 
 
-          {/* 20. ANALYTICS */}
+          {/* 20. ACADEMIC ANALYTICS & STUDY PROGRESS */}
           {activeTab === 'analytics' && (
-            <div className={styles.card}>
-              <div className={styles.cardHeader}>
-                <h3 className={styles.cardTitle}><BarChart3 size={20} color="var(--color-primary)" /> Academic Analytics & Study Progress</h3>
+            <div className={styles.analyticsContainer}>
+              {/* Header Title */}
+              <div className={styles.cardHeader} style={{ marginBottom: 0 }}>
+                <h3 className={styles.cardTitle}>
+                  <BarChart3 size={22} color="var(--color-primary)" />
+                  Academic Analytics & Study Progress
+                </h3>
+                <span className={styles.chartSub}>Live Performance & Performance Metrics</span>
               </div>
+
               {analytics && (
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-                  <div className={styles.profileSection}>
-                    <div className={styles.profileSectionTitle}>Study Metrics</div>
-                    <div className={styles.profileField}><span>Homework Completion:</span><strong>{analytics.homework_completion_pct}%</strong></div>
-                    <div className={styles.profileField}><span>Assignment Completion:</span><strong>{analytics.assignment_completion_pct}%</strong></div>
-                    <div className={styles.profileField}><span>Weekly Study Hours:</span><strong>{analytics.weekly_study_hours} hrs</strong></div>
+                <>
+                  {/* KPI Summary Grid */}
+                  <div className={styles.analyticsKpiGrid}>
+                    <div className={styles.analyticsKpiCard} style={{ borderTop: '3.5px solid var(--color-primary)' }}>
+                      <div className={styles.analyticsKpiHeader}>
+                        <span className={styles.analyticsKpiLabel}>Homework Completed</span>
+                        <div className={styles.analyticsKpiIcon}><CheckCircle2 size={20} /></div>
+                      </div>
+                      <div className={styles.analyticsKpiValue}>{analytics.homework_completion_pct ?? 0}%</div>
+                      <span className={styles.chartSub}>Assigned coursework submission rate</span>
+                    </div>
+
+                    <div className={styles.analyticsKpiCard} style={{ borderTop: '3.5px solid var(--color-success)' }}>
+                      <div className={styles.analyticsKpiHeader}>
+                        <span className={styles.analyticsKpiLabel}>Assignment Completion</span>
+                        <div className={styles.analyticsKpiIcon}><ClipboardList size={20} /></div>
+                      </div>
+                      <div className={styles.analyticsKpiValue}>{analytics.assignment_completion_pct ?? 0}%</div>
+                      <span className={styles.chartSub}>Completed project & lab submissions</span>
+                    </div>
+
+                    <div className={styles.analyticsKpiCard} style={{ borderTop: '3.5px solid #8b5cf6' }}>
+                      <div className={styles.analyticsKpiHeader}>
+                        <span className={styles.analyticsKpiLabel}>Weekly Study Time</span>
+                        <div className={styles.analyticsKpiIcon}><Clock size={20} /></div>
+                      </div>
+                      <div className={styles.analyticsKpiValue}>{analytics.weekly_study_hours ?? 0} hrs</div>
+                      <span className={styles.chartSub}>Tracked active learning time / week</span>
+                    </div>
+
+                    <div className={styles.analyticsKpiCard} style={{ borderTop: '3.5px solid var(--color-warning)' }}>
+                      <div className={styles.analyticsKpiHeader}>
+                        <span className={styles.analyticsKpiLabel}>Exam Performance Peak</span>
+                        <div className={styles.analyticsKpiIcon}><Trophy size={20} /></div>
+                      </div>
+                      <div className={styles.analyticsKpiValue}>
+                        {analytics.marks_trend && analytics.marks_trend.length > 0
+                          ? `${Math.max(...analytics.marks_trend.map((m: any) => m.pct))}%`
+                          : 'N/A'}
+                      </div>
+                      <span className={styles.chartSub}>Highest examination score achieved</span>
+                    </div>
                   </div>
-                  <div className={styles.profileSection}>
-                    <div className={styles.profileSectionTitle}>AI Study Recommendation</div>
-                    <p style={{ margin: 0, fontSize: '0.875rem', lineHeight: 1.6, color: 'var(--color-text-secondary)' }}>{analytics.ai_insights}</p>
+
+                  {/* Visual Graphs Row */}
+                  <div className={styles.chartRowGrid}>
+                    {/* Graph 1: Exam Performance Trend */}
+                    <div className={styles.chartCard}>
+                      <div className={styles.chartHeader}>
+                        <h4 className={styles.chartTitle}><Trophy size={18} color="var(--color-primary)" /> Examination Marks Trend</h4>
+                        <span className={styles.chartSub}>Real Exam Performance Over Time</span>
+                      </div>
+
+                      {analytics.marks_trend && analytics.marks_trend.length > 0 ? (
+                        <div className={styles.graphContainer}>
+                          <div className={styles.graphBenchmarkLine}>
+                            <span className={styles.graphBenchmarkLabel}>Target (85%)</span>
+                          </div>
+                          {analytics.marks_trend.map((item: any, idx: number) => {
+                            const val = Number(item.pct) || 0;
+                            const heightPct = Math.min(Math.max(val, 10), 100);
+                            return (
+                              <div key={idx} className={styles.barCol}>
+                                <div className={styles.barValuePill}>{val}%</div>
+                                <div className={styles.barTrack}>
+                                  <div
+                                    className={styles.barFill}
+                                    style={{
+                                      height: `${heightPct}%`,
+                                      background: val >= 85
+                                        ? 'linear-gradient(180deg, #10b981 0%, #059669 100%)'
+                                        : 'linear-gradient(180deg, #2563eb 0%, #1d4ed8 100%)'
+                                    }}
+                                  />
+                                </div>
+                                <span className={styles.barLabel}>{item.exam}</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <div className={styles.emptyState}>No exam performance trends recorded yet.</div>
+                      )}
+                    </div>
+
+                    {/* Graph 2: Monthly Attendance Trend */}
+                    <div className={styles.chartCard}>
+                      <div className={styles.chartHeader}>
+                        <h4 className={styles.chartTitle}><CalendarDays size={18} color="var(--color-success)" /> Attendance Rate Trend</h4>
+                        <span className={styles.chartSub}>Monthly Attendance (%)</span>
+                      </div>
+
+                      {analytics.attendance_trend && analytics.attendance_trend.length > 0 ? (
+                        <div className={styles.graphContainer}>
+                          <div className={styles.graphBenchmarkLine} style={{ top: '25%' }}>
+                            <span className={styles.graphBenchmarkLabel} style={{ color: 'var(--color-success)' }}>Min Threshold (75%)</span>
+                          </div>
+                          {analytics.attendance_trend.map((item: any, idx: number) => {
+                            const val = Number(item.pct) || 0;
+                            const heightPct = Math.min(Math.max(val, 10), 100);
+                            return (
+                              <div key={idx} className={styles.barCol}>
+                                <div className={styles.barValuePill}>{val}%</div>
+                                <div className={styles.barTrack}>
+                                  <div
+                                    className={styles.barFill}
+                                    style={{
+                                      height: `${heightPct}%`,
+                                      background: val >= 90
+                                        ? 'linear-gradient(180deg, #10b981 0%, #047857 100%)'
+                                        : val >= 75
+                                        ? 'linear-gradient(180deg, #3b82f6 0%, #1d4ed8 100%)'
+                                        : 'linear-gradient(180deg, #ef4444 0%, #b91c1c 100%)'
+                                    }}
+                                  />
+                                </div>
+                                <span className={styles.barLabel}>{item.month}</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <div className={styles.emptyState}>No attendance trend data available.</div>
+                      )}
+                    </div>
                   </div>
-                </div>
+
+                  {/* Subject Mastery & AI Study Recommendation Grid */}
+                  <div className={styles.chartRowGrid}>
+                    {/* Strong & Weak Subject Breakdown */}
+                    <div className={styles.chartCard}>
+                      <div className={styles.chartHeader}>
+                        <h4 className={styles.chartTitle}><Target size={18} color="#8b5cf6" /> Subject Mastery Breakdown</h4>
+                        <span className={styles.chartSub}>Strengths & Focus Areas</span>
+                      </div>
+
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                        <div>
+                          <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--color-text-muted)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                            🌟 Strong Subjects (High Proficiency)
+                          </div>
+                          <div className={styles.subjectTagGroup}>
+                            {analytics.strong_subjects && analytics.strong_subjects.length > 0 ? (
+                              analytics.strong_subjects.map((sub: string, i: number) => (
+                                <span key={i} className={styles.strongTag}><Check size={14} /> {sub}</span>
+                              ))
+                            ) : (
+                              <span className={styles.chartSub}>All core subjects performing consistently.</span>
+                            )}
+                          </div>
+                        </div>
+
+                        <div>
+                          <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--color-text-muted)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                            🎯 Needs Focus & Revision
+                          </div>
+                          <div className={styles.subjectTagGroup}>
+                            {analytics.weak_subjects && analytics.weak_subjects.length > 0 ? (
+                              analytics.weak_subjects.map((sub: string, i: number) => (
+                                <span key={i} className={styles.weakTag}><AlertCircle size={14} /> {sub}</span>
+                              ))
+                            ) : (
+                              <span className={styles.chartSub}>No critical weak areas detected.</span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* AI Personal Study Insights Card */}
+                    <div className={styles.insightCard}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <div className={styles.insightIconWrap}>
+                          <Brain size={20} />
+                        </div>
+                        <div>
+                          <div style={{ fontSize: '0.95rem', fontWeight: 800, color: 'var(--color-text-primary)' }}>AI Personal Study Recommendation</div>
+                          <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>Automated Learning Path Insights</div>
+                        </div>
+                      </div>
+                      <p style={{ margin: 0, fontSize: '0.875rem', lineHeight: 1.6, color: 'var(--color-text-secondary)', fontWeight: 500 }}>
+                        {analytics.ai_insights || 'Continue maintaining your study schedule to preserve your strong performance across all subjects.'}
+                      </p>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 'auto', paddingTop: 8 }}>
+                        <Sparkles size={16} color="var(--color-primary)" />
+                        <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--color-primary)' }}>Updated live based on real classroom assessments</span>
+                      </div>
+                    </div>
+                  </div>
+                </>
               )}
             </div>
           )}
+
 
           {/* 21. ID CARD */}
           {activeTab === 'idcard' && (

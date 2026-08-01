@@ -13,16 +13,17 @@
     align-items: center;
     justify-content: space-around;
     position: fixed;
-    bottom: 0;
-    left: 0;
-    right: 0;
+    bottom: var(--space-3);
+    left: var(--space-3);
+    right: var(--space-3);
     height: var(--bottom-nav-height, 64px);
-    background: color-mix(in srgb, var(--color-surface) 88%, transparent);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
-    border-top: 1px solid var(--color-border);
-    box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.08);
-    z-index: calc(var(--z-fixed, 100) + 10);
+    background: var(--glass-bg);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-2xl);
+    box-shadow: 0 12px 32px rgba(15, 23, 42, 0.15);
+    z-index: calc(var(--z-sidebar) + 10);
     padding: 0 var(--space-2);
   }
 }
@@ -40,7 +41,7 @@
   color: var(--color-text-muted);
   text-decoration: none;
   font-family: var(--font-family);
-  font-size: 10px;
+  font-size: 11px;
   font-weight: var(--font-weight-medium);
   cursor: pointer;
   position: relative;
@@ -57,7 +58,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
+  width: 36px;
   height: 32px;
   border-radius: var(--radius-full);
   transition: all var(--transition-fast);
@@ -80,12 +81,12 @@
 
 .activeIndicator {
   position: absolute;
-  top: 0;
-  width: 24px;
+  top: 4px;
+  width: 20px;
   height: 3px;
   background: var(--color-primary);
-  border-radius: 0 0 3px 3px;
-  animation: slideUp 0.2s ease;
+  border-radius: var(--radius-full);
+  animation: fadeIn 0.2s ease;
 }
 
 .menuBadge {
@@ -98,3 +99,4 @@
   background: var(--color-danger);
   border: 1.5px solid var(--color-surface);
 }
+

@@ -17,7 +17,11 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from typing import TYPE_CHECKING
 from app.database.base import BaseModel
+
+if TYPE_CHECKING:
+    from app.modules.student.models import Student
 
 
 class FeeCategory(BaseModel):

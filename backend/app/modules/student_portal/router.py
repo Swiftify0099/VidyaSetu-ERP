@@ -1297,6 +1297,43 @@ class AssignmentSubmitRequest(PydanticBase):
     attachment_url: Optional[str] = None
 
 
+_HOMEWORK_SUBMISSIONS: dict[int, list[dict]] = {
+    102: [
+        {
+            "id": 1,
+            "homework_id": 102,
+            "student_id": 1,
+            "student_name": "Aarav Sharma",
+            "gr_number": "GR-2024-001",
+            "roll_number": "12",
+            "submitted_at": "2026-07-24T14:30:00",
+            "submission_text": "Completed the lab observation report on displacement reaction of CuSO4 and Fe nails. Diagrams attached.",
+            "attachment_url": "/downloads/chem_lab_spec.pdf",
+            "status": "submitted",
+            "marks_obtained": None,
+            "max_marks": 20,
+            "teacher_remarks": "Well presented diagrams.",
+        }
+    ],
+    103: [
+        {
+            "id": 2,
+            "homework_id": 103,
+            "student_id": 1,
+            "student_name": "Aarav Sharma",
+            "gr_number": "GR-2024-001",
+            "roll_number": "12",
+            "submitted_at": "2026-07-22T09:15:00",
+            "submission_text": "Essay on Solar & Wind Energy in India with advantages and future prospects.",
+            "attachment_url": None,
+            "status": "evaluated",
+            "marks_obtained": 18,
+            "max_marks": 20,
+            "teacher_remarks": "Excellent vocabulary and structure.",
+        }
+    ]
+}
+
 _HOMEWORK_STORE: list[dict] = [
     {
         "id": 101,
@@ -1304,11 +1341,13 @@ _HOMEWORK_STORE: list[dict] = [
         "division": "A",
         "subject": "Mathematics",
         "title": "Quadratic Equations Exercise 3.2",
-        "description": "Complete Questions 1 to 10 from Chapter 3.",
+        "description": "Complete Questions 1 to 10 from Chapter 3. Solve step by step using factorization or quadratic formula.",
+        "instructions": "Use standard notebook. Scanned copy or typed solutions are accepted.",
         "teacher": "Prof. S. R. Patil",
         "assigned_date": "2026-07-22",
         "due_date": "2026-08-05",
         "priority": "High",
+        "max_marks": 20,
         "status": "pending",
         "attachment_url": "/downloads/math_ex3_2.pdf",
         "teacher_remarks": "Show step-by-step working for partial marks.",
@@ -1322,10 +1361,12 @@ _HOMEWORK_STORE: list[dict] = [
         "subject": "Science & Tech",
         "title": "Chemical Reactions Lab Report",
         "description": "Write a 2-page observation report on displacement reaction experiment.",
+        "instructions": "Include chemical equations, observations, and safety precautions.",
         "teacher": "Mrs. A. V. Deshmukh",
         "assigned_date": "2026-07-20",
         "due_date": "2026-08-03",
         "priority": "Medium",
+        "max_marks": 20,
         "status": "submitted",
         "attachment_url": "/downloads/chem_lab_spec.pdf",
         "teacher_remarks": "Well presented diagrams.",
@@ -1338,11 +1379,13 @@ _HOMEWORK_STORE: list[dict] = [
         "division": "A",
         "subject": "English Grammar",
         "title": "Essay on Renewable Energy",
-        "description": "Write 250 words on solar and wind energy advantages.",
+        "description": "Write 250 words on solar and wind energy advantages in India.",
+        "instructions": "Maintain proper intro, body paragraphs, and conclusion.",
         "teacher": "Mr. K. N. Shinde",
         "assigned_date": "2026-07-18",
         "due_date": "2026-08-01",
         "priority": "Normal",
+        "max_marks": 20,
         "status": "evaluated",
         "marks": "18/20",
         "attachment_url": None,
@@ -1365,11 +1408,46 @@ def get_my_homework(current_user: AuthUser, db: DBSession):
     return APIResponse.ok(data={"homework": items, "standard": student.standard})
 
 
-
 @router.post("/homework/submit", response_model=APIResponse)
 def submit_homework(body: HomeworkSubmitRequest, current_user: AuthUser, db: DBSession):
     """Submit or resubmit homework."""
     student = _get_student(db, current_user)
+    now_str = datetime.now().isoformat()
+    
+    # Update main store item
+    hw_item = next((h for h in _HOMEWORK_STORE if h["id"] == body.homework_id), None)
+    if hw_item:
+        hw_item["status"] = "submitted"
+        hw_item["submitted_at"] = now_str
+        hw_item["submission_text"] = body.submission_text
+        if body.attachment_url:
+            hw_item["submission_attachment_url"] = body.attachment_url
+
+    # Save to submissions dict
+    subs = _HOMEWORK_SUBMISSIONS.setdefault(body.homework_id, [])
+    existing = next((s for s in subs if s.get("student_id") == (student.id if hasattr(student, 'id') else 1)), None)
+    if existing:
+        existing["submission_text"] = body.submission_text
+        existing["attachment_url"] = body.attachment_url
+        existing["submitted_at"] = now_str
+        existing["status"] = "submitted"
+    else:
+        subs.append({
+            "id": len(subs) + 1,
+            "homework_id": body.homework_id,
+            "student_id": getattr(student, "id", 1),
+            "student_name": getattr(student, "full_name", f"Student #{student.gr_number}"),
+            "gr_number": getattr(student, "gr_number", "GR-101"),
+            "roll_number": str(getattr(student, "roll_number", "12")),
+            "submitted_at": now_str,
+            "submission_text": body.submission_text,
+            "attachment_url": body.attachment_url,
+            "status": "submitted",
+            "marks_obtained": None,
+            "max_marks": hw_item.get("max_marks", 20) if hw_item else 20,
+            "teacher_remarks": None,
+        })
+
     from app.shared.audit import AuditService
     AuditService.log(
         db, action="HOMEWORK_SUBMITTED", module="student_portal",

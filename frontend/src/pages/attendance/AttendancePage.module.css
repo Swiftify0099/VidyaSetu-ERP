@@ -1,6 +1,6 @@
-.page { display: flex; flex-direction: column; gap: var(--space-4); }
+.page { display: flex; flex-direction: column; gap: var(--space-5); }
 .pageHeader { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-4); flex-wrap: wrap; }
-.pageTitle { font-size: var(--font-size-xl); font-weight: var(--font-weight-bold); color: var(--color-text-primary); }
+.pageTitle { font-size: var(--font-size-xl); font-weight: var(--font-weight-bold); color: var(--color-text-primary); letter-spacing: -0.015em; }
 .pageSub { font-size: var(--font-size-sm); color: var(--color-text-muted); }
 .todayBadge { height: 36px; padding: 0 var(--space-4); border: 1.5px solid var(--color-border); border-radius: var(--radius-full); display: flex; align-items: center; gap: var(--space-2); font-size: var(--font-size-sm); color: var(--color-text-secondary); background: var(--color-surface); }
 
@@ -19,6 +19,8 @@
   border: 1px solid color-mix(in srgb, var(--color-primary) 25%, transparent);
   border-radius: var(--radius-2xl); padding: var(--space-6) var(--space-8);
   display: flex; align-items: center; gap: var(--space-8); flex-wrap: wrap;
+  box-shadow: var(--shadow-sm);
+  backdrop-filter: blur(8px);
 }
 .todayBannerLeft { flex: 1; }
 .todayBannerTitle { font-size: var(--font-size-lg); font-weight: var(--font-weight-bold); color: var(--color-text-primary); }
@@ -38,10 +40,10 @@
 
 /* KPI */
 .kpiGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: var(--space-4); }
-.kpiCard { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-xl); padding: var(--space-5); display: flex; flex-direction: column; gap: var(--space-2); position: relative; overflow: hidden; transition: all var(--transition-base); }
+.kpiCard { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-xl); padding: var(--space-5); display: flex; flex-direction: column; gap: var(--space-3); position: relative; overflow: hidden; transition: all var(--transition-base); box-shadow: var(--shadow-xs); }
 .kpiCard::before { content:''; position:absolute; top:0; left:0; right:0; height:3px; background:var(--kc); }
 .kpiClickable { cursor: pointer; }
-.kpiClickable:hover { transform: translateY(-3px); box-shadow: var(--shadow-xl); }
+.kpiClickable:hover { transform: translateY(-3px); box-shadow: var(--shadow-card-hover); }
 .kpiIcon { display:flex; }
 .kpiVal { font-size: var(--font-size-3xl, 2rem); font-weight: var(--font-weight-bold); color: var(--color-text-primary); }
 .kpiLabel { font-size: var(--font-size-sm); font-weight: var(--font-weight-semibold); color: var(--color-text-primary); }

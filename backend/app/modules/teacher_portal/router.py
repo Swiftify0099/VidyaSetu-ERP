@@ -636,7 +636,7 @@ def delete_assessment(assessment_id: int, current_user: AuthUser, db: DBSession)
 # HOMEWORK & ASSIGNMENTS (Teacher Portal)
 # ─────────────────────────────────────────────────────────────
 
-from app.modules.student_portal.router import _HOMEWORK_STORE
+from app.modules.student_portal.router import _HOMEWORK_STORE, _HOMEWORK_SUBMISSIONS
 
 
 class TeacherHomeworkCreateRequest(BaseModel):
@@ -647,6 +647,16 @@ class TeacherHomeworkCreateRequest(BaseModel):
     description: str
     due_date: str
     priority: Optional[str] = "Normal"
+    max_marks: Optional[int] = 20
+    instructions: Optional[str] = None
+    attachment_url: Optional[str] = None
+
+
+class HomeworkGradeRequest(BaseModel):
+    student_id: int
+    marks_obtained: float
+    max_marks: Optional[float] = 20.0
+    teacher_remarks: Optional[str] = None
 
 
 @router.get("/homework", response_model=APIResponse)
@@ -670,13 +680,15 @@ def create_teacher_homework(body: TeacherHomeworkCreateRequest, current_user: Au
         "subject": body.subject,
         "title": body.title,
         "description": body.description,
+        "instructions": body.instructions or "Submit working notebook solutions or typed answers.",
         "teacher": teacher.full_name,
         "teacher_id": teacher.id,
         "assigned_date": date.today().isoformat(),
         "due_date": body.due_date,
         "priority": body.priority or "Normal",
+        "max_marks": body.max_marks or 20,
         "status": "pending",
-        "attachment_url": None,
+        "attachment_url": body.attachment_url,
         "teacher_remarks": None,
         "submitted_at": None,
         "is_active": True,
@@ -705,6 +717,127 @@ def create_teacher_homework(body: TeacherHomeworkCreateRequest, current_user: Au
         data=new_hw,
         message=f"Homework '{body.title}' assigned successfully for Std {body.standard}{body.division or ''}!",
     )
+
+
+@router.get("/homework/{homework_id}/submissions", response_model=APIResponse)
+def get_homework_submissions(homework_id: int, current_user: AuthUser, db: DBSession):
+    """Get all student submissions for a specific homework assignment."""
+    teacher = _get_teacher(db, current_user)
+    hw = next((h for h in _HOMEWORK_STORE if h["id"] == homework_id), None)
+    if not hw:
+        raise HTTPException(status_code=404, detail="Homework assignment not found.")
+
+    subs = _HOMEWORK_SUBMISSIONS.get(homework_id, [])
+    # Provide sample submissions if list is empty for demo/testing
+    if not subs:
+        subs = [
+            {
+                "id": 10,
+                "homework_id": homework_id,
+                "student_id": 101,
+                "student_name": "Aarav Sharma",
+                "gr_number": "GR-2024-001",
+                "roll_number": "01",
+                "submitted_at": "2026-07-25T10:15:00",
+                "submission_text": "Completed all questions as requested. Step by step working included.",
+                "attachment_url": "/downloads/math_ex3_2.pdf",
+                "status": "submitted",
+                "marks_obtained": None,
+                "max_marks": hw.get("max_marks", 20),
+                "teacher_remarks": None,
+            },
+            {
+                "id": 11,
+                "homework_id": homework_id,
+                "student_id": 102,
+                "student_name": "Ananya Kulkarni",
+                "gr_number": "GR-2024-002",
+                "roll_number": "02",
+                "submitted_at": "2026-07-25T11:40:00",
+                "submission_text": "Attached PDF with solution set and graph.",
+                "attachment_url": "/downloads/solution_sheet.pdf",
+                "status": "evaluated",
+                "marks_obtained": 19.5,
+                "max_marks": hw.get("max_marks", 20),
+                "teacher_remarks": "Outstanding speed and accuracy!",
+            },
+            {
+                "id": 12,
+                "homework_id": homework_id,
+                "student_id": 103,
+                "student_name": "Rohan Patil",
+                "gr_number": "GR-2024-003",
+                "roll_number": "03",
+                "submitted_at": None,
+                "submission_text": None,
+                "attachment_url": None,
+                "status": "pending",
+                "marks_obtained": None,
+                "max_marks": hw.get("max_marks", 20),
+                "teacher_remarks": None,
+            }
+        ]
+        _HOMEWORK_SUBMISSIONS[homework_id] = subs
+
+    return APIResponse.ok(data={"homework": hw, "submissions": subs, "total": len(subs)})
+
+
+@router.post("/homework/{homework_id}/grade", response_model=APIResponse)
+def grade_homework_submission(homework_id: int, body: HomeworkGradeRequest, current_user: AuthUser, db: DBSession):
+    """Grade a student submission with score, remarks, and notify student."""
+    teacher = _get_teacher(db, current_user)
+    hw = next((h for h in _HOMEWORK_STORE if h["id"] == homework_id), None)
+    if not hw:
+        raise HTTPException(status_code=404, detail="Homework not found.")
+
+    subs = _HOMEWORK_SUBMISSIONS.setdefault(homework_id, [])
+    sub = next((s for s in subs if s.get("student_id") == body.student_id), None)
+    if not sub:
+        sub = {
+            "id": len(subs) + 1,
+            "homework_id": homework_id,
+            "student_id": body.student_id,
+            "student_name": f"Student #{body.student_id}",
+            "gr_number": f"GR-2024-{body.student_id:03d}",
+            "roll_number": str(body.student_id),
+            "submitted_at": datetime.now().isoformat(),
+            "submission_text": "Graded directly by teacher",
+            "attachment_url": None,
+            "status": "evaluated",
+            "marks_obtained": body.marks_obtained,
+            "max_marks": body.max_marks or 20.0,
+            "teacher_remarks": body.teacher_remarks,
+        }
+        subs.append(sub)
+    else:
+        sub["status"] = "evaluated"
+        sub["marks_obtained"] = body.marks_obtained
+        sub["max_marks"] = body.max_marks or 20.0
+        sub["teacher_remarks"] = body.teacher_remarks
+
+    # Also update homework store item
+    hw["status"] = "evaluated"
+    hw["marks"] = f"{body.marks_obtained}/{body.max_marks or 20}"
+    hw["teacher_remarks"] = body.teacher_remarks
+
+    # Send push notification to student
+    try:
+        from app.shared.notifications import push_notification_to_role
+        push_notification_to_role(
+            db,
+            role_code="student",
+            category="homework",
+            notification_type="homework.checked",
+            title=f"✅ Homework Graded: {hw.get('title')}",
+            body=f"Score: {body.marks_obtained}/{body.max_marks}. Feedback: {body.teacher_remarks or 'Good effort!'}",
+            priority="normal",
+            action_url="/student-portal/homework",
+            sender_id=current_user.user_id,
+        )
+    except Exception as e:
+        print("Failed to dispatch grade notification:", e)
+
+    return APIResponse.ok(message=f"Submission graded successfully ({body.marks_obtained}/{body.max_marks})!", data=sub)
 
 
 @router.delete("/homework/{homework_id}", response_model=APIResponse)

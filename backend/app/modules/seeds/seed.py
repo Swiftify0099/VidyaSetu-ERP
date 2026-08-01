@@ -812,7 +812,284 @@ def seed_database(db: Session) -> None:
     # ── Timetable Seeding ─────────────────────────────────────────
     seed_timetable(db)
 
+    # ── Real Analytics Demo Data Seeding ──────────────────────────
+    seed_analytics_demo_data(db)
+
     db.commit()
+
+def seed_analytics_demo_data(db: Session):
+    """Seed comprehensive ERP demonstration data for real analytics."""
+    from app.modules.student.models import Student
+    from app.modules.teacher.models import Teacher
+    from app.modules.attendance.models import StudentAttendance, MonthlyAttendanceSummary
+    from app.modules.finance.models import FeeCategory, FeeStructure, StudentFeeRecord, FeePayment
+    from app.modules.library.models import Book, BookIssue
+    from app.modules.inventory.models import Asset, StockItem, MaintenanceRecord
+    from decimal import Decimal
+    from datetime import date, timedelta
+    import random
+
+    print("  [8/8] Seeding rich school-wide analytics demo data...")
+
+    # 1. Seed more students across standards (1 to 10)
+    existing_students_count = db.query(Student).count()
+    if existing_students_count < 30:
+        names = [
+            ("Aarav", "Patil", "male", "1", "A"),
+            ("Ananya", "Deshmukh", "female", "1", "A"),
+            ("Aditya", "Kulkarni", "male", "2", "A"),
+            ("Isha", "Jadhav", "female", "2", "B"),
+            ("Rohan", "Pawar", "male", "3", "A"),
+            ("Saniya", "More", "female", "3", "B"),
+            ("Kabir", "Shinde", "male", "5", "A"),
+            ("Diya", "Chavan", "female", "5", "A"),
+            ("Tanmay", "Gaikwad", "male", "8", "A"),
+            ("Neha", "Bhosale", "female", "8", "B"),
+            ("Pranav", "Mane", "male", "9", "A"),
+            ("Shruti", "Suryavanshi", "female", "9", "A"),
+            ("Siddharth", "Joshi", "male", "10", "A"),
+            ("Pooja", "Kamble", "female", "10", "B"),
+            ("Varun", "Thorat", "male", "10", "A"),
+            ("Riya", "Nimbalkar", "female", "10", "B"),
+            ("Yash", "Salunkhe", "male", "5", "B"),
+            ("Sakshi", "Giri", "female", "8", "A"),
+            ("Atharva", "Sawant", "male", "9", "B"),
+            ("Anushri", "Kadam", "female", "9", "B"),
+            ("Soham", "Kharat", "male", "6", "A"),
+            ("Tanvi", "Parab", "female", "6", "B"),
+            ("Omkar", "Ghadge", "male", "7", "A"),
+            ("Avani", "Rane", "female", "7", "B"),
+        ]
+        for idx, (fn, ln, g, std, div) in enumerate(names, start=existing_students_count + 1):
+            gr_num = f"GR{idx:03d}"
+            adm_num = f"ADM{idx:03d}"
+            st_obj = Student(
+                gr_number=gr_num,
+                admission_number=adm_num,
+                full_name=f"{fn} {ln}",
+                full_name_marathi=f"{fn} {ln}",
+                first_name=fn,
+                last_name=ln,
+                academic_year_id=1,
+                standard=std,
+                division=div,
+                roll_number=idx,
+                dob=date(2012, 1, 1),
+                gender=g,
+                blood_group="B+",
+                father_name=f"Father of {fn}",
+                mother_name_full=f"Mother of {fn}",
+                mobile=f"9822{idx:06d}",
+                address_line1="School Campus",
+                district="Pune",
+                state="Maharashtra",
+                status="active",
+            )
+            db.add(st_obj)
+        db.flush()
+        print("        [OK] Seeded 24 additional students across Standards 1-10.")
+
+    all_students = db.query(Student).all()
+
+    # 2. Seed Monthly Attendance Summary & Daily Attendance
+    existing_monthly_att = db.query(MonthlyAttendanceSummary).first()
+    if not existing_monthly_att and all_students:
+        for st in all_students:
+            # 88% to 96% attendance
+            w_days = 22
+            p_days = random.randint(18, 22)
+            db.add(MonthlyAttendanceSummary(
+                student_id=st.id,
+                academic_year_id=1,
+                year=2026,
+                month=7,
+                working_days=w_days,
+                present_days=p_days,
+                absent_days=w_days - p_days,
+                attendance_percentage=Decimal(str(round(p_days / w_days * 100, 2))),
+            ))
+            # Seed daily attendance for all students across recent dates
+            for d_offset in range(10):
+                att_date = date.today() - timedelta(days=d_offset)
+                exists = db.query(StudentAttendance).filter(
+                    StudentAttendance.student_id == st.id,
+                    StudentAttendance.date == att_date,
+                    StudentAttendance.period == "full_day"
+                ).first()
+                if not exists:
+                    st_status = "present" if (st.id + d_offset) % 9 != 0 else "absent"
+                    db.add(StudentAttendance(
+                        student_id=st.id,
+                        date=att_date,
+                        standard=st.standard,
+                        division=st.division,
+                        academic_year_id=1,
+                        period="full_day",
+                        status=st_status,
+                    ))
+        db.flush()
+        print("        [OK] Seeded student monthly summaries and daily attendance logs.")
+
+    # 3. Seed Fee Categories, Fee Structures, Student Fee Ledgers & Payments
+    cat_tuition = db.query(FeeCategory).filter(FeeCategory.name == "Tuition Fee").first()
+    if not cat_tuition:
+        cat_tuition = FeeCategory(name="Tuition Fee", description="Annual academic tuition fee", is_mandatory=True, is_recurring=True)
+        cat_lib = FeeCategory(name="Library & IT Fee", description="Library access & computer lab fees", is_mandatory=True, is_recurring=True)
+        db.add_all([cat_tuition, cat_lib])
+        db.flush()
+
+        for std in range(1, 11):
+            db.add(FeeStructure(academic_year_id=1, standard=str(std), category_id=cat_tuition.id, amount=Decimal("15000.00")))
+            db.add(FeeStructure(academic_year_id=1, standard=str(std), category_id=cat_lib.id, amount=Decimal("3000.00")))
+        db.flush()
+        print("        [OK] Seeded fee categories & fee structures.")
+
+    existing_fee_rec = db.query(StudentFeeRecord).first()
+    if not existing_fee_rec and all_students and cat_tuition:
+        receipt_counter = 1001
+        for st in all_students:
+            fee_due = Decimal("18000.00")
+            fee_paid = Decimal("14400.00") if st.id % 4 != 0 else Decimal("9000.00")
+            rec = StudentFeeRecord(
+                student_id=st.id,
+                academic_year_id=1,
+                category_id=cat_tuition.id,
+                amount_due=fee_due,
+                amount_paid=fee_paid,
+                status="partial" if fee_paid < fee_due else "paid",
+            )
+            db.add(rec)
+            db.flush()
+
+            # Payments distributed across months Jan - Aug
+            m = (st.id % 7) + 1
+            db.add(FeePayment(
+                receipt_number=f"RCP2026-{receipt_counter}",
+                student_id=st.id,
+                academic_year_id=1,
+                payment_date=date(2026, m, 10),
+                payment_mode="online" if st.id % 2 == 0 else "cash",
+                amount=fee_paid,
+                total_received=fee_paid,
+                fee_record_id=rec.id,
+            ))
+            receipt_counter += 1
+        db.flush()
+        print("        [OK] Seeded student fee records and monthly payments.")
+
+    # 4. Seed Library Catalog & Issues
+    from app.modules.library.models import Book, BookIssue, LibraryMember
+    lib_members = []
+    for st in all_students:
+        lm = db.query(LibraryMember).filter(LibraryMember.reference_id == st.id, LibraryMember.member_type == "student").first()
+        if not lm:
+            lm = LibraryMember(
+                member_id=f"LIB-STU-{st.id:04d}",
+                member_type="student",
+                reference_id=st.id,
+                full_name=st.full_name,
+                standard=st.standard,
+                division=st.division,
+                mobile=st.mobile,
+                membership_date=date(2025, 6, 1),
+            )
+            db.add(lm)
+            db.flush()
+        lib_members.append(lm)
+
+    existing_book = db.query(Book).first()
+    if not existing_book:
+        books_data = [
+            ("Wings of Fire", "Dr. A.P.J. Abdul Kalam", "Science / Biography", 10),
+            ("Shyamchi Aai (श्यामची आई)", "Sane Guruji", "Marathi Literature", 15),
+            ("Brief Answers to Big Questions", "Stephen Hawking", "Science", 8),
+            ("Discovery of India", "Jawaharlal Nehru", "History", 12),
+            ("The Story of My Experiments with Truth", "M. K. Gandhi", "Biography", 10),
+            ("Ignited Minds", "Dr. A.P.J. Abdul Kalam", "Motivation", 7),
+            ("Yayati (ययाती)", "V. S. Khandekar", "Marathi Literature", 14),
+            ("General Science Standards 8-10 Guide", "State Board", "Academics", 20),
+            ("Higher Mathematics for Schools", "R. D. Sharma", "Mathematics", 15),
+            ("English Grammar & Composition", "Wren & Martin", "Languages", 18),
+        ]
+        for idx, (title, author, cat, qty) in enumerate(books_data, start=1):
+            b_obj = Book(
+                isbn=f"978-81-7000-{idx:03d}",
+                accession_number=f"ACC-{idx:04d}",
+                title=title,
+                edition="1st",
+                total_copies=qty,
+                available_copies=qty - 2,
+                language="Marathi" if "आई" in title or "ययाती" in title else "English",
+            )
+            db.add(b_obj)
+        db.flush()
+
+        books_list = db.query(Book).all()
+        for idx, b in enumerate(books_list[:5]):
+            lm = lib_members[idx % len(lib_members)] if lib_members else None
+            if lm:
+                issue_date = date.today() - timedelta(days=10 + idx * 2)
+                due_date = issue_date + timedelta(days=14)
+                is_overdue = due_date < date.today()
+                db.add(BookIssue(
+                    issue_number=f"ISS-{100+idx}",
+                    book_id=b.id,
+                    member_id=lm.id,
+                    issue_date=issue_date,
+                    due_date=due_date,
+                    return_date=None,
+                    status="overdue" if is_overdue else "issued",
+                ))
+        db.flush()
+        print("        [OK] Seeded library books catalog and active issued/overdue books.")
+
+    # 5. Seed Inventory & Assets & Stock Items
+    existing_asset = db.query(Asset).filter(Asset.name != "Dell Latitude Laptop").first()
+    if not existing_asset:
+        assets_data = [
+            ("Dell OptiPlex Desktop Computers (Computer Lab)", "Dell", "OptiPlex 3080", Decimal("450000.00"), "active"),
+            ("Epson iProjection Classroom LCD Projectors", "Epson", "EB-E01", Decimal("120000.00"), "active"),
+            ("Interactive Smart Whiteboard 75 inch", "Promethean", "AP7", Decimal("180000.00"), "active"),
+            ("Physics Lab Oscilloscope & Signal Generator", "Rigol", "DS1054Z", Decimal("65000.00"), "in_repair"),
+            ("Chemistry Fume Hood & Distillation Unit", "Lab Tech", "LT-FH20", Decimal("85000.00"), "maintenance"),
+            ("School Transport Bus 40-Seater", "Tata Motors", "Starbus", Decimal("1850000.00"), "active"),
+        ]
+        for idx, (name, brand, model, price, st) in enumerate(assets_data, start=1):
+            db.add(Asset(
+                asset_code=f"AST-2026-{idx:03d}",
+                name=name,
+                brand=brand,
+                model_number=model,
+                purchase_date=date(2025, 4, 1),
+                purchase_price=price,
+                status=st,
+                condition="Good" if st == "active" else "Requires Maintenance",
+            ))
+        db.flush()
+        print("        [OK] Seeded school infrastructure assets.")
+
+    existing_stock = db.query(StockItem).first()
+    if not existing_stock:
+        stock_data = [
+            ("Whiteboard Marker Pen Boxes (Black/Blue)", "Stationery", 12, 15, Decimal("250.00")),   # Low Stock!
+            ("A4 Size Examination Answer Booklet Reams", "Stationery", 8, 20, Decimal("1400.00")),   # Low Stock!
+            ("Dustless Chalk Box White (100 Pcs)", "Stationery", 45, 10, Decimal("80.00")),
+            ("Practical Science Lab Chemicals Kit", "Lab Supplies", 3, 5, Decimal("3500.00")),        # Low Stock!
+            ("Student Identity Card Lamination Pockets", "Office", 500, 100, Decimal("5.00")),
+        ]
+        for idx, (name, cat, cur, mini, cost) in enumerate(stock_data, start=1):
+            db.add(StockItem(
+                item_code=f"STK-{idx:03d}",
+                name=name,
+                category=cat,
+                unit="box/ream/kit",
+                current_stock=cur,
+                minimum_stock=mini,
+                unit_cost=cost,
+            ))
+        db.flush()
+        print("        [OK] Seeded stock consumable items (with low-stock alerts).")
+
 
 def seed_timetable(db: Session):
     from app.modules.timetable.models import Subject, PeriodConfig, TimetableEntry, TeacherSubjectAssignment

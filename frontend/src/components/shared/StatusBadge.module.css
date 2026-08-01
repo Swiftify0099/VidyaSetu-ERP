@@ -1,22 +1,24 @@
 .badge {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  border-radius: 999px;
-  font-weight: 600;
-  letter-spacing: 0.03em;
+  gap: 6px;
+  border-radius: var(--radius-full);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.02em;
   white-space: nowrap;
   line-height: 1;
+  border: 1px solid transparent;
+  transition: all var(--transition-fast);
 }
 
 /* Sizes */
 .md {
   padding: 4px 10px;
-  font-size: 0.75rem;
+  font-size: var(--font-size-xs);
 }
 
 .sm {
-  padding: 2px 7px;
+  padding: 2px 8px;
   font-size: 0.7rem;
 }
 
@@ -27,45 +29,43 @@
   border-radius: 50%;
   background: currentColor;
   flex-shrink: 0;
+  box-shadow: 0 0 4px currentColor;
 }
 
 /* Variants */
 .success {
-  background: #d1fae5;
-  color: #065f46;
+  background: var(--color-success-light);
+  color: var(--color-success-dark);
+  border-color: var(--color-success-border);
 }
 
 .warning {
-  background: #fef3c7;
-  color: #92400e;
+  background: var(--color-warning-light);
+  color: var(--color-warning-dark);
+  border-color: var(--color-warning-border);
 }
 
 .danger {
-  background: #fee2e2;
-  color: #991b1b;
+  background: var(--color-danger-light);
+  color: var(--color-danger-dark);
+  border-color: var(--color-danger-border);
 }
 
 .info {
-  background: #dbeafe;
-  color: #1e40af;
+  background: var(--color-info-light);
+  color: var(--color-info-dark);
+  border-color: var(--color-info-border);
 }
 
 .primary {
-  background: #ede9fe;
-  color: #4c1d95;
+  background: var(--color-primary-light);
+  color: var(--color-primary-dark);
+  border-color: var(--color-primary-subtle);
 }
 
 .neutral {
-  background: #f3f4f6;
-  color: #374151;
+  background: var(--color-surface-2);
+  color: var(--color-text-secondary);
+  border-color: var(--color-border);
 }
 
-/* Dark mode */
-@media (prefers-color-scheme: dark) {
-  .success { background: rgba(16,185,129,0.15); color: #6ee7b7; }
-  .warning { background: rgba(245,158,11,0.15); color: #fcd34d; }
-  .danger  { background: rgba(239,68,68,0.15);  color: #fca5a5; }
-  .info    { background: rgba(59,130,246,0.15);  color: #93c5fd; }
-  .primary { background: rgba(139,92,246,0.15);  color: #c4b5fd; }
-  .neutral { background: rgba(107,114,128,0.15); color: #d1d5db; }
-}

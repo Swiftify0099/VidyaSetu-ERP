@@ -13,8 +13,9 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../../services/api';
-import styles from './TeacherPortalPage.module.css';
 import { TeacherDashboardHero } from '../../components/teacher/dashboard/TeacherDashboardHero';
+import HomeworkPortalPage from '../homework/HomeworkPortalPage';
+import styles from './TeacherPortalPage.module.css';
 
 type Tab = 'dashboard' | 'timetable' | 'students' | 'attendance' | 'notices' | 'leaves' | 'profile' | 'homework' | 'materials' | 'videos' | 'marks' | 'ai_tools' | 'assessments';
 
@@ -733,35 +734,7 @@ export default function TeacherPortalPage() {
 
       {/* 8. HOMEWORK */}
       {tab === 'homework' && (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-5)' }}>
-          <div className={styles.card}>
-            <div className={styles.cardHeader}>
-              <h3 className={styles.cardTitle}><BookOpen size={18} color="var(--color-primary)" /> Assign Homework</h3>
-            </div>
-            <form onSubmit={handleAddHomework} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
-              {[['Standard', 'standard', 'number'], ['Division', 'division', 'text'], ['Subject', 'subject', 'text'], ['Title', 'title', 'text'], ['Due Date', 'due_date', 'date']].map(([lbl, key, type]) => (
-                <div key={key} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                  <label style={{ fontSize: 'var(--font-size-xs)', fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>{lbl}</label>
-                  <input type={type} className={styles.inputField} value={(hwForm as any)[key]} onChange={e => setHwForm(f => ({ ...f, [key]: e.target.value }))} required />
-                </div>
-              ))}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                <label style={{ fontSize: 'var(--font-size-xs)', fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>Description</label>
-                <textarea className={styles.inputField} style={{ minHeight: 80, resize: 'vertical' }} value={hwForm.description} onChange={e => setHwForm(f => ({ ...f, description: e.target.value }))} />
-              </div>
-              <button type="submit" className={styles.primaryBtn} disabled={savingHw}>{savingHw ? 'Assigning...' : 'Assign Homework'}</button>
-            </form>
-          </div>
-          <div className={styles.card}>
-            <div className={styles.cardHeader}><h3 className={styles.cardTitle}>Recent Homework</h3></div>
-            {homeworkList.length === 0 ? <p style={{ color: 'var(--color-text-muted)', textAlign: 'center', padding: 'var(--space-8)' }}>No homework assigned yet</p> : homeworkList.map((hw: any) => (
-              <div key={hw.id} style={{ padding: 'var(--space-3)', background: 'var(--color-surface-2)', borderRadius: 'var(--radius-md)', marginBottom: 'var(--space-2)', border: '1px solid var(--color-border)' }}>
-                <div style={{ fontWeight: 600, fontSize: 'var(--font-size-sm)' }}>{hw.title}</div>
-                <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)' }}>Std {hw.standard} • {hw.subject} • Due: {hw.due_date}</div>
-              </div>
-            ))}
-          </div>
-        </div>
+        <HomeworkPortalPage />
       )}
 
       {/* 8b. ASSESSMENTS */}

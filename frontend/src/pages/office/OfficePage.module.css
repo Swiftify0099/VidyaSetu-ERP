@@ -1,7 +1,7 @@
-.page { display: flex; flex-direction: column; gap: var(--space-4); }
-.pageHeader { display: flex; align-items: flex-end; justify-content: space-between; }
-.pageTitle { font-size: var(--font-size-xl); font-weight: var(--font-weight-bold); color: var(--color-text-primary); }
-.pageSub { font-size: var(--font-size-sm); color: var(--color-text-muted); margin-top: 2px; }
+.page { display: flex; flex-direction: column; gap: var(--space-5); }
+.pageHeader { display: flex; align-items: flex-end; justify-content: space-between; gap: var(--space-4); flex-wrap: wrap; }
+.pageTitle { font-size: var(--font-size-xl); font-weight: var(--font-weight-bold); color: var(--color-text-primary); letter-spacing: -0.015em; }
+.pageSub { font-size: var(--font-size-sm); color: var(--color-text-muted); margin-top: var(--space-1); }
 
 /* Tabs */
 .tabBar { display: flex; gap: var(--space-1); background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-lg); padding: var(--space-2); overflow-x: auto; flex-shrink: 0; }
@@ -13,11 +13,12 @@
 .overviewGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: var(--space-4); }
 .overviewCard {
   background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-xl);
-  padding: var(--space-5); display: flex; flex-direction: column; gap: var(--space-2); cursor: pointer;
+  padding: var(--space-5); display: flex; flex-direction: column; gap: var(--space-3); cursor: pointer;
   position: relative; overflow: hidden; transition: all var(--transition-base);
+  box-shadow: var(--shadow-xs);
 }
 .overviewCard::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; background: var(--c); }
-.overviewCard:hover { transform: translateY(-3px); box-shadow: var(--shadow-xl); border-color: var(--c); }
+.overviewCard:hover { transform: translateY(-3px); box-shadow: var(--shadow-card-hover); border-color: color-mix(in srgb, var(--c) 40%, var(--color-border)); }
 .overviewIcon { display: flex; }
 .overviewVal { font-size: var(--font-size-3xl, 2rem); font-weight: var(--font-weight-bold); color: var(--color-text-primary); line-height: 1; }
 .overviewTotal { font-size: var(--font-size-xs); color: var(--color-text-muted); }
