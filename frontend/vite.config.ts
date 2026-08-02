@@ -8,8 +8,8 @@ export default defineConfig(({ mode }) => {
 
   // Derive the backend origin from the API URL env var (strip /api/v1 suffix)
   // Used only by the dev proxy; on Render the browser calls the absolute URL directly.
-  const apiUrl = env.VITE_API_URL || 'https://vidya-setu--pankajyewale111.replit.app/api/v1'
-  const backendOrigin = apiUrl.replace(/\/api\/v1\/?$/, '').replace(/\/api\/?$/, '')
+  const apiUrl = env.VITE_API_URL || 'http://127.0.0.1:8000/api/v1'
+  const backendTarget = (apiUrl.startsWith('http') ? apiUrl.replace(/\/api\/v1\/?$/, '').replace(/\/api\/?$/, '') : '') || 'http://127.0.0.1:8000'
 
   return {
     plugins: [react()],
@@ -26,21 +26,18 @@ export default defineConfig(({ mode }) => {
       port: 5173,
       host: true,
       hmr: false,
-      // Proxy only active in local dev when VITE_API_URL is a relative path
-      ...(apiUrl.startsWith('http') ? {} : {
-        proxy: {
-          '/api': {
-            target: backendOrigin,
-            changeOrigin: true,
-            secure: true,
-          },
-          '/storage': {
-            target: backendOrigin,
-            changeOrigin: true,
-            secure: true,
-          },
+      proxy: {
+        '/api': {
+          target: backendTarget,
+          changeOrigin: true,
+          secure: false,
         },
-      }),
+        '/storage': {
+          target: backendTarget,
+          changeOrigin: true,
+          secure: false,
+        },
+      },
     },
 
     // ── Production Build ────────────────────────────────────────

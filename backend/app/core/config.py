@@ -71,7 +71,7 @@ class Settings(BaseSettings):
     REDIS_DB: int = 0
 
     # ── CORS ──────────────────────────────────────────────────
-    ALLOWED_ORIGINS: str = "*,http://localhost:3000,http://localhost:5173,http://127.0.0.1:5173,http://127.0.0.1:3000,http://10.198.198.223:5173,http://10.198.198.223:8000,http://10.198.198.223:8081,http://10.70.162.223:5173,http://10.70.162.223:8000"
+    ALLOWED_ORIGINS: str = "https://vidyasetu.pages.dev,http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173"
 
     # ── School Configuration ──────────────────────────────────
     SCHOOL_CODE: str = "HMMV"
@@ -115,24 +115,15 @@ class Settings(BaseSettings):
     SMTP_FROM_EMAIL: str = "noreply@vidyasetu.com"
     SMTP_FROM_NAME: str = "VidyaSetu ERP"
     SMTP_TLS: bool = True
-    FRONTEND_URL: str = "http://localhost:5173"
-
-    def model_post_init(self, __context) -> None:
-        """Resolve Replit's managed PostgreSQL connection without breaking Docker."""
-        parsed = urlparse(self.DATABASE_URL) if self.DATABASE_URL else None
-        uploaded_docker_url = parsed and parsed.hostname in {"localhost", "127.0.0.1"}
-        if self.PGHOST and (not self.DATABASE_URL or uploaded_docker_url):
-            user = quote_plus(self.PGUSER)
-            password = quote_plus(self.PGPASSWORD)
-            self.DATABASE_URL = (
-                f"postgresql://{user}:{password}@{self.PGHOST}:{self.PGPORT}/"
-                f"{self.PGDATABASE}"
-            )
+    FRONTEND_URL: str = "https://vidyasetu.pages.dev"
 
     # ── Computed Properties ───────────────────────────────────
     @property
     def allowed_origins_list(self) -> List[str]:
-        return [o.strip() for o in self.ALLOWED_ORIGINS.split(",")]
+        origins = [o.strip() for o in self.ALLOWED_ORIGINS.split(",") if o.strip()]
+        if self.FRONTEND_URL and self.FRONTEND_URL.strip() not in origins:
+            origins.append(self.FRONTEND_URL.strip())
+        return origins
 
     @property
     def allowed_image_types_list(self) -> List[str]:

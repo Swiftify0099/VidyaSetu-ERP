@@ -18,8 +18,8 @@ export default defineConfig(function (_a) {
     var env = loadEnv(mode, process.cwd(), '');
     // Derive the backend origin from the API URL env var (strip /api/v1 suffix)
     // Used only by the dev proxy; on Render the browser calls the absolute URL directly.
-    var apiUrl = env.VITE_API_URL || 'https://vidya-setu--pankajyewale111.replit.app/api/v1';
-    var backendOrigin = apiUrl.replace(/\/api\/v1\/?$/, '').replace(/\/api\/?$/, '');
+    var apiUrl = env.VITE_API_URL || 'http://127.0.0.1:8000/api/v1';
+    var backendTarget = (apiUrl.startsWith('http') ? apiUrl.replace(/\/api\/v1\/?$/, '').replace(/\/api\/?$/, '') : '') || 'http://127.0.0.1:8000';
     return {
         plugins: [react()],
         resolve: {
@@ -28,21 +28,24 @@ export default defineConfig(function (_a) {
             },
         },
         // ── Dev server (local only, ignored by Render) ──────────────
-        server: __assign({ allowedHosts: true, port: 5173, host: true, hmr: false }, (apiUrl.startsWith('http') ? {} : {
+        server: {
+            allowedHosts: true,
+            port: 5173,
+            host: true,
+            hmr: false,
             proxy: {
                 '/api': {
-                    target: backendOrigin,
+                    target: backendTarget,
                     changeOrigin: true,
-                    secure: true,
+                    secure: false,
                 },
                 '/storage': {
-                    target: backendOrigin,
+                    target: backendTarget,
                     changeOrigin: true,
-                    secure: true,
+                    secure: false,
                 },
             },
-        })),
-        // ── Production Build ────────────────────────────────────────
+        },// ── Production Build ────────────────────────────────────────
         build: {
             outDir: 'dist',
             sourcemap: false,

@@ -4,6 +4,7 @@
 # ── Core Framework ────────────────────────────────────────────
 fastapi==0.115.0
 uvicorn[standard]==0.30.6
+gunicorn==23.0.0
 python-multipart==0.0.9
 
 # ── Database & ORM ────────────────────────────────────────────
@@ -17,8 +18,8 @@ passlib[bcrypt]==1.7.4
 bcrypt==4.2.0
 
 # ── Configuration ─────────────────────────────────────────────
-pydantic==2.9.2
-pydantic-settings==2.5.2
+pydantic>=2.9.2
+pydantic-settings>=2.5.2
 python-dotenv==1.0.1
 
 # ── AI / LLM — OpenRouter ────────────────────────────────────

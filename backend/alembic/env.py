@@ -12,6 +12,7 @@ from alembic import context
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from app.core.config import settings
+from app.database.session import _DB_URL
 from app.database.base import Base
 
 # Import all models to register them with Base.metadata
@@ -33,7 +34,7 @@ import app.shared.audit
 
 # Alembic Config
 config = context.config
-config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
+config.set_main_option("sqlalchemy.url", _DB_URL)
 
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)

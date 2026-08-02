@@ -149,10 +149,12 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)  # ty
 app.add_middleware(SlowAPIMiddleware)
 
 # ── CORS Middleware ───────────────────────────────────────────
+cors_origins = [o for o in settings.allowed_origins_list if o != "*"]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[o for o in settings.allowed_origins_list if o != "*"],
-    allow_origin_regex=r"https?://.*" if settings.APP_ENV == "development" else None,
+    allow_origins=cors_origins,
+    allow_origin_regex=r"https?://.*" if settings.APP_ENV == "development" else r"https://.*\.pages\.dev",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
