@@ -12,8 +12,8 @@ export default defineConfig({
   },
   server: {
     allowedHosts: true,
-    port: 5173,
-    host: true,
+    port: 5000,
+    host: '0.0.0.0',
     hmr: false,
     proxy: {
       '/api': {
