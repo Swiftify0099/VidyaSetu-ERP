@@ -1,0 +1,195 @@
+# ── VidyaSetu ERP — Production Docker Compose ────────────────
+# Usage:
+#   docker compose -f docker-compose.prod.yml up -d
+#
+# Prerequisites:
+#   1. Copy .env.example to .env and fill all values
+#   2. Place SSL certs at ./infrastructure/ssl/ (or use Certbot)
+#   3. docker compose -f docker-compose.prod.yml exec backend alembic upgrade head
+#   4. docker compose -f docker-compose.prod.yml exec backend python -m app.modules.seeds.seed
+
+services:
+
+  # ── PostgreSQL Database ────────────────────────────────────────
+  db:
+    image: postgres:16-alpine
+    container_name: vs_prod_db
+    restart: always
+    environment:
+      POSTGRES_DB:       ${POSTGRES_DB}
+      POSTGRES_USER:     ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./infrastructure/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    expose:
+      - "5432"         # NOT exposed to host — only internal network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - backend_net
+    logging:
+      driver: "json-file"
+      options: { max-size: "10m", max-file: "3" }
+
+  # ── FastAPI Backend ────────────────────────────────────────────
+  backend:
+    image: ghcr.io/${GITHUB_REPO}/vidyasetu-backend:latest
+    container_name: vs_prod_backend
+    restart: always
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file: .env
+    environment:
+      DATABASE_URL:           postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      SECRET_KEY:             ${SECRET_KEY}
+      JWT_SECRET_KEY:         ${JWT_SECRET_KEY}
+      APP_ENV:                production
+      APP_DEBUG:              "false"
+      SCHOOL_NAME:            ${SCHOOL_NAME}
+      CURRENT_ACADEMIC_YEAR:  ${CURRENT_ACADEMIC_YEAR}
+      UPLOAD_BASE_DIR:        /app/storage
+      ALLOWED_ORIGINS:        ${ALLOWED_ORIGINS}
+    volumes:
+      - uploads_data:/app/storage
+    expose:
+      - "8000"
+    command: >
+      sh -c "
+        python -m alembic upgrade head &&
+        uvicorn app.main:app
+          --host 0.0.0.0
+          --port 8000
+          --workers 4
+          --proxy-headers
+          --forwarded-allow-ips='*'
+          --access-log
+      "
+    networks:
+      - backend_net
+      - frontend_net
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    logging:
+      driver: "json-file"
+      options: { max-size: "50m", max-file: "5" }
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 256M
+
+  # ── Nginx Reverse Proxy ───────────────────────────────────────
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: vs_prod_nginx
+    restart: always
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./infrastructure/nginx/vidyasetu.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./frontend/dist:/usr/share/nginx/html:ro
+      - uploads_data:/app/storage:ro
+      - /etc/letsencrypt:/etc/letsencrypt:ro      # Let's Encrypt SSL certs
+      - nginx_logs:/var/log/nginx
+    networks:
+      - frontend_net
+    healthcheck:
+      test: ["CMD", "nginx", "-t"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    logging:
+      driver: "json-file"
+      options: { max-size: "20m", max-file: "5" }
+
+  # ── Redis (for caching & rate limiting state) ─────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: vs_prod_redis
+    restart: always
+    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru --requirepass ${REDIS_PASSWORD:-redis_pass_2024}
+    volumes:
+      - redis_data:/data
+    expose:
+      - "6379"
+    networks:
+      - backend_net
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+    logging:
+      driver: "json-file"
+      options: { max-size: "10m", max-file: "3" }
+
+  # ── DB Backup (nightly at 2 AM) ───────────────────────────────
+  db-backup:
+    image: postgres:16-alpine
+    container_name: vs_prod_backup
+    restart: unless-stopped
+    depends_on:
+      - db
+    environment:
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - ./infrastructure/backups:/backups
+    networks:
+      - backend_net
+    entrypoint: >
+      sh -c "
+        while true; do
+          sleep 86400 &&
+          pg_dump -h db -U ${POSTGRES_USER} ${POSTGRES_DB} |
+            gzip > /backups/vidyasetu_$$(date +%Y%m%d_%H%M%S).sql.gz &&
+          find /backups -name '*.sql.gz' -mtime +30 -delete &&
+          echo 'Backup completed at '$$( date)
+        done
+      "
+    logging:
+      driver: "json-file"
+      options: { max-size: "5m", max-file: "2" }
+
+# ── Networks ──────────────────────────────────────────────────
+networks:
+  backend_net:
+    driver: bridge
+    internal: true    # DB & Redis not accessible from outside
+  frontend_net:
+    driver: bridge
+
+# ── Volumes ───────────────────────────────────────────────────
+volumes:
+  postgres_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /opt/vidyasetu/data/postgres
+  uploads_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /opt/vidyasetu/data/storage
+  redis_data:
+    driver: local
+  nginx_logs:
+    driver: local

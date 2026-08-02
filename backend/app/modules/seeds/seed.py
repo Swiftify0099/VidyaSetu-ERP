@@ -830,6 +830,15 @@ def seed_analytics_demo_data(db: Session):
     import random
 
     print("  [8/8] Seeding rich school-wide analytics demo data...")
+    current_academic_year = (
+        db.query(AcademicYear)
+        .filter(AcademicYear.is_current == True)
+        .order_by(AcademicYear.id.desc())
+        .first()
+    )
+    if not current_academic_year:
+        raise RuntimeError("No current academic year exists; run the core seed first.")
+    academic_year_id = current_academic_year.id
 
     # 1. Seed more students across standards (1 to 10)
     existing_students_count = db.query(Student).count()
@@ -870,7 +879,7 @@ def seed_analytics_demo_data(db: Session):
                 full_name_marathi=f"{fn} {ln}",
                 first_name=fn,
                 last_name=ln,
-                academic_year_id=1,
+                academic_year_id=academic_year_id,
                 standard=std,
                 division=div,
                 roll_number=idx,
@@ -900,7 +909,7 @@ def seed_analytics_demo_data(db: Session):
             p_days = random.randint(18, 22)
             db.add(MonthlyAttendanceSummary(
                 student_id=st.id,
-                academic_year_id=1,
+                academic_year_id=academic_year_id,
                 year=2026,
                 month=7,
                 working_days=w_days,
@@ -923,7 +932,7 @@ def seed_analytics_demo_data(db: Session):
                         date=att_date,
                         standard=st.standard,
                         division=st.division,
-                        academic_year_id=1,
+                        academic_year_id=academic_year_id,
                         period="full_day",
                         status=st_status,
                     ))
@@ -939,8 +948,8 @@ def seed_analytics_demo_data(db: Session):
         db.flush()
 
         for std in range(1, 11):
-            db.add(FeeStructure(academic_year_id=1, standard=str(std), category_id=cat_tuition.id, amount=Decimal("15000.00")))
-            db.add(FeeStructure(academic_year_id=1, standard=str(std), category_id=cat_lib.id, amount=Decimal("3000.00")))
+            db.add(FeeStructure(academic_year_id=academic_year_id, standard=str(std), category_id=cat_tuition.id, amount=Decimal("15000.00")))
+            db.add(FeeStructure(academic_year_id=academic_year_id, standard=str(std), category_id=cat_lib.id, amount=Decimal("3000.00")))
         db.flush()
         print("        [OK] Seeded fee categories & fee structures.")
 
@@ -952,7 +961,7 @@ def seed_analytics_demo_data(db: Session):
             fee_paid = Decimal("14400.00") if st.id % 4 != 0 else Decimal("9000.00")
             rec = StudentFeeRecord(
                 student_id=st.id,
-                academic_year_id=1,
+                academic_year_id=academic_year_id,
                 category_id=cat_tuition.id,
                 amount_due=fee_due,
                 amount_paid=fee_paid,
@@ -966,7 +975,7 @@ def seed_analytics_demo_data(db: Session):
             db.add(FeePayment(
                 receipt_number=f"RCP2026-{receipt_counter}",
                 student_id=st.id,
-                academic_year_id=1,
+                academic_year_id=academic_year_id,
                 payment_date=date(2026, m, 10),
                 payment_mode="online" if st.id % 2 == 0 else "cash",
                 amount=fee_paid,
@@ -1095,6 +1104,16 @@ def seed_timetable(db: Session):
     from app.modules.timetable.models import Subject, PeriodConfig, TimetableEntry, TeacherSubjectAssignment
     from app.modules.teacher.models import Teacher
 
+    current_academic_year = (
+        db.query(AcademicYear)
+        .filter(AcademicYear.is_current == True)
+        .order_by(AcademicYear.id.desc())
+        .first()
+    )
+    if not current_academic_year:
+        raise RuntimeError("No current academic year exists; run the core seed first.")
+    academic_year_id = current_academic_year.id
+
     # 1. Seed Subjects
     existing_subj = db.query(Subject).first()
     subjects_map = {}
@@ -1121,7 +1140,7 @@ def seed_timetable(db: Session):
         subjects_map[s.code or s.name] = s.id
 
     # 2. Seed Period Configurations
-    existing_periods = db.query(PeriodConfig).filter(PeriodConfig.academic_year_id == 1).all()
+    existing_periods = db.query(PeriodConfig).filter(PeriodConfig.academic_year_id == academic_year_id).all()
     if not existing_periods:
         periods_data = [
             (0, "Assembly",   "07:30", "07:45",  15, "assembly"),
@@ -1137,7 +1156,7 @@ def seed_timetable(db: Session):
         ]
         for i, (num, name, st, et, dur, ptype) in enumerate(periods_data):
             p = PeriodConfig(
-                academic_year_id=1,
+                academic_year_id=academic_year_id,
                 period_number=num, period_name=name,
                 start_time=st, end_time=et,
                 duration_minutes=dur, period_type=ptype,
@@ -1151,7 +1170,7 @@ def seed_timetable(db: Session):
     teachers = db.query(Teacher).all()
     t_ids = [t.id for t in teachers] if teachers else [1, 2, 3, 4]
     
-    existing_assignments = db.query(TeacherSubjectAssignment).filter(TeacherSubjectAssignment.academic_year_id == 1).first()
+    existing_assignments = db.query(TeacherSubjectAssignment).filter(TeacherSubjectAssignment.academic_year_id == academic_year_id).first()
     if not existing_assignments and t_ids and all_subjects:
         stds = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10']
         divs = ['A', 'B']
@@ -1164,7 +1183,7 @@ def seed_timetable(db: Session):
                         subject_id=subj.id,
                         standard=std,
                         division=div,
-                        academic_year_id=1,
+                        academic_year_id=academic_year_id,
                         periods_per_week=5,
                         is_class_teacher=(idx == 0)
                     ))
@@ -1176,7 +1195,7 @@ def seed_timetable(db: Session):
             for div in ['A', 'B']:
                 try:
                     TimetableService.auto_generate_timetable(
-                        db, AutoGenerateRequest(standard=std, division=div, academic_year_id=1, overwrite=True), 1
+                        db, AutoGenerateRequest(standard=std, division=div, academic_year_id=academic_year_id, overwrite=True), 1
                     )
                 except Exception as ex:
                     pass

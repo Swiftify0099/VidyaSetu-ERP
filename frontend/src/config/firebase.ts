@@ -12,19 +12,28 @@ export const firebaseConfig = {
   measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID,
 };
 
+const hasFirebaseConfig = Boolean(
+  firebaseConfig.apiKey &&
+  firebaseConfig.authDomain &&
+  firebaseConfig.projectId &&
+  firebaseConfig.appId,
+);
+
 // Initialize Firebase App singleton
-export const app: FirebaseApp = !getApps().length
-  ? initializeApp(firebaseConfig)
-  : getApp();
+export const app: FirebaseApp | null = hasFirebaseConfig
+  ? (!getApps().length ? initializeApp(firebaseConfig) : getApp())
+  : null;
 
 // Safely initialize Analytics if supported in the browser environment
 export let analytics: Analytics | null = null;
 if (typeof window !== "undefined") {
-  isSupported().then((supported) => {
-    if (supported) {
-      analytics = getAnalytics(app);
-    }
-  });
+  if (app) {
+    isSupported().then((supported) => {
+      if (supported) {
+        analytics = getAnalytics(app);
+      }
+    });
+  }
 }
 
 export default app;

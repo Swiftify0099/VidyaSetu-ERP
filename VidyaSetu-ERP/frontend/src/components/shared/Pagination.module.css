@@ -1,0 +1,90 @@
+.container {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 12px 4px;
+}
+
+.info {
+  font-size: 0.8rem;
+  color: var(--text-secondary, #6b7280);
+  white-space: nowrap;
+}
+
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.btn {
+  min-width: 32px;
+  height: 32px;
+  padding: 0 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1.5px solid var(--border-color, #d1d5db);
+  border-radius: 6px;
+  background: var(--card-bg, #ffffff);
+  color: var(--text-primary, #374151);
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+  line-height: 1;
+}
+
+.btn:hover:not(:disabled) {
+  background: var(--primary, #4f46e5);
+  border-color: var(--primary, #4f46e5);
+  color: #ffffff;
+}
+
+.btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.btn.active {
+  background: var(--primary, #4f46e5);
+  border-color: var(--primary, #4f46e5);
+  color: #ffffff;
+  font-weight: 700;
+}
+
+.ellipsis {
+  padding: 0 4px;
+  color: var(--text-muted, #9ca3af);
+  font-size: 0.875rem;
+  line-height: 32px;
+}
+
+/* Page size */
+.sizeSelector {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.sizeLabel {
+  font-size: 0.8rem;
+  color: var(--text-secondary, #6b7280);
+}
+
+.sizeSelect {
+  padding: 5px 8px;
+  border: 1.5px solid var(--border-color, #d1d5db);
+  border-radius: 6px;
+  font-size: 0.8rem;
+  background: var(--card-bg, #ffffff);
+  color: var(--text-primary, #374151);
+  cursor: pointer;
+  outline: none;
+}
+
+.sizeSelect:focus {
+  border-color: var(--primary, #4f46e5);
+}

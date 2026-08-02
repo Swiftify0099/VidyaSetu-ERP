@@ -1,0 +1,21 @@
+# To learn about the project structure, visit https://reactnative.dev
+
+# Gradle files
+.gradle
+build/
+
+# Node
+node_modules/
+
+# BUCK
+buck-out/
+\.buckd/
+*.keystore
+!debug.keystore
+
+# Bundle artifacts
+*.jsbundle
+
+# Android Studio
+.idea
+.DS_Store

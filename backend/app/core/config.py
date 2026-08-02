@@ -6,6 +6,7 @@ Never hardcode values — always use settings.VARIABLE_NAME.
 """
 from functools import lru_cache
 from typing import List, Optional
+from urllib.parse import quote_plus, urlparse
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -25,7 +26,15 @@ class Settings(BaseSettings):
     APP_VERSION: str = "1.0.0"
 
     # ── Database ──────────────────────────────────────────────
-    DATABASE_URL: str
+    # Docker uses DATABASE_URL directly. Replit's managed PostgreSQL also
+    # provides PGHOST/PGPORT/PGUSER/PGPASSWORD/PGDATABASE; prefer those when
+    # an uploaded Docker .env still contains a localhost URL.
+    DATABASE_URL: str = ""
+    PGHOST: str = ""
+    PGPORT: int = 5432
+    PGUSER: str = ""
+    PGPASSWORD: str = ""
+    PGDATABASE: str = ""
     DB_POOL_SIZE: int = 10
     DB_MAX_OVERFLOW: int = 20
     DB_POOL_TIMEOUT: int = 30
@@ -107,6 +116,18 @@ class Settings(BaseSettings):
     SMTP_FROM_NAME: str = "VidyaSetu ERP"
     SMTP_TLS: bool = True
     FRONTEND_URL: str = "http://localhost:5173"
+
+    def model_post_init(self, __context) -> None:
+        """Resolve Replit's managed PostgreSQL connection without breaking Docker."""
+        parsed = urlparse(self.DATABASE_URL) if self.DATABASE_URL else None
+        uploaded_docker_url = parsed and parsed.hostname in {"localhost", "127.0.0.1"}
+        if self.PGHOST and (not self.DATABASE_URL or uploaded_docker_url):
+            user = quote_plus(self.PGUSER)
+            password = quote_plus(self.PGPASSWORD)
+            self.DATABASE_URL = (
+                f"postgresql://{user}:{password}@{self.PGHOST}:{self.PGPORT}/"
+                f"{self.PGDATABASE}"
+            )
 
     # ── Computed Properties ───────────────────────────────────
     @property

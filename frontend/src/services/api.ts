@@ -1,8 +1,20 @@
 import axios from 'axios';
 import authService from './authService';
 
+const configuredApiUrl = import.meta.env.VITE_API_URL;
+const isReplitPreview =
+  typeof window !== 'undefined' &&
+  (window.location.hostname.endsWith('.replit.dev') ||
+    window.location.hostname.endsWith('.repl.co'));
+
+export const API_BASE_URL =
+  isReplitPreview && configuredApiUrl?.includes('localhost')
+    ? '/api/v1'
+    : configuredApiUrl || '/api/v1';
+
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000/api/v1',
+  // Replit proxies /api to FastAPI. Docker can still use its configured URL.
+  baseURL: API_BASE_URL,
   headers: { 'Content-Type': 'application/json' },
   timeout: 30000,
 });
