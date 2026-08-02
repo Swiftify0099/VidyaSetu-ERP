@@ -19,22 +19,25 @@ const { width } = Dimensions.get('window');
 
 // Tab icon map — FontAwesome5 icon names
 const TAB_ICONS: Record<string, { icon: string; solid: boolean }> = {
-  Dashboard:     { icon: 'home',        solid: true  },
-  Home:          { icon: 'home',        solid: true  },
-  Students:      { icon: 'user-graduate', solid: true },
-  Attendance:    { icon: 'clipboard-check', solid: true },
-  Notifications: { icon: 'bell',        solid: true  },
-  Profile:       { icon: 'user-circle', solid: true  },
-  Marks:         { icon: 'pen',         solid: true  },
-  Plans:         { icon: 'book-open',   solid: true  },
-  Timetable:     { icon: 'calendar-alt', solid: true },
-  Results:       { icon: 'chart-bar',   solid: true  },
-  Fees:          { icon: 'rupee-sign',  solid: true  },
-  Notices:       { icon: 'bullhorn',    solid: true  },
-  Reports:       { icon: 'chart-pie',   solid: true  },
-  Library:       { icon: 'book',        solid: true  },
-  Search:        { icon: 'search',      solid: true  },
-  Office:        { icon: 'building',    solid: true  },
+  Dashboard:     { icon: 'home',            solid: true  },
+  Home:          { icon: 'home',            solid: true  },
+  Students:      { icon: 'user-graduate',   solid: true  },
+  Attendance:    { icon: 'clipboard-check', solid: true  },
+  Notifications: { icon: 'bell',            solid: true  },
+  Profile:       { icon: 'user-circle',     solid: true  },
+  Marks:         { icon: 'pen',             solid: true  },
+  Plans:         { icon: 'book-open',       solid: true  },
+  Timetable:     { icon: 'calendar-alt',    solid: true  },
+  Results:       { icon: 'chart-bar',       solid: true  },
+  Fees:          { icon: 'rupee-sign',      solid: true  },
+  Notices:       { icon: 'bullhorn',        solid: true  },
+  Reports:       { icon: 'chart-pie',       solid: true  },
+  Library:       { icon: 'book',            solid: true  },
+  Search:        { icon: 'search',          solid: true  },
+  Office:        { icon: 'building',        solid: true  },
+  Communication: { icon: 'comments',        solid: true  },
+  Homework:      { icon: 'tasks',           solid: true  },
+  Transport:     { icon: 'bus',             solid: true  },
 };
 
 function TabItem({
@@ -114,8 +117,10 @@ function TabItem({
 
 export default function PremiumTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
   const { colors, roleAccent } = useTheme();
-  const tabCount = state.routes.length;
+  const tabCount = state.routes.length || 1;
   const tabWidth = (width - 32) / tabCount;
+  const indicatorWidth = tabWidth * 0.45;
+  const indicatorOffset = (tabWidth - indicatorWidth) / 2;
 
   // Sliding pill indicator
   const indicatorX = useSharedValue(state.index * tabWidth);
@@ -141,7 +146,7 @@ export default function PremiumTabBar({ state, descriptors, navigation }: Bottom
       <Animated.View
         style={[
           styles.indicator,
-          { backgroundColor: roleAccent.primary, width: tabWidth * 0.45 },
+          { backgroundColor: roleAccent.primary, width: indicatorWidth, left: 16 + indicatorOffset },
           indicatorStyle,
         ]}
       />
@@ -179,7 +184,6 @@ const styles = StyleSheet.create({
     borderRadius: radius.full,
     position: 'absolute',
     top: 0,
-    left: 16 + (Dimensions.get('window').width - 32) / 10 * 0.275, // center under first tab icon approx
   },
   tabsRow: {
     flexDirection: 'row',

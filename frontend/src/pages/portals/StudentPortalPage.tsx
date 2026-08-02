@@ -370,12 +370,6 @@ export default function StudentPortalPage() {
             setQrHistory(qr.scans || []);
           }
           break;
-        case 'examination':
-          if (!hallTicket) {
-            const ht = await studentPortalService.getHallTicket();
-            setHallTicket(ht);
-          }
-          break;
         case 'certificates':
           if (!certificates.length) {
             const [certRes, bdApps] = await Promise.all([

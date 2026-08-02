@@ -8,6 +8,7 @@
 .env.*
 !.env.example
 *.env
+*_env.json
 firebase-credentials.json
 *.pem
 *.key

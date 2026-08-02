@@ -44,12 +44,17 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     set({ isLoading: true, error: null });
     try {
       const res = await authAPI.login(username, password);
-      const { access_token, user } = res.data?.data ?? res.data;
+      const { access_token, refresh_token, user } = res.data?.data ?? res.data;
 
-      await AsyncStorage.multiSet([
-        [STORAGE_KEYS.ACCESS_TOKEN,  access_token],
-        [STORAGE_KEYS.USER,          JSON.stringify(user)],
-      ]);
+      const itemsToSave: [string, string][] = [
+        [STORAGE_KEYS.ACCESS_TOKEN, access_token],
+        [STORAGE_KEYS.USER,         JSON.stringify(user)],
+      ];
+      if (refresh_token) {
+        itemsToSave.push([STORAGE_KEYS.REFRESH_TOKEN, refresh_token]);
+      }
+
+      await AsyncStorage.multiSet(itemsToSave);
 
       set({
         user,
