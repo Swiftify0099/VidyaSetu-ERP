@@ -1,8 +1,11 @@
 import axios from 'axios';
 import authService from './authService';
 
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL || 'https://vidyasetu-erp.onrender.com/api/v1';
+export const STORAGE_BASE_URL = import.meta.env.VITE_STORAGE_URL || 'https://vidyasetu-erp.onrender.com/storage';
+
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1',
+  baseURL: API_BASE_URL,
   headers: { 'Content-Type': 'application/json' },
   timeout: 30000,
 });
