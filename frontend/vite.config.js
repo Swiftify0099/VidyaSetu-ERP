@@ -17,12 +17,12 @@ export default defineConfig({
         hmr: false,
         proxy: {
             '/api': {
-                target: 'http://127.0.0.1:8000',
+                target: 'https://vidya-setu--pankajyewale111.replit.app',
                 changeOrigin: true,
                 secure: false,
             },
             '/storage': {
-                target: 'http://127.0.0.1:8000',
+                target: 'https://vidya-setu--pankajyewale111.replit.app',
                 changeOrigin: true,
                 secure: false,
             },
