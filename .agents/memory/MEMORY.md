@@ -1,0 +1,1 @@
+- [VidyaSetu Replit setup](vidyasetu-replit-setup.md) — uploaded Docker env is reconciled with Replit PostgreSQL and the root app runs as one port-5000 workflow

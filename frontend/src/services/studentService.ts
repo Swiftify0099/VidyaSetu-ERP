@@ -1,4 +1,4 @@
-import api from './api';
+import api, { API_BASE_URL } from './api';
 
 export interface Student {
   id: number;
@@ -180,12 +180,12 @@ const studentService = {
   },
 
   downloadTC(studentId: number): void {
-    window.open(`${import.meta.env.VITE_API_URL}/students/${studentId}/tc`, '_blank');
+    window.open(`${API_BASE_URL}/students/${studentId}/tc`, '_blank');
   },
 
   downloadBonafide(studentId: number, purpose: string = 'General Purpose'): void {
     window.open(
-      `${import.meta.env.VITE_API_URL}/students/${studentId}/bonafide?purpose=${encodeURIComponent(purpose)}`,
+      `${API_BASE_URL}/students/${studentId}/bonafide?purpose=${encodeURIComponent(purpose)}`,
       '_blank'
     );
   },

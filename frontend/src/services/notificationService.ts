@@ -181,6 +181,10 @@ const notificationService = {
 
       const { getMessaging, getToken, onMessage } = await import('firebase/messaging');
       const { app: firebaseApp } = await import('../config/firebase');
+      if (!firebaseApp) {
+        console.warn('[FCM] Firebase client configuration is not available.');
+        return null;
+      }
       const messaging = getMessaging(firebaseApp);
 
       // Register Service Worker and wait for active ready state
