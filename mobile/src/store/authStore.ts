@@ -5,6 +5,7 @@
 import { create } from 'zustand';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { authAPI, STORAGE_KEYS } from '../services/api';
+import mobileFcmService from '../services/fcmService';
 
 interface Role { id: number; name: string; code: string; color: string; }
 interface User {
@@ -63,6 +64,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         isLoading: false,
         error: null,
       });
+
+      // Initialize FCM after successful login — fire-and-forget
+      mobileFcmService.init().catch(console.warn);
     } catch (err: unknown) {
       const axiosErr = err as { response?: { data?: { detail?: string; message?: string }; status?: number }; message?: string; code?: string };
       const responseData = axiosErr?.response?.data;
@@ -85,6 +89,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   logout: async () => {
+    // Unregister FCM token before clearing storage (needs auth token)
+    mobileFcmService.unregisterCurrentToken().catch(console.warn);
     try { await authAPI.logout(); } catch { /* ignore */ }
     await AsyncStorage.multiRemove([
       STORAGE_KEYS.ACCESS_TOKEN,

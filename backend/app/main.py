@@ -49,6 +49,7 @@ from app.modules.qr.router import router as qr_router
 from app.modules.ai.router import router as ai_router
 from app.modules.behaviour.router import router as behaviour_router
 from app.modules.transport.router import router as transport_router
+from app.modules.fcm.router import router as fcm_router
 from app.shared.storage import StorageService
 
 # ── Logging ───────────────────────────────────────────────────
@@ -87,6 +88,7 @@ async def lifespan(app: FastAPI):
         import app.modules.timetable.models, app.modules.communication.models, app.modules.inventory.models
         import app.modules.leave.models, app.modules.lesson_plan.models, app.modules.behaviour.models
         import app.modules.transport.models
+        import app.modules.fcm.models  # FCM device tokens + notification logs
         BaseModel.metadata.create_all(bind=engine)
         from sqlalchemy import text
         with engine.begin() as conn:
@@ -154,7 +156,7 @@ cors_origins = [o for o in settings.allowed_origins_list if o != "*"]
 app.add_middleware(
     CORSMiddleware,
     allow_origins=cors_origins,
-    allow_origin_regex=r"https?://.*" if settings.APP_ENV == "development" else r"https://.*\.pages\.dev",
+    allow_origin_regex=r"https?://.*" if settings.APP_ENV == "development" else r"https://.*\.(pages|workers)\.dev",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -245,6 +247,7 @@ app.include_router(qr_router,              prefix=API_PREFIX)
 app.include_router(ai_router,              prefix=API_PREFIX)
 app.include_router(behaviour_router,       prefix=API_PREFIX)
 app.include_router(transport_router,       prefix=API_PREFIX)
+app.include_router(fcm_router,             prefix=API_PREFIX)
 
 
 # ── Root Endpoint ─────────────────────────────────────────────

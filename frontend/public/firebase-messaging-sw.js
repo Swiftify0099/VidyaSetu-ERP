@@ -1,151 +1,109 @@
-// VidyaSetu ERP — Firebase Cloud Messaging Service Worker
-// This file MUST be served at /firebase-messaging-sw.js (root of your site)
-// It handles background push notifications, native OS tray popups, and notification clicks.
+/**
+ * VidyaSetu ERP — Firebase Messaging Service Worker
+ * ====================================================
+ * Handles background FCM push notifications when the app tab is
+ * closed or not in focus.
+ *
+ * IMPORTANT: This file MUST be placed in the /public directory so
+ * it is served from the root path (/firebase-messaging-sw.js).
+ *
+ * The VAPID key is NOT needed here — it's used in the main app
+ * thread when generating the token. This file only handles incoming
+ * push events in the background.
+ */
 
-importScripts('https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js');
-importScripts('https://www.gstatic.com/firebasejs/10.13.0/firebase-messaging-compat.js');
+// ── Import Firebase scripts (use compat for Service Workers) ──
+importScripts('https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js');
+importScripts('https://www.gstatic.com/firebasejs/10.14.1/firebase-messaging-compat.js');
 
-firebase.initializeApp({
-  apiKey: "AIzaSyDa-hfmThLygBtQ138MFvc6OX9f54GwhMM",
+// ── Firebase config must be hardcoded here (no Vite/env vars in SW) ──
+// These values are the same as your VITE_FIREBASE_* env vars
+// They are PUBLIC client values — safe to include in JS files.
+const firebaseConfig = {
+  apiKey: "AIzaSyBp-Td8PYLudqOebOEcvp9APT8Za-XQpQY",
   authDomain: "amc-ticketmanagement.firebaseapp.com",
   projectId: "amc-ticketmanagement",
   storageBucket: "amc-ticketmanagement.firebasestorage.app",
   messagingSenderId: "769130712470",
   appId: "1:769130712470:web:3a3e9fa0783715c24161b7",
-});
+};
+
+firebase.initializeApp(firebaseConfig);
 
 const messaging = firebase.messaging();
 
-// Instant service worker activation lifecycle hooks
-self.addEventListener('install', (event) => {
-  console.log('[firebase-messaging-sw.js] ⚙️ Installing Service Worker...');
-  self.skipWaiting();
-});
-
-self.addEventListener('activate', (event) => {
-  console.log('[firebase-messaging-sw.js] 🚀 Activating Service Worker & claiming clients...');
-  event.waitUntil(self.clients.claim());
-});
-
-// Handle background push messages (when app tab is closed or minimized)
+// ── Background message handler ─────────────────────────────────
+// Called when the app is NOT in the foreground (tab closed / background)
 messaging.onBackgroundMessage((payload) => {
-  console.log('[firebase-messaging-sw.js] 🔔 Background message received:', payload);
+  console.log('[firebase-messaging-sw.js] Background message received:', payload);
 
-  const rawTitle = payload.notification?.title || payload.data?.title || 'VidyaSetu ERP';
-  const rawBody = payload.notification?.body || payload.data?.body || '';
-  const category = payload.data?.category || '';
-  const priority = payload.data?.priority || '';
+  const notificationTitle =
+    payload.notification?.title ||
+    payload.data?.title ||
+    'VidyaSetu ERP';
 
-  let titlePrefix = '';
-  if (priority === 'critical') titlePrefix = '🚨 [CRITICAL] ';
-  else if (priority === 'high') titlePrefix = '🔴 [HIGH] ';
-  else if (category) titlePrefix = `[${category.toUpperCase()}] `;
-
-  const title = titlePrefix ? `${titlePrefix}${rawTitle}` : rawTitle;
-  const body = rawBody;
-  const icon = payload.notification?.icon || '/icon.png';
-  const badge = payload.notification?.badge || '/icon.png';
-  const image = payload.notification?.image || payload.data?.image;
-  const actionUrl = payload.data?.url || payload.data?.action_url || payload.fcmOptions?.link || '/';
-  const tag = payload.messageId || payload.data?.id || `notif_${Date.now()}`;
-  const timestamp = payload.notification?.timestamp
-    ? new Date(payload.notification.timestamp).getTime()
-    : Date.now();
+  const notificationBody =
+    payload.notification?.body ||
+    payload.data?.body ||
+    'You have a new notification.';
 
   const notificationOptions = {
-    body,
-    icon,
-    badge,
-    image,
-    timestamp,
-    tag,
-    requireInteraction: true,
-    renotify: true,
-    vibrate: [200, 100, 200],
+    body: notificationBody,
+    icon: '/icon.png',
+    badge: '/icon.png',
+    image: payload.notification?.image || payload.data?.image_url,
     data: {
-      url: actionUrl,
-      id: payload.data?.id,
-      payload,
+      url: payload.data?.url || payload.fcmOptions?.link || '/',
+      ...payload.data,
     },
-    actions: [
-      { action: 'open', title: 'Open App' },
-      { action: 'mark_as_read', title: 'Mark as Read' },
-    ],
+    requireInteraction: false,
+    vibrate: [200, 100, 200],
+    // Group notifications by category to avoid spamming
+    tag: payload.data?.category || 'vidyasetu-notification',
+    renotify: true,
   };
 
-  return self.registration.showNotification(title, notificationOptions);
+  self.registration.showNotification(notificationTitle, notificationOptions);
 });
 
-// Fallback listener for raw Web Push events outside FCM SDK payload wrapping
-self.addEventListener('push', (event) => {
-  if (!event.data) return;
-  try {
-    const data = event.data.json();
-    console.log('[firebase-messaging-sw.js] 📩 Native Push event received:', data);
-    // If onBackgroundMessage already handled it or if it's FCM format, FCM compat SDK processes it.
-    // If it's custom push format missing notification key:
-    if (data && !data.notification && data.data && data.data.title) {
-      const title = data.data.title;
-      const body = data.data.body || '';
-      const options = {
-        body,
-        icon: '/icon.png',
-        badge: '/icon.png',
-        requireInteraction: true,
-        data: { url: data.data.url || '/' },
-      };
-      event.waitUntil(self.registration.showNotification(title, options));
-    }
-  } catch (e) {
-    console.warn('[firebase-messaging-sw.js] Push event parse non-JSON:', event.data.text());
-  }
-});
-
-// Handle notification click event -> focus existing tab or open new tab & navigate to target URL
+// ── Notification click handler ─────────────────────────────────
+// Opens the app when the user taps the notification
 self.addEventListener('notificationclick', (event) => {
-  console.log('[firebase-messaging-sw.js] 🖱️ Notification clicked:', event.notification, 'Action:', event.action);
-
   event.notification.close();
 
   const targetUrl = event.notification.data?.url || '/';
-  const notificationId = event.notification.data?.id;
+  const fullUrl = self.location.origin + targetUrl;
 
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
-      // 1. If action is 'mark_as_read', notify clients to mark as read without opening new tabs if tab is open
-      if (event.action === 'mark_as_read') {
-        for (const client of clientList) {
-          if (client.url.includes(self.location.origin)) {
-            client.postMessage({
-              type: 'MARK_NOTIFICATION_READ',
-              notificationId,
-            });
-          }
-        }
-        return;
-      }
-
-      // 2. Default click or 'open' action: focus open tab and navigate
+      // If app is already open in a tab, focus it and navigate
       for (const client of clientList) {
-        if (client.url.includes(self.location.origin) && 'focus' in client) {
-          return client.focus().then(() => {
-            // Post message to client for React Router navigation
-            client.postMessage({
-              type: 'FCM_NOTIFICATION_CLICKED',
-              url: targetUrl,
-              id: notificationId,
-            });
-            if ('navigate' in client && typeof client.navigate === 'function') {
-              return client.navigate(targetUrl);
-            }
-          });
+        if (client.url.startsWith(self.location.origin) && 'focus' in client) {
+          client.focus();
+          client.navigate(fullUrl);
+          return;
         }
       }
-
-      // 3. No open tab found -> open new browser window/tab
+      // Otherwise open a new tab
       if (clients.openWindow) {
-        return clients.openWindow(targetUrl);
+        return clients.openWindow(fullUrl);
       }
     })
   );
+});
+
+// ── Push event fallback ────────────────────────────────────────
+// Handles raw push events not processed by Firebase SDK
+self.addEventListener('push', (event) => {
+  if (!event.data) return;
+
+  let data = {};
+  try {
+    data = event.data.json();
+  } catch {
+    data = { notification: { title: 'VidyaSetu ERP', body: event.data.text() } };
+  }
+
+  // Only show if Firebase SDK didn't already handle it
+  if (data.handled) return;
 });

@@ -785,3 +785,70 @@ export const teacherPortalAPI = {
   getMyLeave: (params?: Record<string, any>) =>
     api.get('/teacher-portal/leave', { params }),
 };
+
+// ─────────────────────────────────────────────────────────
+// FCM PUSH NOTIFICATION API
+// ─────────────────────────────────────────────────────────
+export const fcmAPI = {
+  /** Register or update the FCM device token (call after login) */
+  registerToken: (data: {
+    fcm_token: string;
+    device_type: 'android' | 'ios' | 'web';
+    platform?: string;
+    browser?: string;
+    os?: string;
+    device_name?: string;
+  }) => api.post('/fcm/register', data),
+
+  /** Remove token on logout */
+  unregisterToken: (fcm_token: string) =>
+    api.delete('/fcm/unregister', { data: { fcm_token } }),
+
+  /** Remove ALL tokens for current user (logout-all) */
+  unregisterAllTokens: () => api.delete('/fcm/unregister-all'),
+
+  /** List current user's registered devices */
+  getMyDevices: () => api.get('/fcm/tokens'),
+
+  // ── Admin send endpoints ──────────────────────────────
+  /** Admin: send to a single user */
+  sendToUser: (userId: number, payload: {
+    title: string; body: string; data?: Record<string, any>; image_url?: string;
+  }) => api.post(`/fcm/send/user/${userId}`, payload),
+
+  /** Admin: send to multiple users */
+  sendToUsers: (payload: {
+    user_ids: number[]; title: string; body: string; data?: Record<string, any>; image_url?: string;
+  }) => api.post('/fcm/send/users', payload),
+
+  /** Admin: broadcast to all devices */
+  broadcast: (payload: {
+    title: string; body: string; data?: Record<string, any>; image_url?: string;
+  }) => api.post('/fcm/send/broadcast', payload),
+
+  /** Admin: send by role code */
+  sendToRole: (roleCode: string, payload: {
+    title: string; body: string; data?: Record<string, any>; image_url?: string;
+  }) => api.post(`/fcm/send/role/${roleCode}`, payload),
+
+  /** Admin: send to FCM topic */
+  sendToTopic: (topic: string, payload: {
+    title: string; body: string; data?: Record<string, any>; image_url?: string;
+  }) => api.post(`/fcm/send/topic/${topic}`, payload),
+
+  /** Admin: send to a class */
+  sendToClass: (classId: number, payload: {
+    title: string; body: string; data?: Record<string, any>; image_url?: string;
+  }) => api.post(`/fcm/send/class/${classId}`, payload),
+
+  /** Admin: get notification delivery history */
+  getLogs: (params?: {
+    limit?: number; offset?: number; user_id?: number; delivery_status?: string;
+  }) => api.get('/fcm/logs', { params }),
+
+  /** Admin: list all registered devices */
+  getAllDevices: (params?: {
+    limit?: number; offset?: number; user_id?: number; device_type?: string;
+  }) => api.get('/fcm/admin/devices', { params }),
+};
+

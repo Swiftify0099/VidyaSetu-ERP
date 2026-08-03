@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import authService, { type LoginCredentials, type AuthUser } from '../services/authService';
 import { getPortalPath } from '../utils/rolePortals';
 import notificationService from '../services/notificationService';
+import fcmService from '../services/fcmService';
 
 interface AuthContextType {
   user: AuthUser | null;
@@ -36,7 +37,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           const freshUser = await authService.getMe();
           setUser(freshUser);
           authService.storeUser(freshUser);
-          // FCM token is registered when user clicks the bell (user gesture required by browser)
+          // Re-initialize FCM on session restore (handles token rotation)
+          void fcmService.init();
         } catch {
           authService.clearStorage();
           setUser(null);
@@ -51,13 +53,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = useCallback(async (credentials: LoginCredentials) => {
     const response = await authService.login(credentials);
     setUser(response.user);
-    // FCM token is registered when user clicks the bell (user gesture required by browser)
+    // Initialize FCM after login — request permission + register token with backend
+    // Runs in background; never blocks the login flow.
+    void fcmService.init();
     const roleCode = response.user.roles?.[0]?.code;
     navigate(getPortalPath(roleCode ?? ''), { replace: true });
   }, [navigate]);
 
   // ── Logout ─────────────────────────────────────────────────────
   const logout = useCallback(async () => {
+    // Unregister FCM token BEFORE clearing storage (needs auth token)
+    void fcmService.unregisterCurrentToken();
     try { await authService.logout(); } finally {
       setUser(null);
       navigate('/login', { replace: true });
