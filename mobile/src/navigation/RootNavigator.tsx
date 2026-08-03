@@ -72,8 +72,18 @@ import TransportDashboardScreen from '../screens/transport/TransportDashboardScr
 // ── Office ────────────────────────────────────────────────────────────────────
 import OfficeDashboardScreen from '../screens/office/OfficeDashboardScreen';
 
+// ── Admission Module ───────────────────────────────────────────────
+import AdmissionManagementScreen from '../screens/admission/AdmissionManagementScreen';
+
+// ── Behaviour Module ───────────────────────────────────────────────
+import BehaviourLogScreen from '../screens/behaviour/BehaviourLogScreen';
+
+// ── Announcements (standalone) ────────────────────────────────────
+import AnnouncementsScreen from '../screens/communication/AnnouncementsScreen';
+
 const Stack = createNativeStackNavigator();
 const Tab   = createBottomTabNavigator();
+
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Premium Splash Screen
@@ -136,20 +146,23 @@ function AdminStack() {
   const h = useHeaderOpts();
   return (
     <Stack.Navigator screenOptions={h}>
-      <Stack.Screen name="AdminDashboard"  component={AdminDashboardScreen}  options={{ title: 'Dashboard' }} />
-      <Stack.Screen name="Students"        component={StudentListScreen}      options={{ title: 'Students' }} />
-      <Stack.Screen name="Attendance"      component={AttendanceScreen}       options={{ title: 'Attendance' }} />
-      <Stack.Screen name="ExamDashboard"   component={ExamDashboardScreen}    options={{ title: 'Exams' }} />
-      <Stack.Screen name="ExamSchedule"    component={ExamScheduleScreen}     options={{ title: 'Exam Schedules' }} />
-      <Stack.Screen name="ExamMarks"       component={MarksEntryScreen}       options={{ title: 'Enter Marks' }} />
-      <Stack.Screen name="ExamResults"     component={ExamResultsScreen}      options={{ title: 'Results' }} />
-      <Stack.Screen name="HomeworkPortal"  component={HomeworkPortalScreen}   options={{ title: 'Homework' }} />
-      <Stack.Screen name="Leave"           component={LeaveManagementScreen}  options={{ title: 'Leave Management' }} />
-      <Stack.Screen name="Communication"   component={CommunicationScreen}    options={{ title: 'Communication' }} />
-      <Stack.Screen name="UserManagement"  component={UserManagementScreen}   options={{ title: 'Users' }} />
-      <Stack.Screen name="Reports"         component={ReportsScreen}          options={{ title: 'Reports' }} />
-      <Stack.Screen name="Profile"         component={ProfileScreen}          options={{ title: 'My Profile' }} />
-      <Stack.Screen name="Notifications"   component={NotificationsScreen}    options={{ title: 'Notifications' }} />
+      <Stack.Screen name="AdminDashboard"  component={AdminDashboardScreen}       options={{ title: 'Dashboard' }} />
+      <Stack.Screen name="Students"        component={StudentListScreen}           options={{ title: 'Students' }} />
+      <Stack.Screen name="Attendance"      component={AttendanceScreen}           options={{ title: 'Attendance' }} />
+      <Stack.Screen name="ExamDashboard"   component={ExamDashboardScreen}        options={{ title: 'Exams' }} />
+      <Stack.Screen name="ExamSchedule"    component={ExamScheduleScreen}         options={{ title: 'Exam Schedules' }} />
+      <Stack.Screen name="ExamMarks"       component={MarksEntryScreen}           options={{ title: 'Enter Marks' }} />
+      <Stack.Screen name="ExamResults"     component={ExamResultsScreen}          options={{ title: 'Results' }} />
+      <Stack.Screen name="HomeworkPortal"  component={HomeworkPortalScreen}       options={{ title: 'Homework' }} />
+      <Stack.Screen name="Leave"           component={LeaveManagementScreen}      options={{ title: 'Leave Management' }} />
+      <Stack.Screen name="Communication"   component={CommunicationScreen}        options={{ title: 'Communication' }} />
+      <Stack.Screen name="UserManagement"  component={UserManagementScreen}       options={{ title: 'Users' }} />
+      <Stack.Screen name="Reports"         component={ReportsScreen}              options={{ title: 'Reports' }} />
+      <Stack.Screen name="Profile"         component={ProfileScreen}              options={{ title: 'My Profile' }} />
+      <Stack.Screen name="Notifications"   component={NotificationsScreen}        options={{ title: 'Notifications' }} />
+      <Stack.Screen name="Admission"       component={AdmissionManagementScreen}  options={{ title: 'Admissions' }} />
+      <Stack.Screen name="Behaviour"       component={BehaviourLogScreen}         options={{ title: 'Behaviour Log' }} />
+      <Stack.Screen name="Announcements"   component={AnnouncementsScreen}        options={{ title: 'Announcements' }} />
     </Stack.Navigator>
   );
 }
@@ -173,18 +186,20 @@ function TeacherStack() {
   const h = useHeaderOpts();
   return (
     <Stack.Navigator screenOptions={h}>
-      <Stack.Screen name="TeacherDashboard" component={TeacherDashboardScreen} options={{ title: 'Dashboard' }} />
-      <Stack.Screen name="Attendance"       component={AttendanceScreen}       options={{ title: 'Attendance' }} />
-      <Stack.Screen name="ExamDashboard"    component={ExamDashboardScreen}    options={{ title: 'Exams' }} />
-      <Stack.Screen name="ExamSchedule"     component={ExamScheduleScreen}     options={{ title: 'Exam Schedule' }} />
-      <Stack.Screen name="ExamMarks"        component={MarksEntryScreen}       options={{ title: 'Enter Marks' }} />
-      <Stack.Screen name="ExamResults"      component={ExamResultsScreen}      options={{ title: 'Results' }} />
-      <Stack.Screen name="HomeworkPortal"   component={HomeworkPortalScreen}   options={{ title: 'Homework' }} />
-      <Stack.Screen name="Leave"            component={LeaveManagementScreen}  options={{ title: 'Leave' }} />
-      <Stack.Screen name="Timetable"        component={TimetableScreen}        options={{ title: 'Timetable' }} />
-      <Stack.Screen name="Communication"    component={CommunicationScreen}    options={{ title: 'Communication' }} />
-      <Stack.Screen name="Profile"          component={ProfileScreen}          options={{ title: 'My Profile' }} />
-      <Stack.Screen name="Notifications"    component={NotificationsScreen}    options={{ title: 'Notifications' }} />
+      <Stack.Screen name="TeacherDashboard" component={TeacherDashboardScreen}  options={{ title: 'Dashboard' }} />
+      <Stack.Screen name="Attendance"       component={AttendanceScreen}        options={{ title: 'Attendance' }} />
+      <Stack.Screen name="ExamDashboard"    component={ExamDashboardScreen}     options={{ title: 'Exams' }} />
+      <Stack.Screen name="ExamSchedule"     component={ExamScheduleScreen}      options={{ title: 'Exam Schedule' }} />
+      <Stack.Screen name="ExamMarks"        component={MarksEntryScreen}        options={{ title: 'Enter Marks' }} />
+      <Stack.Screen name="ExamResults"      component={ExamResultsScreen}       options={{ title: 'Results' }} />
+      <Stack.Screen name="HomeworkPortal"   component={HomeworkPortalScreen}    options={{ title: 'Homework' }} />
+      <Stack.Screen name="Leave"            component={LeaveManagementScreen}   options={{ title: 'Leave' }} />
+      <Stack.Screen name="Timetable"        component={TimetableScreen}         options={{ title: 'Timetable' }} />
+      <Stack.Screen name="Communication"    component={CommunicationScreen}     options={{ title: 'Communication' }} />
+      <Stack.Screen name="Profile"          component={ProfileScreen}           options={{ title: 'My Profile' }} />
+      <Stack.Screen name="Notifications"    component={NotificationsScreen}     options={{ title: 'Notifications' }} />
+      <Stack.Screen name="Announcements"    component={AnnouncementsScreen}     options={{ title: 'Announcements' }} />
+      <Stack.Screen name="Behaviour"        component={BehaviourLogScreen}      options={{ title: 'Behaviour Log' }} />
     </Stack.Navigator>
   );
 }
@@ -214,7 +229,8 @@ function StudentStack() {
       <Stack.Screen name="MyHomework"       component={HomeworkPortalScreen}   options={{ title: 'My Homework' }} />
       <Stack.Screen name="MyLeave"          component={LeaveManagementScreen}  options={{ title: 'My Leave' }} />
       <Stack.Screen name="Timetable"        component={TimetableScreen}        options={{ title: 'Timetable' }} />
-      <Stack.Screen name="Announcements"    component={CommunicationScreen}    options={{ title: 'Announcements' }} />
+      <Stack.Screen name="Announcements"    component={AnnouncementsScreen}    options={{ title: 'Announcements' }} />
+      <Stack.Screen name="Communication"    component={CommunicationScreen}    options={{ title: 'Communication' }} />
       <Stack.Screen name="Profile"          component={ProfileScreen}          options={{ title: 'My Profile' }} />
       <Stack.Screen name="Notifications"    component={NotificationsScreen}    options={{ title: 'Notifications' }} />
     </Stack.Navigator>
@@ -350,11 +366,12 @@ function OfficeStack() {
   const h = useHeaderOpts();
   return (
     <Stack.Navigator screenOptions={h}>
-      <Stack.Screen name="OfficeDashboard" component={OfficeDashboardScreen} options={{ title: 'Office' }} />
-      <Stack.Screen name="Students"        component={StudentListScreen}      options={{ title: 'Students' }} />
-      <Stack.Screen name="Leave"           component={LeaveManagementScreen}  options={{ title: 'Leave' }} />
-      <Stack.Screen name="Communication"   component={CommunicationScreen}    options={{ title: 'Communication' }} />
-      <Stack.Screen name="Profile"         component={ProfileScreen}          options={{ title: 'My Profile' }} />
+      <Stack.Screen name="OfficeDashboard"  component={OfficeDashboardScreen}  options={{ title: 'Office' }} />
+      <Stack.Screen name="Students"         component={StudentListScreen}       options={{ title: 'Students' }} />
+      <Stack.Screen name="Leave"            component={LeaveManagementScreen}   options={{ title: 'Leave' }} />
+      <Stack.Screen name="Communication"    component={CommunicationScreen}     options={{ title: 'Communication' }} />
+      <Stack.Screen name="Announcements"    component={AnnouncementsScreen}     options={{ title: 'Announcements' }} />
+      <Stack.Screen name="Profile"          component={ProfileScreen}           options={{ title: 'My Profile' }} />
     </Stack.Navigator>
   );
 }
@@ -373,10 +390,21 @@ function OfficeTabs() {
 // ─────────────────────────────────────────────────────────────────────────────
 // Role Resolver — maps role code to appropriate Tab Navigator
 // ─────────────────────────────────────────────────────────────────────────────
+function resolveRoleCode(u: any): string {
+  if (!u) return 'admin';
+  if (typeof u.role === 'string' && u.role) return u.role.toLowerCase();
+  if (Array.isArray(u.roles) && u.roles.length > 0) {
+    const r0 = u.roles[0];
+    if (typeof r0 === 'string' && r0) return r0.toLowerCase();
+    if (typeof r0 === 'object' && r0?.code) return r0.code.toLowerCase();
+  }
+  return 'admin';
+}
+
 function MainNavigator() {
   const { user } = useAuthStore();
   const { setRoleCode } = useTheme();
-  const role = user?.roles?.[0]?.code ?? 'admin';
+  const role = resolveRoleCode(user);
 
   useEffect(() => { setRoleCode(role); }, [role]);
 

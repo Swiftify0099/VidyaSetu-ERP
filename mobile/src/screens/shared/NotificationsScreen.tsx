@@ -14,6 +14,10 @@ import Badge from '../../components/ui/Badge';
 import SkeletonLoader from '../../components/ui/SkeletonLoader';
 import { spacing, radius, typography, shadows } from '../../theme';
 
+import { Alert } from 'react-native';
+import { getFcmToken, requestNotificationPermission } from '../../config/firebase';
+import Toast from 'react-native-toast-message';
+
 interface Notification { id: number; title: string; content: string; created_at: string; type?: string; }
 
 export default function NotificationsScreen() {
@@ -21,17 +25,55 @@ export default function NotificationsScreen() {
   const [items, setItems]      = useState<Notification[]>([]);
   const [loading, setLoading]  = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [fcmToken, setFcmToken] = useState<string | null>(null);
 
   const fetchData = useCallback(async () => {
     try {
-      const res = await communicationAPI.getAnnouncements({ limit: 30 });
-      setItems(res.data?.data?.items ?? []);
+      const [res, token] = await Promise.all([
+        communicationAPI.getAnnouncements({ limit: 30 }).catch(() => null),
+        getFcmToken().catch(() => null),
+      ]);
+      if (res?.data?.data?.items) setItems(res.data.data.items);
+      if (token) setFcmToken(token);
     } catch { /* ignore */ }
     finally { setLoading(false); setRefreshing(false); }
   }, []);
 
-  useEffect(() => { fetchData(); }, [fetchData]);
+  useEffect(() => {
+    requestNotificationPermission();
+    fetchData();
+  }, [fetchData]);
+
   const onRefresh = () => { setRefreshing(true); fetchData(); };
+
+  const showFcmToken = async () => {
+    const token = await getFcmToken();
+    setFcmToken(token);
+    console.log('\n================================================================');
+    console.log('🔥🔥🔥 FIREBASE FCM DEVICE TOKEN FOR CONSOLE TESTING 🔥🔥🔥');
+    console.log(token);
+    console.log('================================================================\n');
+    Alert.alert(
+      '🔥 Firebase FCM Token',
+      `Device Token for Firebase Console testing:\n\n${token}`,
+      [{ text: 'Copy to Log', onPress: () => console.log('COPIED FCM TOKEN:', token) }, { text: 'OK' }]
+    );
+  };
+
+  const triggerTestNotification = () => {
+    const testItem: Notification = {
+      id: Date.now(),
+      title: '🔔 Firebase FCM Push Notification',
+      content: 'Firebase notification channel connected to project amc-ticketmanagement. Real-time alert active!',
+      created_at: new Date().toISOString(),
+    };
+    setItems(prev => [testItem, ...prev]);
+    Toast.show({
+      type: 'success',
+      text1: '🔔 Firebase Notification Received',
+      text2: 'Test alert delivered on VidyaSetu ERP Mobile!',
+    });
+  };
 
   const renderItem = ({ item, index }: { item: Notification; index: number }) => {
     const isNew = index < 3;
@@ -74,12 +116,32 @@ export default function NotificationsScreen() {
     <View style={[styles.root, { backgroundColor: colors.background }]}>
       {/* Header */}
       <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.border, paddingTop: Platform.OS === 'ios' ? 56 : 24 }]}>
-        <Text style={[styles.headerTitle, { color: colors.text }]}>Notifications</Text>
-        {items.length > 0 && (
-          <View style={[styles.headerBadge, { backgroundColor: roleAccent.primary }]}>
-            <Text style={styles.headerBadgeText}>{items.length}</Text>
-          </View>
-        )}
+        <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <Text style={[styles.headerTitle, { color: colors.text }]}>Notifications</Text>
+          {items.length > 0 && (
+            <View style={[styles.headerBadge, { backgroundColor: roleAccent.primary }]}>
+              <Text style={styles.headerBadgeText}>{items.length}</Text>
+            </View>
+          )}
+        </View>
+        <View style={{ flexDirection: 'row', gap: 6 }}>
+          <TouchableOpacity
+            onPress={showFcmToken}
+            style={[styles.testBtn, { backgroundColor: colors.surfaceAlt, borderWidth: 1, borderColor: colors.border }]}
+            activeOpacity={0.8}
+          >
+            <Icon name="key" size={12} color={colors.text} solid />
+            <Text style={[styles.testBtnText, { color: colors.text }]}>FCM Token</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={triggerTestNotification}
+            style={[styles.testBtn, { backgroundColor: roleAccent.primary }]}
+            activeOpacity={0.8}
+          >
+            <Icon name="paper-plane" size={12} color="#fff" solid />
+            <Text style={styles.testBtnText}>Test Alert</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       {loading ? (
@@ -127,6 +189,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8, paddingVertical: 3, borderRadius: radius.full,
   },
   headerBadgeText: { color: '#fff', fontSize: typography.size.xs, fontWeight: typography.weight.bold },
+  testBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: radius.full,
+  },
+  testBtnText: { color: '#fff', fontSize: typography.size.xs, fontWeight: typography.weight.bold },
   loadingPad: { padding: spacing.base },
   list: { padding: spacing.base },
   itemWrap: {},

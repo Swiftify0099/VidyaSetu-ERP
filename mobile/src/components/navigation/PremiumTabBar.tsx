@@ -1,44 +1,54 @@
 /**
- * PremiumTabBar — Floating bottom navigation with animated pill indicator
- * Features: Reanimated floating indicator, FA5 icons, role-specific colors,
- * scale animation on press, label fade on inactive.
+ * PremiumTabBar — Floating bottom navigation with high-visibility vector icons & clear tab labels
  */
-import React, { useCallback } from 'react';
+import React, { useCallback, useState } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet, Platform, Dimensions,
 } from 'react-native';
 import Animated, {
   useSharedValue, useAnimatedStyle, withSpring, withTiming,
 } from 'react-native-reanimated';
-import Icon from 'react-native-vector-icons/FontAwesome5';
+import FontAwesome5 from 'react-native-vector-icons/FontAwesome5';
+import FontAwesome from 'react-native-vector-icons/FontAwesome';
 import { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { useTheme } from '../../theme/ThemeContext';
 import { shadows, radius, typography } from '../../theme';
 
 const { width } = Dimensions.get('window');
 
-// Tab icon map — FontAwesome5 icon names
-const TAB_ICONS: Record<string, { icon: string; solid: boolean }> = {
-  Dashboard:     { icon: 'home',            solid: true  },
-  Home:          { icon: 'home',            solid: true  },
-  Students:      { icon: 'user-graduate',   solid: true  },
-  Attendance:    { icon: 'clipboard-check', solid: true  },
-  Notifications: { icon: 'bell',            solid: true  },
-  Profile:       { icon: 'user-circle',     solid: true  },
-  Marks:         { icon: 'pen',             solid: true  },
-  Plans:         { icon: 'book-open',       solid: true  },
-  Timetable:     { icon: 'calendar-alt',    solid: true  },
-  Results:       { icon: 'chart-bar',       solid: true  },
-  Fees:          { icon: 'rupee-sign',      solid: true  },
-  Notices:       { icon: 'bullhorn',        solid: true  },
-  Reports:       { icon: 'chart-pie',       solid: true  },
-  Library:       { icon: 'book',            solid: true  },
-  Search:        { icon: 'search',          solid: true  },
-  Office:        { icon: 'building',        solid: true  },
-  Communication: { icon: 'comments',        solid: true  },
-  Homework:      { icon: 'tasks',           solid: true  },
-  Transport:     { icon: 'bus',             solid: true  },
+// Tab icon map with primary FA5 icon, fallback standard FA icon, and emoji fallback
+const TAB_ICONS: Record<string, { icon: string; faName: string; emoji: string }> = {
+  Dashboard:     { icon: 'home',            faName: 'home',          emoji: '🏠' },
+  Home:          { icon: 'home',            faName: 'home',          emoji: '🏠' },
+  Students:      { icon: 'user-graduate',   faName: 'graduation-cap',emoji: '🎓' },
+  Attendance:    { icon: 'clipboard-check', faName: 'check-square',  emoji: '📋' },
+  Notifications: { icon: 'bell',            faName: 'bell',          emoji: '🔔' },
+  Profile:       { icon: 'user-circle',     faName: 'user-circle',   emoji: '👤' },
+  Marks:         { icon: 'pen',             faName: 'pencil',        emoji: '✏️' },
+  Plans:         { icon: 'book-open',       faName: 'book',          emoji: '📖' },
+  Timetable:     { icon: 'calendar-alt',    faName: 'calendar',      emoji: '📅' },
+  Results:       { icon: 'chart-bar',       faName: 'bar-chart',     emoji: '📊' },
+  Fees:          { icon: 'rupee-sign',      faName: 'money',         emoji: '💰' },
+  Notices:       { icon: 'bullhorn',        faName: 'bullhorn',      emoji: '📢' },
+  Reports:       { icon: 'chart-pie',       faName: 'pie-chart',     emoji: '📈' },
+  Library:       { icon: 'book',            faName: 'book',          emoji: '📚' },
+  Search:        { icon: 'search',          faName: 'search',        emoji: '🔍' },
+  Office:        { icon: 'building',        faName: 'building',      emoji: '🏢' },
+  Communication: { icon: 'comments',        faName: 'comments',      emoji: '💬' },
+  Homework:      { icon: 'tasks',           faName: 'tasks',         emoji: '📝' },
+  Transport:     { icon: 'bus',             faName: 'bus',           emoji: '🚌' },
 };
+
+function SmartTabIcon({ iconInfo, color, size, focused }: { iconInfo: { icon: string; faName: string; emoji: string }; color: string; size: number; focused: boolean }) {
+  return (
+    <FontAwesome5
+      name={iconInfo.icon}
+      size={size}
+      color={color}
+      solid
+    />
+  );
+}
 
 function TabItem({
   route, index, state, descriptors, navigation, tabWidth, activeColor, inactiveColor,
@@ -49,24 +59,16 @@ function TabItem({
   const focused = state.index === index;
   const { options } = descriptors[route.key];
   const label = options.tabBarLabel ?? options.title ?? route.name;
-
-  const iconInfo = TAB_ICONS[route.name] ?? { icon: 'circle', solid: true };
+  const iconInfo = TAB_ICONS[route.name] ?? { icon: 'circle', faName: 'circle', emoji: '⭕' };
 
   const scale = useSharedValue(1);
-  const labelOpacity = useSharedValue(focused ? 1 : 0);
 
   const iconStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],
   }));
 
-  const labelStyle = useAnimatedStyle(() => ({
-    opacity: labelOpacity.value,
-    transform: [{ translateY: withTiming(focused ? 0 : 4, { duration: 200 }) }],
-  }));
-
   React.useEffect(() => {
-    scale.value = withSpring(focused ? 1.15 : 1, { damping: 12, stiffness: 200 });
-    labelOpacity.value = withTiming(focused ? 1 : 0, { duration: 200 });
+    scale.value = withSpring(focused ? 1.12 : 1, { damping: 14, stiffness: 220 });
   }, [focused]);
 
   const onPress = useCallback(() => {
@@ -76,7 +78,7 @@ function TabItem({
       canPreventDefault: true,
     });
     if (!focused && !event.defaultPrevented) {
-      navigation.navigate({ name: route.name, merge: true });
+      navigation.navigate(route.name);
     }
   }, [focused, navigation, route.key, route.name]);
 
@@ -94,23 +96,22 @@ function TabItem({
         <View style={[styles.activePill, { backgroundColor: `${activeColor}18` }]} />
       )}
       <Animated.View style={iconStyle}>
-        <Icon
-          name={iconInfo.icon}
-          size={focused ? 20 : 19}
+        <SmartTabIcon
+          iconInfo={iconInfo}
+          size={focused ? 20 : 18}
           color={focused ? activeColor : inactiveColor}
-          solid={iconInfo.solid}
+          focused={focused}
         />
       </Animated.View>
-      <Animated.Text
+      <Text
         style={[
           styles.tabLabel,
-          { color: activeColor },
-          labelStyle,
+          { color: focused ? activeColor : inactiveColor, fontWeight: focused ? '700' : '500' },
         ]}
         numberOfLines={1}
       >
         {label}
-      </Animated.Text>
+      </Text>
     </TouchableOpacity>
   );
 }
@@ -118,8 +119,8 @@ function TabItem({
 export default function PremiumTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
   const { colors, roleAccent } = useTheme();
   const tabCount = state.routes.length || 1;
-  const tabWidth = (width - 32) / tabCount;
-  const indicatorWidth = tabWidth * 0.45;
+  const tabWidth = (width - 24) / tabCount;
+  const indicatorWidth = Math.min(tabWidth * 0.5, 36);
   const indicatorOffset = (tabWidth - indicatorWidth) / 2;
 
   // Sliding pill indicator
@@ -128,7 +129,7 @@ export default function PremiumTabBar({ state, descriptors, navigation }: Bottom
   React.useEffect(() => {
     indicatorX.value = withSpring(state.index * tabWidth, {
       damping: 18,
-      stiffness: 200,
+      stiffness: 220,
       mass: 0.8,
     });
   }, [state.index, tabWidth]);
@@ -137,16 +138,16 @@ export default function PremiumTabBar({ state, descriptors, navigation }: Bottom
     transform: [{ translateX: indicatorX.value }],
   }));
 
-  const activeColor   = roleAccent.primary;
-  const inactiveColor = colors.tabInactive;
+  const activeColor   = roleAccent.primary || '#4f46e5';
+  const inactiveColor = colors.textSecondary || '#64748b';
 
   return (
-    <View style={[styles.wrapper, { backgroundColor: colors.tabBar, borderTopColor: colors.tabBarBorder, ...shadows.lg }]}>
+    <View style={[styles.wrapper, { backgroundColor: colors.tabBar || colors.surface, borderTopColor: colors.tabBarBorder || colors.border, ...shadows.md }]}>
       {/* Sliding indicator */}
       <Animated.View
         style={[
           styles.indicator,
-          { backgroundColor: roleAccent.primary, width: indicatorWidth, left: 16 + indicatorOffset },
+          { backgroundColor: activeColor, width: indicatorWidth, left: 12 + indicatorOffset },
           indicatorStyle,
         ]}
       />
@@ -174,10 +175,11 @@ export default function PremiumTabBar({ state, descriptors, navigation }: Bottom
 const styles = StyleSheet.create({
   wrapper: {
     borderTopWidth: 1,
-    paddingHorizontal: 16,
-    paddingBottom: Platform.OS === 'ios' ? 24 : 8,
-    paddingTop: 8,
+    paddingHorizontal: 12,
+    paddingBottom: Platform.OS === 'ios' ? 24 : 6,
+    paddingTop: 6,
     position: 'relative',
+    elevation: 8,
   },
   indicator: {
     height: 3,
@@ -191,21 +193,21 @@ const styles = StyleSheet.create({
   tabItem: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 6,
-    gap: 2,
+    paddingVertical: 4,
+    gap: 3,
     position: 'relative',
     minHeight: 48,
   },
   activePill: {
     position: 'absolute',
     top: 2,
-    width: '60%',
-    height: 40,
+    width: '75%',
+    height: 42,
     borderRadius: 12,
   },
   tabLabel: {
-    fontSize: typography.size.xs,
-    fontWeight: typography.weight.semibold,
+    fontSize: 11,
     letterSpacing: 0.1,
+    textAlign: 'center',
   },
 });

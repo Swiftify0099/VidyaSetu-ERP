@@ -223,7 +223,7 @@ export default function UserManagementScreen({ navigation }: { navigation: any }
                     <Text style={[s.userName, { color: colors.text }]}>{item.full_name}</Text>
                     <Badge
                       label={item.is_active ? 'Active' : 'Inactive'}
-                      variant={item.is_active ? 'success' : 'default'}
+                      variant={item.is_active ? 'success' : 'neutral'}
                       size="sm" rounded
                     />
                   </View>

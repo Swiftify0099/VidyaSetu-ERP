@@ -336,7 +336,7 @@ export const roleAccents = {
   principal:      { primary: palette.indigo600, light: palette.indigo50,  gradient: [palette.indigo600, palette.indigo800] as string[] },
   vice_principal: { primary: palette.indigo500, light: palette.indigo50,  gradient: [palette.indigo500, palette.indigo700] as string[] },
   teacher:        { primary: palette.blue600,   light: palette.blue50,    gradient: [palette.blue500,   palette.blue700]   as string[] },
-  class_teacher:  { primary: palette.blue700,   light: palette.blue50,    gradient: [palette.blue600,   palette.blue800]   as string[] },
+  class_teacher:  { primary: palette.blue700,   light: palette.blue50,    gradient: [palette.blue600,   '#1e40af']   as string[] },
   student:        { primary: palette.emerald600, light: palette.emerald50, gradient: [palette.emerald500, palette.emerald700] as string[] },
   parent:         { primary: palette.amber600,  light: palette.amber50,   gradient: [palette.amber500,  palette.amber700]  as string[] },
   accountant:     { primary: palette.emerald600, light: palette.emerald50, gradient: [palette.emerald500, palette.emerald700] as string[] },

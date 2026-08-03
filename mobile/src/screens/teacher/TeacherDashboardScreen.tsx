@@ -10,7 +10,7 @@ import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/FontAwesome5';
 import { useAuthStore } from '../../store/authStore';
 import { useTheme } from '../../theme/ThemeContext';
-import { dashboardAPI, communicationAPI } from '../../services/api';
+import { teacherPortalAPI, communicationAPI } from '../../services/api';
 import StatCard from '../../components/ui/StatCard';
 import SectionHeader from '../../components/ui/SectionHeader';
 import PremiumCard from '../../components/ui/PremiumCard';
@@ -38,19 +38,24 @@ function getGreeting() {
 export default function TeacherDashboardScreen({ navigation }: { navigation: any }) {
   const { user } = useAuthStore();
   const { colors, roleAccent } = useTheme();
-  const [stats, setStats] = useState<Record<string, number>>({});
+  const [stats, setStats] = useState<Record<string, any>>({});
   const [announcements, setAnnouncements] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
   const fetchData = useCallback(async () => {
     try {
-      const [sum, ann] = await Promise.allSettled([
-        dashboardAPI.getSummary(CUR_YEAR),
+      const [profRes, annRes] = await Promise.allSettled([
+        teacherPortalAPI.getProfile(),
         communicationAPI.getAnnouncements({ limit: 5 }),
       ]);
-      if (sum.status === 'fulfilled') setStats(sum.value.data?.data ?? {});
-      if (ann.status === 'fulfilled') setAnnouncements(ann.value.data?.data?.items ?? []);
+      if (profRes.status === 'fulfilled') {
+        const tData = profRes.value.data?.data ?? {};
+        setStats(tData.stats ?? tData);
+      }
+      if (annRes.status === 'fulfilled') {
+        setAnnouncements(annRes.value.data?.data?.items ?? []);
+      }
     } catch { /* ignore */ }
     finally { setLoading(false); setRefreshing(false); }
   }, []);
@@ -111,10 +116,10 @@ export default function TeacherDashboardScreen({ navigation }: { navigation: any
             <View style={styles.statsGrid}><SkeletonLoader variant="stat" count={4} /></View>
           ) : (
             <View style={styles.statsGrid}>
-              <StatCard label="My Classes"     value={stats.total_classes ?? '—'}     icon="door-open"       color={colors.primary} />
-              <StatCard label="Today Attendance" value={stats.today_attendance ? `${stats.today_attendance}%` : '—'} icon="clipboard-check" color={colors.success} />
-              <StatCard label="Pending Marks"  value={stats.pending_marks ?? '—'}     icon="pen"             color={colors.warning} />
-              <StatCard label="Lesson Plans"   value={stats.lesson_plans ?? '—'}      icon="book-open"       color={colors.info} />
+              <StatCard label="My Classes"     value={stats.assigned_classes_count ?? stats.total_classes ?? 0} icon="door-open"       color={colors.primary} />
+              <StatCard label="Total Students" value={stats.total_students ?? 0} icon="user-graduate"   color={colors.success} />
+              <StatCard label="Lectures Today" value={stats.today_lectures ?? stats.today_attendance ?? 0} icon="clipboard-check" color={colors.info} />
+              <StatCard label="Pending Leave"  value={stats.pending_leave_count ?? stats.pending_marks ?? 0} icon="pen" color={colors.warning} />
             </View>
           )}
         </View>

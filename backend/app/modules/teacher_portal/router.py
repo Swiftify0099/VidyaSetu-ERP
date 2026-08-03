@@ -58,7 +58,8 @@ def _get_current_year(db) -> Optional[AcademicYear]:
 # ─────────────────────────────────────────────────────────────
 
 @router.get("/me", response_model=APIResponse)
-def get_teacher_profile(current_user: AuthUser, db: DBSession):
+@router.get("/dashboard", response_model=APIResponse)
+def get_my_teacher_profile(current_user: AuthUser, db: DBSession):
     """Teacher profile with dashboard KPIs."""
     teacher = _get_teacher(db, current_user)
     ac_year = _get_current_year(db)

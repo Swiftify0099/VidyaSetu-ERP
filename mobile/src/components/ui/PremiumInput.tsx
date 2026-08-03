@@ -71,7 +71,7 @@ export default function PremiumInput({
       {
         scale: interpolate(floatAnim.value, [0, 1], [1, 0.82], Extrapolation.CLAMP),
       },
-    ],
+    ] as any,
     color: interpolate(floatAnim.value, [0, 1], [0, 1]) > 0.5
       ? (error ? colors.danger : colors.primary)
       : colors.textTertiary,

@@ -19,12 +19,12 @@ import {
 // Context Shape
 // ─────────────────────────────────────────────────────────────────────────────
 interface ThemeContextType {
-  theme: Theme;
+  theme: any;
   isDark: boolean;
   toggleTheme: () => void;
   setRoleCode: (code: string) => void;
   roleAccent: RoleAccent;
-  colors: Theme['colors'];
+  colors: any;
 }
 
 const ThemeContext = createContext<ThemeContextType>({

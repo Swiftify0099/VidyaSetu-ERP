@@ -10,7 +10,7 @@ import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/FontAwesome5';
 import { useAuthStore } from '../../store/authStore';
 import { useTheme } from '../../theme/ThemeContext';
-import { dashboardAPI, communicationAPI } from '../../services/api';
+import { studentPortalAPI, communicationAPI } from '../../services/api';
 import StatCard from '../../components/ui/StatCard';
 import SectionHeader from '../../components/ui/SectionHeader';
 import PremiumCard from '../../components/ui/PremiumCard';
@@ -19,11 +19,11 @@ import SkeletonLoader from '../../components/ui/SkeletonLoader';
 import { spacing, radius, typography, shadows } from '../../theme';
 
 const { width } = Dimensions.get('window');
-const CUR_YEAR = '2025-2026';
 
 export default function StudentDashboardScreen({ navigation }: { navigation: any }) {
   const { user } = useAuthStore();
   const { colors, roleAccent } = useTheme();
+  const [profile, setProfile] = useState<Record<string, any>>({});
   const [stats, setStats] = useState<Record<string, any>>({});
   const [announcements, setAnnouncements] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -31,12 +31,18 @@ export default function StudentDashboardScreen({ navigation }: { navigation: any
 
   const fetchData = useCallback(async () => {
     try {
-      const [sum, ann] = await Promise.allSettled([
-        dashboardAPI.getSummary(CUR_YEAR),
+      const [profRes, annRes] = await Promise.allSettled([
+        studentPortalAPI.getProfile(),
         communicationAPI.getAnnouncements({ limit: 3 }),
       ]);
-      if (sum.status === 'fulfilled') setStats(sum.value.data?.data ?? {});
-      if (ann.status === 'fulfilled') setAnnouncements(ann.value.data?.data?.items ?? []);
+      if (profRes.status === 'fulfilled') {
+        const pData = profRes.value.data?.data ?? {};
+        setProfile(pData);
+        setStats(pData.stats ?? {});
+      }
+      if (annRes.status === 'fulfilled') {
+        setAnnouncements(annRes.value.data?.data?.items ?? []);
+      }
     } catch { /* ignore */ }
     finally { setLoading(false); setRefreshing(false); }
   }, []);
@@ -96,15 +102,15 @@ export default function StudentDashboardScreen({ navigation }: { navigation: any
 
         {/* ── Stats ─────────────────────────────────────────── */}
         <View style={styles.section}>
-          <SectionHeader title="My Academics" icon="graduation-cap" />
+          <SectionHeader title="My Academics & Status" icon="graduation-cap" />
           {loading ? (
             <View style={styles.statsGrid}><SkeletonLoader variant="stat" count={4} /></View>
           ) : (
             <View style={styles.statsGrid}>
-              <StatCard label="Attendance" value={attendance > 0 ? `${attendance}%` : '—'} icon="clipboard-check" color={attendanceColor} />
-              <StatCard label="Average Score" value={stats.average_score ? `${stats.average_score}%` : '—'} icon="star" color={colors.warning} />
-              <StatCard label="Homework Due" value={stats.homework_pending ?? '0'} icon="book" color={colors.danger} />
-              <StatCard label="Rank in Class" value={stats.class_rank ? `#${stats.class_rank}` : '—'} icon="trophy" color={colors.info} />
+              <StatCard label="Attendance" value={attendance > 0 ? `${attendance}%` : '0%'} icon="clipboard-check" color={attendanceColor} />
+              <StatCard label="Pending Fees" value={stats.pending_fees != null ? `₹${stats.pending_fees}` : '₹0'} icon="rupee-sign" color={colors.warning} />
+              <StatCard label="Library Books" value={stats.issued_books != null ? `${stats.issued_books}` : '0'} icon="book" color={colors.info} />
+              <StatCard label="Upcoming Exams" value={stats.upcoming_exams != null ? `${stats.upcoming_exams}` : '0'} icon="calendar-alt" color={colors.primary} />
             </View>
           )}
         </View>

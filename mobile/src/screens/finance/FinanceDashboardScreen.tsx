@@ -97,7 +97,7 @@ export default function FinanceDashboardScreen({ navigation }: { navigation: any
         {/* Summary Stats */}
         {loading ? (
           <View style={{ padding: spacing.base }}>
-            <SkeletonLoader variant="stats" count={4} />
+            <SkeletonLoader variant="stat" count={4} />
           </View>
         ) : summary ? (
           <View style={[s.statsWrap, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>

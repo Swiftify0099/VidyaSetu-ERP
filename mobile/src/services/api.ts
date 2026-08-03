@@ -20,15 +20,15 @@ export const STORAGE_KEYS = {
 // Priority 1: Local machine backend (dev only)
 let LOCAL_BASE_URL  = 'http://localhost:8000/api/v1';
 const EMULATOR_BASE_URL = 'http://10.0.2.2:8000/api/v1';
-// Priority 2: Replit cloud backend (always available fallback)
-const REPLIT_BASE_URL = 'https://vidya-setu--pankajyewale111.replit.app/api/v1';
+// Priority 2: Render cloud backend (production — always available)
+const RENDER_BASE_URL = 'https://vidyasetu-erp.onrender.com/api/v1';
 // Production URL (used in release builds)
-const PROD_BASE_URL   = REPLIT_BASE_URL;
+const PROD_BASE_URL   = RENDER_BASE_URL;
 
 /**
  * Start with local backend in DEV mode.
  * The response interceptor automatically falls back
- * to the Replit backend when local is unreachable.
+ * to the Render backend when local is unreachable.
  */
 const INITIAL_BASE_URL = __DEV__ ? LOCAL_BASE_URL : PROD_BASE_URL;
 
@@ -85,16 +85,16 @@ export const api: AxiosInstance = axios.create({
 
 /**
  * On first load in DEV mode, check if local backend is alive.
- * If not, switch immediately to Replit.
+ * If not, switch immediately to Render (production backend).
  */
 if (__DEV__) {
   isLocalReachable().then(reachable => {
     if (!reachable && !usingFallback) {
       usingFallback = true;
-      setBaseURL(REPLIT_BASE_URL);
+      setBaseURL(RENDER_BASE_URL);
       console.log(
-        '[API] Local backend unreachable. Using Replit fallback:',
-        REPLIT_BASE_URL,
+        '[API] Local backend unreachable. Using Render fallback:',
+        RENDER_BASE_URL,
       );
     } else {
       console.log('[API] Local backend active:', activeBaseURL);
@@ -118,7 +118,7 @@ let refreshQueue: Array<(token: string) => void> = [];
 api.interceptors.response.use(
   response => response,
   async (error: AxiosError) => {
-    // ── Auto-fallback: if local backend drops mid-session, switch to Replit ──
+    // ── Auto-fallback: if local backend drops mid-session, switch to Render ──
     if (
       __DEV__ &&
       !error.response &&                  // no HTTP response = network/connection error
@@ -132,21 +132,21 @@ api.interceptors.response.use(
 
       if (!localAlive) {
         usingFallback = true;
-        setBaseURL(REPLIT_BASE_URL);
-        console.log('[API] Local went offline mid-session → switched to Replit:', REPLIT_BASE_URL);
+        setBaseURL(RENDER_BASE_URL);
+        console.log('[API] Local went offline mid-session → switched to Render:', RENDER_BASE_URL);
 
         // Retry the failed request with the new URL
         const retryConfig = error.config as any;
         if (retryConfig && !retryConfig._fallbackRetry) {
           retryConfig._fallbackRetry = true;
-          retryConfig.baseURL = REPLIT_BASE_URL;
+          retryConfig.baseURL = RENDER_BASE_URL;
           retryConfig.url = retryConfig.url?.replace(LOCAL_BASE_URL, '') ?? retryConfig.url;
           return api(retryConfig);
         }
       }
     }
 
-    // ── Also try recovering: if on Replit fallback and local comes back ──
+    // ── Also try recovering: if on Render fallback and local comes back ──
     if (
       __DEV__ &&
       !error.response &&
@@ -167,8 +167,8 @@ api.interceptors.response.use(
     if (!error.response) {
       const isTimeout = error.code === 'ECONNABORTED';
       error.message = isTimeout
-        ? 'Request timed out. Make sure the server is running.'
-        : `Cannot connect to server.\nLocal: ${LOCAL_BASE_URL}\nFallback: ${REPLIT_BASE_URL}`;
+        ? 'Request timed out. Please check your internet connection.'
+        : `Cannot connect to server.\nRender: ${RENDER_BASE_URL}\nLocal: ${LOCAL_BASE_URL}`;
     }
 
     const originalRequest = error.config as any;
@@ -186,7 +186,7 @@ api.interceptors.response.use(
       try {
         const refreshToken = await AsyncStorage.getItem(STORAGE_KEYS.REFRESH_TOKEN);
         if (refreshToken) {
-          const res = await axios.post(`${activeBaseURL}/auth/refresh`, { refresh_token: refreshToken });
+          const res = await axios.post(`${activeBaseURL}/auth/refresh`, { refresh_token: refreshToken }, { timeout: 15000 });
           const newToken = res.data?.data?.access_token ?? res.data?.access_token;
           if (newToken) {
             await AsyncStorage.setItem(STORAGE_KEYS.ACCESS_TOKEN, newToken);
@@ -729,27 +729,28 @@ export const officeAPI = {
 // PARENT PORTAL API
 // ─────────────────────────────────────────────────────────
 export const parentAPI = {
-  getMyChildren: () => api.get('/parent/children'),
+  getMyChildren: () => api.get('/parent-portal/children'),
   getChildProfile: (childId: number) =>
-    api.get(`/parent/children/${childId}`),
+    api.get(`/parent-portal/children/${childId}`),
   getChildAttendance: (childId: number, params?: Record<string, any>) =>
-    api.get(`/parent/children/${childId}/attendance`, { params }),
+    api.get(`/parent-portal/children/${childId}/attendance`, { params }),
   getChildFees: (childId: number, params?: Record<string, any>) =>
-    api.get(`/parent/children/${childId}/fees`, { params }),
+    api.get(`/parent-portal/children/${childId}/fees`, { params }),
   getChildResults: (childId: number, params?: Record<string, any>) =>
-    api.get(`/parent/children/${childId}/results`, { params }),
+    api.get(`/parent-portal/children/${childId}/results`, { params }),
   getChildHomework: (childId: number, params?: Record<string, any>) =>
-    api.get(`/parent/children/${childId}/homework`, { params }),
+    api.get(`/parent-portal/children/${childId}/homework`, { params }),
   getChildTimetable: (childId: number) =>
-    api.get(`/parent/children/${childId}/timetable`),
+    api.get(`/parent-portal/children/${childId}/timetable`),
   applyLeaveForChild: (childId: number, data: object) =>
-    api.post(`/parent/children/${childId}/leave`, data),
+    api.post(`/parent-portal/children/${childId}/leave`, data),
 };
 
 // ─────────────────────────────────────────────────────────
 // STUDENT PORTAL API
 // ─────────────────────────────────────────────────────────
 export const studentPortalAPI = {
+  getProfile: () => api.get('/student-portal/me'),
   getDashboard: () => api.get('/student-portal/dashboard'),
   getMyTimetable: () => api.get('/student-portal/timetable'),
   getMyAttendance: (params?: Record<string, any>) =>
@@ -766,12 +767,15 @@ export const studentPortalAPI = {
     api.get('/student-portal/leave', { params }),
   applyLeave: (data: object) => api.post('/student-portal/leave/apply', data),
   getExamSchedule: () => api.get('/student-portal/exam-schedule'),
+  getIdCard: () => api.get('/student-portal/id-card'),
+  getNotices: () => api.get('/student-portal/notices'),
 };
 
 // ─────────────────────────────────────────────────────────
 // TEACHER PORTAL API
 // ─────────────────────────────────────────────────────────
 export const teacherPortalAPI = {
+  getProfile: () => api.get('/teacher-portal/me'),
   getDashboard: () => api.get('/teacher-portal/dashboard'),
   getMyClasses: () => api.get('/teacher-portal/classes'),
   getMyTimetable: () => api.get('/teacher-portal/timetable'),

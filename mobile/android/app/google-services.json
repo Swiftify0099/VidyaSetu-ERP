@@ -7,24 +7,59 @@
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:769130712470:android:3a3e9fa0783715c24161b7",
+        "mobilesdk_app_id": "1:769130712470:android:a77694d05e821a6a4161b7",
+        "android_client_info": {
+          "package_name": "com.vidyasetu"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "769130712470-sj68cibbtpbj7q1ro0lm87kgqusnds10.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBp-Td8PYLudqOebOEcvp9APT8Za-XQpQY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "769130712470-sj68cibbtpbj7q1ro0lm87kgqusnds10.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:769130712470:android:a77694d05e821a6a4161b7",
         "android_client_info": {
           "package_name": "com.vidyasetumobile"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "769130712470-sj68cibbtpbj7q1ro0lm87kgqusnds10.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
-          "current_key": "AIzaSyDa-hfmThLygBtQ138MFvc6OX9f54GwhMM"
+          "current_key": "AIzaSyBp-Td8PYLudqOebOEcvp9APT8Za-XQpQY"
         }
       ],
       "services": {
-        "analytics_service": {
-          "status": 1
-        },
         "appinvite_service": {
-          "status": 1,
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "769130712470-sj68cibbtpbj7q1ro0lm87kgqusnds10.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }

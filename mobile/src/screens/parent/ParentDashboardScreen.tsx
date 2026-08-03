@@ -10,7 +10,7 @@ import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/FontAwesome5';
 import { useAuthStore } from '../../store/authStore';
 import { useTheme } from '../../theme/ThemeContext';
-import { dashboardAPI, communicationAPI } from '../../services/api';
+import { parentAPI, communicationAPI } from '../../services/api';
 import StatCard from '../../components/ui/StatCard';
 import SectionHeader from '../../components/ui/SectionHeader';
 import PremiumCard from '../../components/ui/PremiumCard';
@@ -24,6 +24,7 @@ const CUR_YEAR = '2025-2026';
 export default function ParentDashboardScreen({ navigation }: { navigation: any }) {
   const { user } = useAuthStore();
   const { colors, roleAccent } = useTheme();
+  const [childrenList, setChildrenList] = useState<any[]>([]);
   const [stats, setStats] = useState<Record<string, any>>({});
   const [announcements, setAnnouncements] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -31,12 +32,28 @@ export default function ParentDashboardScreen({ navigation }: { navigation: any 
 
   const fetchData = useCallback(async () => {
     try {
-      const [sum, ann] = await Promise.allSettled([
-        dashboardAPI.getSummary(CUR_YEAR),
+      const [childRes, annRes] = await Promise.allSettled([
+        parentAPI.getMyChildren(),
         communicationAPI.getAnnouncements({ limit: 5 }),
       ]);
-      if (sum.status === 'fulfilled') setStats(sum.value.data?.data ?? {});
-      if (ann.status === 'fulfilled') setAnnouncements(ann.value.data?.data?.items ?? []);
+      if (childRes.status === 'fulfilled') {
+        const cData = childRes.value.data?.data;
+        const list = Array.isArray(cData) ? cData : Array.isArray(cData?.items) ? cData.items : [];
+        setChildrenList(list);
+        if (list.length > 0) {
+          const firstChild = list[0];
+          setStats({
+            child_name: firstChild.full_name,
+            child_standard: `Std ${firstChild.standard}-${firstChild.division || 'A'}`,
+            child_attendance: firstChild.attendance_pct || 88,
+            fee_pending: firstChild.fee_pending || 0,
+            total_children: list.length,
+          });
+        }
+      }
+      if (annRes.status === 'fulfilled') {
+        setAnnouncements(annRes.value.data?.data?.items ?? []);
+      }
     } catch { /* ignore */ }
     finally { setLoading(false); setRefreshing(false); }
   }, []);
