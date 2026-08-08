@@ -1,0 +1,90 @@
+# ============================================================
+# VidyaSetu ERP — Complete Root .gitignore
+# Frontend, Backend, and Mobile (React Native + Android/iOS)
+# ============================================================
+
+# ── Environment & Secret Files (NEVER COMMIT) ───────────────
+.env
+.env.*
+!.env.example
+*.env
+*_env.json
+firebase-credentials.json
+*.pem
+*.key
+*.p12
+*.pfx
+
+# ── Dependencies (Node & Python) ─────────────────────────────
+node_modules/
+**/node_modules/
+.venv/
+venv/
+ENV/
+env/
+__pycache__/
+/**/__pycache__/
+*.py[cod]
+*$py.class
+
+# ── Build & Dist Output ──────────────────────────────────────
+dist/
+**/dist/
+build/
+**/build/
+out/
+.vite/
+.next/
+*.tsbuildinfo
+
+# ── React Native & Metro ─────────────────────────────────────
+.metro-health-check*
+*.bundle
+*.jsbundle
+mobile/android/app/src/main/assets/index.android.bundle
+
+# ── Android Build Artifacts & Caches ─────────────────────────
+mobile/android/.gradle/
+mobile/android/app/build/
+mobile/android/.cxx/
+mobile/android/app/.cxx/
+mobile/android/build/
+mobile/android/local.properties
+mobile/android/app/libs/
+*.apk
+*.aab
+*.keystore
+!mobile/android/app/debug.keystore
+
+# ── iOS Build Artifacts & CocoaPods ──────────────────────────
+mobile/ios/Pods/
+mobile/ios/build/
+mobile/ios/DerivedData/
+mobile/ios/*.xcworkspace
+!mobile/ios/*.xcodeproj/project.pbxproj
+
+# ── Storage & User Uploads ───────────────────────────────────
+storage/uploads/*
+!storage/uploads/.gitkeep
+postgres_data/
+uploads_data/
+
+# ── Logs & Debugging ─────────────────────────────────────────
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+logs/
+
+# ── IDEs & OS Files ──────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+.idea/
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+*.swp
+*.swo
+.antigravityignore
