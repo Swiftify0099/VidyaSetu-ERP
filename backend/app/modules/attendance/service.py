@@ -176,9 +176,29 @@ class HolidayService:
         return db.scalar(select(Holiday).where(Holiday.date == d, Holiday.is_deleted == False))
 
 
+VALID_ATTENDANCE_STATUSES = frozenset({
+    "present", "absent", "late", "half_day", "leave", "medical_leave"
+})
+
+
 class StudentAttendanceService:
     @staticmethod
     def mark_bulk(db: Session, data: BulkAttendanceRequest, marked_by: int) -> int:
+        # ── Validate: no future dates ──────────────────────────
+        if data.date > date.today():
+            raise HTTPException(
+                status_code=400,
+                detail=f"Cannot mark attendance for a future date ({data.date}). Today is {date.today()}."
+            )
+
+        # ── Validate: attendance statuses ──────────────────────
+        for row in data.rows:
+            if row.status not in VALID_ATTENDANCE_STATUSES:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Invalid attendance status '{row.status}'. Allowed: {sorted(VALID_ATTENDANCE_STATUSES)}"
+                )
+
         holiday = HolidayService.is_holiday(db, data.date)
 
         saved = 0
@@ -226,6 +246,11 @@ class StudentAttendanceService:
             ClassAttendanceSession.period == data.period,
             ClassAttendanceSession.is_deleted == False,
         )
+        # ── FIXED: Include division filter to prevent wrong session update ──
+        if data.division is not None:
+            q_sess = q_sess.where(ClassAttendanceSession.division == data.division)
+        else:
+            q_sess = q_sess.where(ClassAttendanceSession.division.is_(None))
         if data.subject_id is not None:
             q_sess = q_sess.where(ClassAttendanceSession.subject_id == data.subject_id)
         else:

@@ -62,6 +62,9 @@ function getDeviceInfo(): FCMDeviceInfo {
 
 // ── Mobile FCM Service ────────────────────────────────────────
 
+let isRegistering = false;
+let lastRegisteredToken = '';
+
 const mobileFcmService = {
   /**
    * Get cached token from AsyncStorage.
@@ -154,15 +157,20 @@ const mobileFcmService = {
    * Sends device metadata for the device management panel.
    */
   async registerToken(token: string): Promise<void> {
+    if (!token || (isRegistering && lastRegisteredToken === token)) return;
+    isRegistering = true;
     const deviceInfo = getDeviceInfo();
     try {
       await api.post('/fcm/register', {
         fcm_token: token,
         ...deviceInfo,
       });
+      lastRegisteredToken = token;
       console.log('[FCM Mobile] ✅ Token registered with backend.');
     } catch (err) {
       console.error('[FCM Mobile] Failed to register token:', err);
+    } finally {
+      isRegistering = false;
     }
   },
 
@@ -176,8 +184,8 @@ const mobileFcmService = {
     try {
       await api.delete('/fcm/unregister', { data: { fcm_token: token } });
       console.log('[FCM Mobile] ✅ Token unregistered from backend.');
-    } catch (err) {
-      console.warn('[FCM Mobile] Failed to unregister token:', err);
+    } catch {
+      console.log('[FCM Mobile] Token unregister skipped or server offline.');
     } finally {
       await this.clearCachedToken();
       // Also delete from Firebase SDK
@@ -196,8 +204,8 @@ const mobileFcmService = {
     try {
       await api.delete('/fcm/unregister-all');
       console.log('[FCM Mobile] ✅ All tokens unregistered.');
-    } catch (err) {
-      console.warn('[FCM Mobile] Failed to unregister all tokens:', err);
+    } catch {
+      console.log('[FCM Mobile] Tokens unregister-all skipped or server offline.');
     } finally {
       await this.clearCachedToken();
     }
@@ -251,8 +259,8 @@ const mobileFcmService = {
     messaging().onMessage(async (remoteMessage: FirebaseMessagingTypes.RemoteMessage) => {
       console.log('[FCM Mobile] 🔔 Foreground message:', remoteMessage);
 
-      const title = remoteMessage.notification?.title ?? remoteMessage.data?.title ?? 'VidyaSetu ERP';
-      const body = remoteMessage.notification?.body ?? remoteMessage.data?.body ?? '';
+      const title = String(remoteMessage.notification?.title ?? remoteMessage.data?.title ?? 'VidyaSetu ERP');
+      const body = String(remoteMessage.notification?.body ?? remoteMessage.data?.body ?? '');
 
       // Show an in-app Alert for foreground messages
       // In production, replace this with a toast notification component

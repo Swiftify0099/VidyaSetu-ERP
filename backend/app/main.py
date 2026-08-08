@@ -89,6 +89,7 @@ async def lifespan(app: FastAPI):
         import app.modules.leave.models, app.modules.lesson_plan.models, app.modules.behaviour.models
         import app.modules.transport.models
         import app.modules.fcm.models  # FCM device tokens + notification logs
+        import app.modules.video.models  # Video content (lectures uploaded by teachers)
         BaseModel.metadata.create_all(bind=engine)
         from sqlalchemy import text
         with engine.begin() as conn:

@@ -52,6 +52,20 @@ class FeeStructureRequest(BaseModel):
     due_date: Optional[date] = None
     late_fine_per_day: Decimal = Decimal("0")
 
+    @field_validator("amount")
+    @classmethod
+    def validate_amount(cls, v: Decimal) -> Decimal:
+        if v <= 0:
+            raise ValueError("Fee structure amount must be greater than zero.")
+        return v
+
+    @field_validator("late_fine_per_day")
+    @classmethod
+    def validate_fine(cls, v: Decimal) -> Decimal:
+        if v < 0:
+            raise ValueError("Late fine per day cannot be negative.")
+        return v
+
 
 class FeeStructureResponse(BaseModel):
     model_config = {"from_attributes": True}
@@ -87,6 +101,20 @@ class FeePaymentRequest(BaseModel):
     cheque_number: Optional[str] = None
     cheque_date: Optional[date] = None
     remarks: Optional[str] = None
+
+    @field_validator("amount")
+    @classmethod
+    def validate_pay_amount(cls, v: Decimal) -> Decimal:
+        if v <= 0:
+            raise ValueError("Payment amount must be greater than zero.")
+        return v
+
+    @field_validator("late_fine", "concession")
+    @classmethod
+    def validate_non_negative(cls, v: Decimal) -> Decimal:
+        if v < 0:
+            raise ValueError("Amount cannot be negative.")
+        return v
 
 
 class FeePaymentResponse(BaseModel):

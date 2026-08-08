@@ -242,7 +242,7 @@ export default function CommunicationScreen({ navigation }: { navigation: any })
           </Text>
           <TouchableOpacity
             style={[s.composeBtn, { backgroundColor: colors.primary }]}
-            onPress={() => navigation.navigate('ComposeMessage')}
+            onPress={() => { setForm({ ...EMPTY_FORM }); setShowCreate(true); }}
           >
             <Icon name="pen" size={14} color="#fff" solid />
             <Text style={s.composeBtnText}>Compose Message</Text>

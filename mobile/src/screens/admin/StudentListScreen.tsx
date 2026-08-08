@@ -22,7 +22,7 @@ interface Student {
   is_active: boolean;
 }
 
-export default function StudentListScreen() {
+export default function StudentListScreen({ navigation }: { navigation: any }) {
   const [students, setStudents] = useState<Student[]>([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
@@ -42,7 +42,10 @@ export default function StudentListScreen() {
   const onRefresh = () => { setRefreshing(true); loadStudents(); };
 
   const renderItem = ({ item }: { item: Student }) => (
-    <TouchableOpacity style={s.card}>
+    <TouchableOpacity
+      style={s.card}
+      onPress={() => navigation?.navigate('StudentDetail', { studentId: item.id, studentName: item.full_name })}
+    >
       <View style={s.avatar}>
         <Text style={s.avatarText}>{item.full_name.charAt(0).toUpperCase()}</Text>
       </View>

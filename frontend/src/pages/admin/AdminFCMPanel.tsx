@@ -399,7 +399,7 @@ export default function AdminFCMPanel() {
                         <span style={styles.typePill}>{log.target_type}</span>
                         {log.user_id && <span style={{ marginLeft: 4, color: '#9ca3af', fontSize: 11 }}>#{log.user_id}</span>}
                       </td>
-                      <td style={styles.td}>{statusBadge(log.delivery_status)}</td>
+                      <td style={styles.td}>{statusBadge(log.delivery_status ?? log.status ?? 'unknown')}</td>
                       <td style={{ ...styles.td, color: '#ef4444', fontSize: 11 }}>{log.error_message ?? '—'}</td>
                     </tr>
                   ))}

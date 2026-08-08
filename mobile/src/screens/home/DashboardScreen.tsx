@@ -48,11 +48,15 @@ export default function DashboardScreen({ navigation }: { navigation: any }) {
 
   const onRefresh = () => { setRefreshing(true); fetchData(); };
 
+  const attVal = stats.today_attendance ?? stats.today_attendance_pct;
+  const feesVal = stats.fees_collected ?? stats.fee_collected;
+  const duesVal = stats.pending_dues ?? stats.fee_pending;
+
   const statCards: StatCard[] = [
     { icon: '🎓', label: 'Total Students', value: stats.total_students ?? '—', color: COLORS.primary },
-    { icon: '✅', label: "Today's Attendance", value: stats.today_attendance ? `${stats.today_attendance}%` : '—', color: COLORS.success },
-    { icon: '💰', label: 'Fees Collected', value: stats.fees_collected ? `₹${(stats.fees_collected/1000).toFixed(0)}K` : '—', color: COLORS.warning },
-    { icon: '⚠️', label: 'Pending Dues', value: stats.pending_dues ?? '—', color: COLORS.danger },
+    { icon: '✅', label: "Today's Attendance", value: attVal !== undefined ? `${attVal}%` : '—', color: COLORS.success },
+    { icon: '💰', label: 'Fees Collected', value: feesVal ? `₹${(feesVal / 1000).toFixed(0)}K` : '—', color: COLORS.warning },
+    { icon: '⚠️', label: 'Pending Dues', value: duesVal !== undefined ? `₹${(duesVal / 1000).toFixed(0)}K` : '—', color: COLORS.danger },
   ];
 
   if (loading) {

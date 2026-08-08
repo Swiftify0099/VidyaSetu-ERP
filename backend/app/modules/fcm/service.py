@@ -115,14 +115,32 @@ class FCMTokenService:
         Business logic:
         - If the token already exists (for ANY user), update its owner and metadata.
         - If the token does not exist, insert a new record.
-        - This handles the case where a device is re-used by a different user.
+        - Handles concurrent registration attempts gracefully via transaction rollback.
         """
-        # Check for existing token (could be owned by this or another user)
+        # Sync user/student/teacher fcm_token field for backward compatibility
+        try:
+            from app.modules.auth.models import User
+            from app.modules.student.models import Student
+            from app.modules.teacher.models import Teacher
+
+            u = db.scalar(select(User).where(User.id == user_id))
+            if u:
+                u.fcm_token = request.fcm_token
+            s = db.scalar(select(Student).where((Student.user_id == user_id) | (Student.id == user_id)))
+            if s:
+                s.fcm_token = request.fcm_token
+            t = db.scalar(select(Teacher).where((Teacher.user_id == user_id) | (Teacher.id == user_id)))
+            if t:
+                t.fcm_token = request.fcm_token
+        except Exception as sync_err:
+            logger.warning(f"[FCM] Sync user token warning: {sync_err}")
+
+        # Check for existing token
         stmt = select(FCMToken).where(FCMToken.fcm_token == request.fcm_token)
         existing: Optional[FCMToken] = db.scalar(stmt)
 
         if existing:
-            # Update the owner and refresh metadata
+            # Update owner & metadata
             existing.user_id = user_id
             existing.device_type = request.device_type
             existing.platform = request.platform
@@ -133,12 +151,22 @@ class FCMTokenService:
             existing.is_deleted = False
             existing.deleted_at = None
             existing.last_used_at = datetime.now(timezone.utc)
-            db.commit()
-            db.refresh(existing)
+            try:
+                db.commit()
+                db.refresh(existing)
+            except Exception as commit_err:
+                db.rollback()
+                logger.warning(f"[FCM] Retry update existing token: {commit_err}")
+                existing = db.scalar(stmt)
+                if existing:
+                    existing.user_id = user_id
+                    db.commit()
+                    db.refresh(existing)
+                    return existing
             logger.info(f"[FCM] Updated token for user_id={user_id} device={request.device_type}")
             return existing
 
-        # Insert new token record
+        # Insert new token record with concurrency protection
         new_token = FCMToken(
             user_id=user_id,
             fcm_token=request.fcm_token,
@@ -150,10 +178,29 @@ class FCMTokenService:
             last_used_at=datetime.now(timezone.utc),
         )
         db.add(new_token)
-        db.commit()
-        db.refresh(new_token)
-        logger.info(f"[FCM] Registered new token for user_id={user_id} device={request.device_type}")
-        return new_token
+        try:
+            db.commit()
+            db.refresh(new_token)
+            logger.info(f"[FCM] Registered new token for user_id={user_id} device={request.device_type}")
+            return new_token
+        except Exception as err:
+            db.rollback()
+            logger.warning(f"[FCM] Concurrent token insertion detected, attempting update: {err}")
+            existing_token = db.scalar(stmt)
+            if existing_token:
+                existing_token.user_id = user_id
+                existing_token.device_type = request.device_type
+                existing_token.platform = request.platform
+                existing_token.browser = request.browser
+                existing_token.os = request.os
+                existing_token.device_name = request.device_name
+                existing_token.is_active = True
+                existing_token.is_deleted = False
+                existing_token.last_used_at = datetime.now(timezone.utc)
+                db.commit()
+                db.refresh(existing_token)
+                return existing_token
+            raise err
 
     @staticmethod
     def unregister(db: Session, user_id: int, fcm_token: str) -> bool:

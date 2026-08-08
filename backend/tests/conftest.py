@@ -13,7 +13,8 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from app.main import app
-from app.core.database import Base, get_db
+from app.database.base import Base
+from app.database.session import get_db
 from app.core.security import hash_password
 
 # ── In-Memory SQLite (fast, no external DB needed) ────────────

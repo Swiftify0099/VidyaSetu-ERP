@@ -5,9 +5,10 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity,
-  Alert, ActivityIndicator, Platform, TextInput,
+  Alert, ActivityIndicator, Platform, TextInput, ScrollView,
 } from 'react-native';
-import { attendanceAPI } from '../../services/api';
+import { attendanceAPI, teacherPortalAPI } from '../../services/api';
+import { CLASSES, DIVISIONS } from '../../config/constants';
 import Toast from 'react-native-toast-message';
 
 const COLORS = {
@@ -34,13 +35,32 @@ const STATUS_CONFIG: Record<AttendanceStatus, { label: string; color: string; bg
 };
 
 export default function AttendanceScreen() {
-  const [standard, setStandard] = useState('8');
-  const [division, setDivision] = useState('A');
+  // Default to first standard; will be updated when teacher's class loads
+  const [standard, setStandard] = useState(CLASSES[0]);
+  const [division, setDivision] = useState(DIVISIONS[0]);
+  const [availableClasses, setAvailableClasses] = useState<string[]>(CLASSES);
+  const [availableDivisions, setAvailableDivisions] = useState<string[]>(DIVISIONS);
   const [date] = useState(new Date().toISOString().split('T')[0]);
   const [students, setStudents] = useState<StudentRecord[]>([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [fetched, setFetched] = useState(false);
+
+  // Load teacher's assigned classes on mount to pre-fill selection
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await teacherPortalAPI.getMyClasses();
+        const classes = res.data?.data ?? [];
+        if (Array.isArray(classes) && classes.length > 0) {
+          const standards = [...new Set(classes.map((c: any) => String(c.standard)))];
+          const divisions = [...new Set(classes.map((c: any) => String(c.division ?? 'A')))];
+          if (standards.length > 0) { setAvailableClasses(standards); setStandard(standards[0]); }
+          if (divisions.length > 0) { setAvailableDivisions(divisions); setDivision(divisions[0]); }
+        }
+      } catch { /* Use default CLASSES and DIVISIONS */ }
+    })();
+  }, []);
 
   const fetchClassList = useCallback(async () => {
     if (!standard || !division) return;
@@ -49,7 +69,9 @@ export default function AttendanceScreen() {
     try {
       const res = await attendanceAPI.getClassAttendance(standard, division, date);
       const data = res.data?.data ?? [];
-      setStudents(data.map((s: any) => ({ ...s, status: s.status ?? 'present' })));
+      // Support both roster array and { students: [] } format
+      const rows = Array.isArray(data) ? data : (data.students ?? []);
+      setStudents(rows.map((s: any) => ({ ...s, status: s.status ?? 'present' })));
       setFetched(true);
     } catch {
       Toast.show({ type: 'error', text1: 'Failed to load class list' });
@@ -76,11 +98,14 @@ export default function AttendanceScreen() {
       const records = students.map(s => ({
         student_id: s.id,
         status: s.status,
-        date,
+      }));
+      await attendanceAPI.markAttendance({
+        att_date: date,
         standard,
         division,
-      }));
-      await attendanceAPI.markAttendance(records);
+        academic_year_id: 1,
+        records,
+      });
       Toast.show({
         type: 'success',
         text1: 'Attendance Saved!',
@@ -101,21 +126,23 @@ export default function AttendanceScreen() {
         <View style={styles.pickerRow}>
           <View style={styles.pickerGroup}>
             <Text style={styles.pickerLabel}>Standard</Text>
-            <View style={styles.pickerWrap}>
-              {['5','6','7','8','9','10'].map(s => (
-                <TouchableOpacity
-                  key={s} style={[styles.pickerBtn, standard === s && styles.pickerActive]}
-                  onPress={() => setStandard(s)}
-                >
-                  <Text style={[styles.pickerText, standard === s && styles.pickerActiveText]}>{s}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              <View style={styles.pickerWrap}>
+                {availableClasses.map(s => (
+                  <TouchableOpacity
+                    key={s} style={[styles.pickerBtn, standard === s && styles.pickerActive]}
+                    onPress={() => setStandard(s)}
+                  >
+                    <Text style={[styles.pickerText, standard === s && styles.pickerActiveText]}>{s}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </ScrollView>
           </View>
           <View style={styles.pickerGroup}>
             <Text style={styles.pickerLabel}>Division</Text>
             <View style={styles.pickerWrap}>
-              {['A','B','C','D'].map(d => (
+              {availableDivisions.map(d => (
                 <TouchableOpacity
                   key={d} style={[styles.pickerBtn, division === d && styles.pickerActive]}
                   onPress={() => setDivision(d)}

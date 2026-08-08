@@ -65,13 +65,17 @@ class Settings(BaseSettings):
     ALLOWED_IMAGE_TYPES: str = "jpg,jpeg,png,webp"
     ALLOWED_DOC_TYPES: str = "pdf,doc,docx,xls,xlsx,ppt,pptx"
     ALLOWED_VIDEO_TYPES: str = "mp4,mov,avi,webm,mkv"
+    # Base URL of the backend server — used to build absolute file URLs returned by the API.
+    # Frontend at a different domain cannot resolve relative /storage/ paths.
+    # Example: https://vidyasetu-backend.onrender.com  (no trailing slash)
+    BACKEND_URL: str = "http://localhost:8000"
 
     # ── Redis ─────────────────────────────────────────────────
     REDIS_URL: str = "redis://localhost:6379"
     REDIS_DB: int = 0
 
     # ── CORS ──────────────────────────────────────────────────
-    ALLOWED_ORIGINS: str = "https://vidyasetu.pages.dev,http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173"
+    ALLOWED_ORIGINS: str = "https://vidyasetu.pages.dev,https://vidyasetu-erp.vidyasetu001.workers.dev,http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173"
 
     # ── School Configuration ──────────────────────────────────
     SCHOOL_CODE: str = "HMMV"
@@ -120,9 +124,11 @@ class Settings(BaseSettings):
     # ── Computed Properties ───────────────────────────────────
     @property
     def allowed_origins_list(self) -> List[str]:
-        origins = [o.strip() for o in self.ALLOWED_ORIGINS.split(",") if o.strip()]
-        if self.FRONTEND_URL and self.FRONTEND_URL.strip() not in origins:
-            origins.append(self.FRONTEND_URL.strip())
+        origins = [o.strip().rstrip("/") for o in self.ALLOWED_ORIGINS.split(",") if o.strip()]
+        if self.FRONTEND_URL:
+            frontend = self.FRONTEND_URL.strip().rstrip("/")
+            if frontend and frontend not in origins:
+                origins.append(frontend)
         return origins
 
     @property

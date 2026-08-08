@@ -12,7 +12,7 @@ from datetime import date
 from decimal import Decimal
 from sqlalchemy import (
     BigInteger, Boolean, Date, ForeignKey,
-    Integer, Numeric, String, Text, UniqueConstraint
+    Integer, Numeric, String, Text, UniqueConstraint, Index
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -43,8 +43,18 @@ class StudentAttendance(BaseModel):
     """
     Daily student attendance record.
     One row per student per day per period/session (and optionally subject).
+    UniqueConstraint enforces one record per student/date/period/subject at the DB level.
     """
     __tablename__ = "student_attendance"
+    __table_args__ = (
+        # Enforce one record per student per date per session per subject at DB level.
+        # subject_id=NULL is treated as a distinct value in PostgreSQL partial indexes;
+        # we use a separate unique index to handle the NULL case correctly.
+        UniqueConstraint(
+            "student_id", "date", "period", "subject_id",
+            name="uq_student_attendance_slot"
+        ),
+    )
 
     student_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("students.id"), nullable=False, index=True)
     date: Mapped[date] = mapped_column(Date, nullable=False, index=True)

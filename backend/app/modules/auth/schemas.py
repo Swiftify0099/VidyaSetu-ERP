@@ -34,6 +34,13 @@ class ForgotPasswordRequest(BaseModel):
     """Initiate forgot password flow."""
     mobile: str
 
+    @field_validator("mobile")
+    @classmethod
+    def validate_mobile(cls, v: str) -> str:
+        from app.core.validators import validate_indian_phone
+        validated = validate_indian_phone(v, required=True)
+        return validated or v.strip()
+
 
 class ResetPasswordRequest(BaseModel):
     """Reset password with OTP."""
@@ -41,6 +48,22 @@ class ResetPasswordRequest(BaseModel):
     otp: str
     new_password: str
     confirm_password: str
+
+    @field_validator("mobile")
+    @classmethod
+    def validate_mobile(cls, v: str) -> str:
+        from app.core.validators import validate_indian_phone
+        validated = validate_indian_phone(v, required=True)
+        return validated or v.strip()
+
+    @field_validator("new_password")
+    @classmethod
+    def validate_new_pass(cls, v: str) -> str:
+        if len(v.strip()) < 6:
+            raise ValueError("Password must be at least 6 characters long.")
+        if len(v) > 100:
+            raise ValueError("Password cannot exceed 100 characters.")
+        return v
 
     @field_validator("confirm_password")
     @classmethod
@@ -55,6 +78,15 @@ class ChangePasswordRequest(BaseModel):
     current_password: str
     new_password: str
     confirm_password: str
+
+    @field_validator("new_password")
+    @classmethod
+    def validate_new_pass(cls, v: str) -> str:
+        if len(v.strip()) < 6:
+            raise ValueError("New password must be at least 6 characters long.")
+        if len(v) > 100:
+            raise ValueError("New password cannot exceed 100 characters.")
+        return v
 
     @field_validator("confirm_password")
     @classmethod

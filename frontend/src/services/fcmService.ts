@@ -68,6 +68,38 @@ export interface NotificationSendResult {
   message_id?: string;
 }
 
+export interface NotificationLogRecord {
+  id: number;
+  uuid?: string;
+  title: string;
+  body: string;
+  /** Timestamp when the notification was sent */
+  sent_at: string;
+  /** 'broadcast' | 'role' | 'class' | 'user' | 'users' | 'topic' */
+  send_mode?: string;
+  /** Alias used by AdminFCMPanel for the target audience type */
+  target_type?: string;
+  target_role?: string;
+  target_class?: string;
+  /** User ID when targeting a single user */
+  user_id?: number;
+  target_user_id?: number;
+  total_sent?: number;
+  success_count?: number;
+  failure_count?: number;
+  sent_by?: number;
+  sent_by_name?: string;
+  /** 'sent' | 'failed' | 'partial' */
+  status?: string;
+  /** Alias used by AdminFCMPanel */
+  delivery_status?: string;
+  /** Error detail if delivery failed */
+  error_message?: string | null;
+  created_at?: string;
+  data?: Record<string, string>;
+  image_url?: string;
+}
+
 // ── Device detection helpers ─────────────────────────────────
 
 function detectDeviceInfo(): FCMDeviceInfo {
