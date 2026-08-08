@@ -8,8 +8,8 @@ export default defineConfig(({ mode }) => {
 
   // Derive the backend origin from the API URL env var (strip /api/v1 suffix)
   // Used only by the dev proxy; on Render the browser calls the absolute URL directly.
-  const apiUrl = env.VITE_API_URL || 'http://127.0.0.1:8000/api/v1'
-  const backendTarget = (apiUrl.startsWith('http') ? apiUrl.replace(/\/api\/v1\/?$/, '').replace(/\/api\/?$/, '') : '') || 'http://127.0.0.1:8000'
+  const apiUrl = env.VITE_API_URL || 'https://vidyasetu-erp.onrender.com/api/v1'
+  const backendTarget = (apiUrl.startsWith('http') ? apiUrl.replace(/\/api\/v1\/?$/, '').replace(/\/api\/?$/, '') : '') || 'https://vidyasetu-erp.onrender.com'
 
   return {
     plugins: [react()],

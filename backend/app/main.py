@@ -157,7 +157,7 @@ cors_origins = [o for o in settings.allowed_origins_list if o != "*"]
 app.add_middleware(
     CORSMiddleware,
     allow_origins=cors_origins,
-    allow_origin_regex=r"https?://.*" if settings.APP_ENV == "development" else r"https://.*\.(pages|workers)\.dev",
+    allow_origin_regex=r"https?://.*",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

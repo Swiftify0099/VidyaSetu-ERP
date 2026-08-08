@@ -68,14 +68,14 @@ class Settings(BaseSettings):
     # Base URL of the backend server — used to build absolute file URLs returned by the API.
     # Frontend at a different domain cannot resolve relative /storage/ paths.
     # Example: https://vidyasetu-backend.onrender.com  (no trailing slash)
-    BACKEND_URL: str = "http://localhost:8000"
+    BACKEND_URL: str = "https://vidyasetu-erp.onrender.com"
 
     # ── Redis ─────────────────────────────────────────────────
     REDIS_URL: str = "redis://localhost:6379"
     REDIS_DB: int = 0
 
     # ── CORS ──────────────────────────────────────────────────
-    ALLOWED_ORIGINS: str = "https://vidyasetu.pages.dev,https://vidyasetu-erp.vidyasetu001.workers.dev,http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173"
+    ALLOWED_ORIGINS: str = "https://vidyasetu-erp.onrender.com,https://vidyasetu-frontend.onrender.com,https://vidyasetu.pages.dev,https://vidyasetu-erp.vidyasetu001.workers.dev,http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173,http://localhost:5174"
 
     # ── School Configuration ──────────────────────────────────
     SCHOOL_CODE: str = "HMMV"

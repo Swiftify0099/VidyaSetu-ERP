@@ -1,8 +1,8 @@
 import axios from 'axios';
 import authService from './authService';
 
-export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL || 'https://vidyasetu-backend.onrender.com/api/v1';
-export const STORAGE_BASE_URL = import.meta.env.VITE_STORAGE_URL || 'https://vidyasetu-backend.onrender.com/storage';
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL || 'https://vidyasetu-erp.onrender.com/api/v1';
+export const STORAGE_BASE_URL = import.meta.env.VITE_STORAGE_URL || 'https://vidyasetu-erp.onrender.com/storage';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
