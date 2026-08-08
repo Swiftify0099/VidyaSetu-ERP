@@ -14,8 +14,9 @@ import { useState, useEffect, useCallback } from 'react';
 import fcmService, {
   type SendNotificationPayload,
   type NotificationSendResult,
+  type NotificationLogRecord,
+  type FCMTokenRecord,
 } from '../../services/fcmService';
-import type { NotificationLogRecord, FCMTokenRecord } from '../../services/fcmService';
 
 // ── Types ─────────────────────────────────────────────────────
 type SendMode = 'user' | 'users' | 'broadcast' | 'role' | 'topic' | 'class';
