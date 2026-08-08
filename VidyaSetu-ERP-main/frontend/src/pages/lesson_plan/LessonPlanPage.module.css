@@ -1,0 +1,117 @@
+/* LessonPlanPage.module.css — Enterprise 2026 Edition */
+
+.page { padding: var(--space-6); max-width: 1400px; margin: 0 auto; display: flex; flex-direction: column; gap: var(--space-5); }
+
+/* ── Tab Bar ─────────────────────────────────────────────── */
+.tabs {
+  display: flex; gap: var(--space-1);
+  background: var(--color-surface); border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg); padding: var(--space-2);
+  overflow-x: auto; width: fit-content;
+  box-shadow: var(--shadow-xs);
+}
+.tab {
+  height: 38px; padding: 0 var(--space-5);
+  border-radius: var(--radius-md); border: none; background: none;
+  font-size: var(--font-size-sm); font-weight: var(--font-weight-medium);
+  cursor: pointer; color: var(--color-text-secondary); font-family: var(--font-family);
+  transition: all var(--transition-fast); white-space: nowrap;
+}
+.tab:hover { background: var(--color-surface-2); color: var(--color-text-primary); }
+.activeTab {
+  background: var(--color-primary) !important; color: white !important;
+  font-weight: var(--font-weight-semibold);
+}
+
+/* ── Table Card ──────────────────────────────────────────── */
+.tableCard {
+  background: var(--color-surface); border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl); overflow: hidden; box-shadow: var(--shadow-sm);
+}
+
+/* ── Cell Helpers ─────────────────────────────────────────── */
+.subject { font-weight: var(--font-weight-semibold); font-size: var(--font-size-sm); color: var(--color-text-primary); }
+.classDiv { font-size: var(--font-size-xs); color: var(--color-text-muted); }
+.periods { display: flex; align-items: center; gap: 2px; font-weight: var(--font-weight-bold); font-size: var(--font-size-sm); justify-content: center; }
+.completed { color: var(--color-success); }
+.slash { color: var(--color-text-muted); }
+
+/* ── Action Buttons ──────────────────────────────────────── */
+.actionGroup { display: flex; gap: var(--space-1); justify-content: center; }
+.xbtn {
+  height: 30px; padding: 0 var(--space-3);
+  border-radius: var(--radius-md); border: none;
+  cursor: pointer; font-size: var(--font-size-xs); font-weight: var(--font-weight-semibold);
+  font-family: var(--font-family); transition: all var(--transition-fast);
+  display: flex; align-items: center; gap: 4px;
+}
+.xbtn:hover { filter: brightness(0.9); transform: translateY(-1px); }
+.info   { background: var(--color-info-light); color: var(--color-info); border: 1px solid var(--color-info-border); }
+.info:hover { background: var(--color-info); color: white; }
+.danger { background: var(--color-danger-light); color: var(--color-danger); border: 1px solid var(--color-danger-border); }
+.danger:hover { background: var(--color-danger); color: white; }
+
+/* ── Form ─────────────────────────────────────────────────── */
+.form { display: flex; flex-direction: column; gap: var(--space-4); }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4); }
+.grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: var(--space-4); }
+.fg { display: flex; flex-direction: column; gap: var(--space-2); }
+.lbl { font-size: var(--font-size-sm); font-weight: var(--font-weight-semibold); color: var(--color-text-primary); }
+
+.inp {
+  height: 42px; padding: 0 var(--space-4);
+  border: 1.5px solid var(--color-border); border-radius: var(--radius-md);
+  font-size: var(--font-size-sm); outline: none;
+  background: var(--color-surface-2); color: var(--color-text-primary);
+  font-family: var(--font-family); transition: all var(--transition-fast); width: 100%;
+}
+.inp:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 12%, transparent);
+  background: var(--color-surface);
+}
+.ta {
+  resize: vertical; padding: var(--space-3) var(--space-4);
+  border: 1.5px solid var(--color-border); border-radius: var(--radius-md);
+  font-size: var(--font-size-sm); outline: none;
+  background: var(--color-surface-2); color: var(--color-text-primary);
+  font-family: var(--font-family); transition: all var(--transition-fast); width: 100%;
+}
+.ta:focus { border-color: var(--color-primary); background: var(--color-surface); }
+
+.checkRow { display: flex; align-items: center; gap: var(--space-5); font-size: var(--font-size-sm); }
+.checkRow label { display: flex; align-items: center; gap: var(--space-2); cursor: pointer; color: var(--color-text-secondary); }
+.checkRow input { accent-color: var(--color-primary); }
+
+/* ── Header Buttons ──────────────────────────────────────── */
+.headerBtns { display: flex; gap: var(--space-2); }
+
+.primaryBtn {
+  height: 42px; padding: 0 var(--space-6); border-radius: var(--radius-md);
+  border: none; background: var(--color-primary); color: white;
+  font-weight: var(--font-weight-semibold); cursor: pointer;
+  font-size: var(--font-size-sm); font-family: var(--font-family);
+  display: flex; align-items: center; gap: var(--space-2);
+  box-shadow: var(--shadow-primary); transition: all var(--transition-base);
+}
+.primaryBtn:hover:not(:disabled) { background: var(--color-primary-hover); transform: translateY(-1px); }
+.primaryBtn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+.secondaryBtn {
+  height: 42px; padding: 0 var(--space-5); border-radius: var(--radius-md);
+  border: 1.5px solid var(--color-border); background: var(--color-surface);
+  color: var(--color-text-primary); font-weight: var(--font-weight-medium);
+  cursor: pointer; font-size: var(--font-size-sm); font-family: var(--font-family);
+  transition: all var(--transition-fast);
+}
+.secondaryBtn:hover { border-color: var(--color-primary); color: var(--color-primary); background: var(--color-primary-light); }
+
+.cancelBtn {
+  height: 42px; padding: 0 var(--space-5); border-radius: var(--radius-md);
+  border: 1.5px solid var(--color-border); background: none;
+  cursor: pointer; font-size: var(--font-size-sm); font-family: var(--font-family);
+  color: var(--color-text-secondary); transition: all var(--transition-fast);
+}
+.cancelBtn:hover { background: var(--color-surface-2); }
+
+@media (max-width: 640px) { .grid2, .grid3 { grid-template-columns: 1fr; } }
