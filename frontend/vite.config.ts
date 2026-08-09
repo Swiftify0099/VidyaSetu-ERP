@@ -49,10 +49,10 @@ export default defineConfig(({ mode }) => {
       rollupOptions: {
         output: {
           manualChunks: {
-            react:   ['react', 'react-dom', 'react-router-dom'],
-            charts:  ['recharts'],
-            utils:   ['axios', 'zustand', 'date-fns'],
-            tiptap:  ['@tiptap/react', '@tiptap/starter-kit'],
+            react: ['react', 'react-dom', 'react-router-dom'],
+            charts: ['recharts'],
+            utils: ['axios', 'zustand', 'date-fns'],
+            tiptap: ['@tiptap/react', '@tiptap/starter-kit'],
           },
         },
       },
