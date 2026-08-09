@@ -6,6 +6,7 @@ import { ThemeProvider } from './contexts/ThemeContext';
 import { NotificationProvider } from './contexts/NotificationContext';
 import ProtectedRoute from './components/ui/ProtectedRoute';
 import LoadingScreen from './components/ui/LoadingScreen';
+import MobileBlock from './components/ui/MobileBlock';
 import RolePortalRedirect, { RoleGuard } from './components/ui/RolePortalRedirect';
 import './i18n';
 import './theme/tokens.css';
@@ -91,7 +92,11 @@ const TransportPage = lazy(() => import('./pages/transport/TransportPage'));
 
 export default function App() {
   return (
-    <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+    <>
+      {/* ── Mobile phone gate — shows only on phones (<768px + touch) ── */}
+      <MobileBlock />
+
+      <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <ThemeProvider>
         <AuthProvider>
           <NotificationProvider>
@@ -222,5 +227,6 @@ export default function App() {
         </AuthProvider>
       </ThemeProvider>
     </BrowserRouter>
+    </>
   );
 }
