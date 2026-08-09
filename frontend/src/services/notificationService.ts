@@ -241,26 +241,26 @@ const notificationService = {
   },
 
   /**
-   * Category → emoji map
+   * Category icon indicator label
    */
   getCategoryIcon(category: string): string {
     const map: Record<string, string> = {
-      attendance: '📋',
-      exam: '🎓',
-      fee: '💰',
-      leave: '🏖️',
-      library: '📚',
-      security: '🔐',
-      system: '⚙️',
-      homework: '📝',
-      certificate: '📄',
-      behaviour: '⚠️',
-      transport: '🚌',
-      notice: '📢',
-      birthday: '🎂',
-      admission: '📋',
+      attendance: 'Attendance',
+      exam: 'Exam',
+      fee: 'Fee',
+      leave: 'Leave',
+      library: 'Library',
+      security: 'Security',
+      system: 'System',
+      homework: 'Homework',
+      certificate: 'Certificate',
+      behaviour: 'Behaviour',
+      transport: 'Transport',
+      notice: 'Notice',
+      birthday: 'Birthday',
+      admission: 'Admission',
     };
-    return map[category] ?? '🔔';
+    return map[category] ?? 'Notification';
   },
 
   /**

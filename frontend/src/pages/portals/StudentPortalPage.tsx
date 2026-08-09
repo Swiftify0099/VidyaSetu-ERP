@@ -471,9 +471,9 @@ export default function StudentPortalPage() {
       const asmRes = await studentPortalService.getAssessments();
       setAssessments(asmRes.assessments || []);
       if (result.passed) {
-        toast.success(`🎉 Excellent! You scored ${result.score}/${result.total_marks} (${result.percentage}%) — ${result.grade}`);
+        toast.success(`Excellent! You scored ${result.score}/${result.total_marks} (${result.percentage}%) — ${result.grade}`);
       } else {
-        toast('📚 Assessment submitted. Practice more to improve your score!', { icon: '💡' });
+        toast('Assessment submitted. Practice more to improve your score!');
       }
     } catch {
       toast.error('Submission failed. Please try again.');

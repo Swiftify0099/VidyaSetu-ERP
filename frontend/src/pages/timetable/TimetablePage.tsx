@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, Fragment } from 'react';
 import {
   CalendarDays, Plus, RefreshCw, Check, X, BookOpen,
   Clock, Pencil, Trash2, LayoutGrid, User, Copy, AlertTriangle,
-  Printer, UserCheck, ShieldAlert, Layers, Sparkles
+  Printer, UserCheck, ShieldAlert, Layers, Sparkles, Building2
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import timetableService, {
@@ -556,8 +556,8 @@ export default function TimetablePage() {
                             <>
                               <div className={styles.cellSubject}>{cell.subject_name}</div>
                               {cell.subject_name_marathi && <div className={styles.cellSubjectMr}>{cell.subject_name_marathi}</div>}
-                              {cell.teacher_name && <div className={styles.cellTeacher}>👤 {cell.teacher_name.split(' ').slice(-1)[0]}</div>}
-                              {cell.room && <div className={styles.cellRoom}>🏫 {cell.room}</div>}
+                              {cell.teacher_name && <div className={styles.cellTeacher}><User size={11} className="inline mr-1" /> {cell.teacher_name.split(' ').slice(-1)[0]}</div>}
+                              {cell.room && <div className={styles.cellRoom}><Building2 size={11} className="inline mr-1" /> {cell.room}</div>}
                             </>
                           ) : (
                             <div className={styles.emptyCell}>
@@ -637,7 +637,7 @@ export default function TimetablePage() {
                               <div className={styles.teacherCellInner}>
                                 <div className={styles.tcClass}>Std {cell.standard}{cell.division}</div>
                                 <div className={styles.tcSubject}>{cell.subject_name}</div>
-                                {cell.room && <div className={styles.tcRoom}>🏫 {cell.room}</div>}
+                                {cell.room && <div className={styles.tcRoom}><Building2 size={11} className="inline mr-1" /> {cell.room}</div>}
                               </div>
                             ) : <span className={styles.freeCell}>— Free —</span>}
                           </td>
@@ -703,7 +703,7 @@ export default function TimetablePage() {
                   Original Teacher: <span style={{ textDecoration: 'line-through' }}>{s.original_teacher_name || 'N/A'}</span>
                 </div>
                 <div style={{ fontSize: '13px', color: 'var(--color-primary)', fontWeight: 'bold' }}>
-                  Substitute: 👤 {s.substitute_teacher_name}
+                  Substitute: <User size={12} className="inline mr-1" /> {s.substitute_teacher_name}
                 </div>
                 {s.reason && <div style={{ fontSize: '12px', fontStyle: 'italic' }}>Note: {s.reason}</div>}
                 <button className={`${styles.miniBtn} ${styles.miniBtnDanger}`} style={{ alignSelf: 'flex-start', marginTop: '8px' }}
@@ -972,7 +972,7 @@ export default function TimetablePage() {
                 <select className={styles.mi} value={selSubTeacher} onChange={e => setSelSubTeacher(e.target.value)}>
                   <option value="">-- Select Free Teacher --</option>
                   {freeTeachers.map(t => (
-                    <option key={t.id} value={t.id}>👤 {t.full_name} {t.designation ? `(${t.designation})` : ''}</option>
+                    <option key={t.id} value={t.id}>{t.full_name} {t.designation ? `(${t.designation})` : ''}</option>
                   ))}
                 </select>
                 {freeTeachers.length === 0 && <span style={{ fontSize: '11px', color: '#ef4444' }}>No free teachers detected during this period! You can select any teacher below:</span>}

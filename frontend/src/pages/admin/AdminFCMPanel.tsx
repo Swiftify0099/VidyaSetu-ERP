@@ -22,11 +22,11 @@ type SendMode = 'user' | 'users' | 'broadcast' | 'role' | 'topic' | 'class';
 type Tab = 'send' | 'logs' | 'devices';
 
 const ROLE_OPTIONS = [
-  { code: 'student', label: '🎓 Students' },
-  { code: 'teacher', label: '👩‍🏫 Teachers' },
-  { code: 'parent', label: '👨‍👩‍👧 Parents' },
-  { code: 'staff', label: '🏢 Staff' },
-  { code: 'admin', label: '🔐 Admins' },
+  { code: 'student', label: 'Students' },
+  { code: 'teacher', label: 'Teachers' },
+  { code: 'parent', label: 'Parents' },
+  { code: 'staff', label: 'Staff' },
+  { code: 'admin', label: 'Admins' },
 ];
 
 export default function AdminFCMPanel() {
@@ -392,14 +392,14 @@ export default function AdminFCMPanel() {
                 <tbody>
                   {logs.map(log => (
                     <tr key={log.id} style={styles.tr}>
-                      <td style={styles.td}>{new Date(log.sent_at).toLocaleString('en-IN')}</td>
+                      <td style={styles.td}>{new Date(log.sent_at || log.created_at || Date.now()).toLocaleString('en-IN')}</td>
                       <td style={{ ...styles.td, fontWeight: 600 }}>{log.title}</td>
                       <td style={styles.td}>{log.body.substring(0, 60)}{log.body.length > 60 ? '…' : ''}</td>
                       <td style={styles.td}>
                         <span style={styles.typePill}>{log.target_type}</span>
                         {log.user_id && <span style={{ marginLeft: 4, color: '#9ca3af', fontSize: 11 }}>#{log.user_id}</span>}
                       </td>
-                      <td style={styles.td}>{statusBadge(log.delivery_status)}</td>
+                      <td style={styles.td}>{statusBadge(log.delivery_status || log.status || 'sent')}</td>
                       <td style={{ ...styles.td, color: '#ef4444', fontSize: 11 }}>{log.error_message ?? '—'}</td>
                     </tr>
                   ))}

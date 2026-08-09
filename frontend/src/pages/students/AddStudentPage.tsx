@@ -4,7 +4,7 @@ import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import toast from 'react-hot-toast';
-import { ChevronLeft, ChevronRight, Save, User, Users, MapPin, BookOpen, Heart } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Save, User, Users, MapPin, BookOpen, Heart, CheckCircle2 } from 'lucide-react';
 import studentService from '../../services/studentService';
 import styles from './AddStudentPage.module.css';
 
@@ -113,7 +113,7 @@ export default function AddStudentPage() {
         admission_date: data.admission_date || new Date().toISOString().split('T')[0],
       };
       const result = await studentService.create(payload);
-      toast.success(`✅ Student admitted! GR: ${result.gr_number}`);
+      toast.success(`Student admitted! GR: ${result.gr_number}`);
       navigate(`/students/${result.id}`);
     } catch (err: any) {
       const msg = err?.response?.data?.detail || err?.response?.data?.message || 'Admission failed. Please try again.';
@@ -432,7 +432,7 @@ export default function AddStudentPage() {
               </div>
 
               <div className={styles.reviewBox}>
-                <div className={styles.reviewTitle}>✅ Ready to Submit</div>
+                <div className={styles.reviewTitle}><CheckCircle2 size={16} className="inline mr-1 text-emerald-500" /> Ready to Submit</div>
                 <p className={styles.reviewText}>
                   A GR number will be automatically assigned. Review all details before submitting.
                 </p>

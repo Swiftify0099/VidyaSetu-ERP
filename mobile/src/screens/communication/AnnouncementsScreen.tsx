@@ -1,11 +1,9 @@
-/**
- * VidyaSetu Mobile — Announcements / Notifications Screen
- */
 import React, { useState, useCallback, useEffect } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity,
   RefreshControl, ActivityIndicator,
 } from 'react-native';
+import Icon from 'react-native-vector-icons/FontAwesome5';
 import { communicationAPI } from '../../services/api';
 import Toast from 'react-native-toast-message';
 
@@ -26,8 +24,8 @@ interface Announcement {
 }
 
 const TYPE_ICONS: Record<string, string> = {
-  general: '📢', exam: '📝', holiday: '🎉', fee: '💰',
-  event: '🎭', emergency: '🚨', academic: '📚',
+  general: 'bullhorn', exam: 'file-alt', holiday: 'calendar-check', fee: 'money-bill-wave',
+  event: 'glass-cheers', emergency: 'exclamation-triangle', academic: 'book-open',
 };
 const TYPE_COLORS: Record<string, string> = {
   general: '#4f46e5', exam: '#7c3aed', holiday: '#059669',
@@ -77,13 +75,13 @@ export default function AnnouncementsScreen() {
         ItemSeparatorComponent={() => <View style={{ height: 10 }} />}
         ListEmptyComponent={
           <View style={styles.center}>
-            <Text style={styles.emptyIcon}>📭</Text>
+            <Icon name="inbox" size={40} color={COLORS.textSecondary} />
             <Text style={styles.emptyText}>No announcements yet</Text>
           </View>
         }
         renderItem={({ item }) => {
           const typeColor = TYPE_COLORS[item.announcement_type] ?? COLORS.primary;
-          const typeIcon  = TYPE_ICONS[item.announcement_type] ?? '📢';
+          const iconName  = TYPE_ICONS[item.announcement_type] ?? 'bullhorn';
           return (
             <TouchableOpacity
               style={[styles.card, !item.is_read && styles.cardUnread]}
@@ -95,14 +93,14 @@ export default function AnnouncementsScreen() {
 
               <View style={styles.cardHeader}>
                 <View style={[styles.typeChip, { backgroundColor: typeColor + '18' }]}>
-                  <Text style={styles.typeIcon}>{typeIcon}</Text>
+                  <Icon name={iconName} size={11} color={typeColor} />
                   <Text style={[styles.typeText, { color: typeColor }]}>
                     {item.announcement_type.toUpperCase()}
                   </Text>
                 </View>
                 {item.priority === 'high' || item.priority === 'urgent' ? (
                   <View style={styles.urgentChip}>
-                    <Text style={styles.urgentText}>🔴 {item.priority.toUpperCase()}</Text>
+                    <Text style={styles.urgentText}>{item.priority.toUpperCase()}</Text>
                   </View>
                 ) : null}
               </View>
@@ -119,7 +117,7 @@ export default function AnnouncementsScreen() {
                   })}
                 </Text>
                 <View style={styles.audienceBadge}>
-                  <Text style={styles.audienceText}>📣 {item.target_audience}</Text>
+                  <Text style={styles.audienceText}>{item.target_audience}</Text>
                 </View>
               </View>
             </TouchableOpacity>

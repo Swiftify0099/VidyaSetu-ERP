@@ -48,11 +48,11 @@ interface Summary {
 }
 
 const PAYMENT_MODE_ICONS: Record<string, string> = {
-  cash: '💵',
-  upi: '📱',
-  cheque: '🏦',
-  bank_transfer: '🔄',
-  dd: '📄',
+  cash: 'money-bill-wave',
+  upi: 'mobile-alt',
+  cheque: 'university',
+  bank_transfer: 'exchange-alt',
+  dd: 'file-invoice-dollar',
 };
 
 export default function FinanceDashboardScreen({ navigation }: { navigation: any }) {
@@ -172,7 +172,7 @@ export default function FinanceDashboardScreen({ navigation }: { navigation: any
             {tab === 'receipts' ? (
               receipts.length === 0 ? (
                 <PremiumCard variant="flat" style={s.emptyCard}>
-                  <Text style={s.emptyIcon}>🧾</Text>
+                  <Icon name="receipt" size={32} color={colors.textSecondary} />
                   <Text style={[s.emptyText, { color: colors.textSecondary }]}>No receipts today</Text>
                 </PremiumCard>
               ) : (
@@ -180,7 +180,7 @@ export default function FinanceDashboardScreen({ navigation }: { navigation: any
                   <PremiumCard key={r.id} variant="bordered" padding={12} style={{ marginBottom: 8 }}>
                     <View style={s.receiptRow}>
                       <View style={[s.receiptIcon, { backgroundColor: colors.successBg }]}>
-                        <Text style={{ fontSize: 20 }}>{PAYMENT_MODE_ICONS[r.payment_mode] ?? '💰'}</Text>
+                        <Icon name={PAYMENT_MODE_ICONS[r.payment_mode] ?? 'money-bill-wave'} size={18} color={colors.success} />
                       </View>
                       <View style={{ flex: 1 }}>
                         <Text style={[s.receiptName, { color: colors.text }]}>{r.student_name}</Text>

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import {
   BookOpen, Plus, Search, Filter, Calendar, Clock, CheckCircle2,
   AlertTriangle, FileText, Send, Sparkles, Download, Trash2,
-  Award, Eye, X, RefreshCw, LayoutGrid, List, MessageSquare, ExternalLink, ChevronRight
+  Award, Eye, X, RefreshCw, LayoutGrid, List, MessageSquare, ExternalLink, ChevronRight, Pencil, Bot
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '../../contexts/AuthContext';
@@ -198,7 +198,7 @@ export default function HomeworkPortalPage() {
     setSavingHw(true);
     try {
       await homeworkService.createHomework(hwForm);
-      toast.success('Homework assigned successfully! 📚 Notification sent to class.');
+      toast.success('Homework assigned successfully! Notification sent to class.');
       setShowAssignModal(false);
       loadHomework();
       setHwForm({
@@ -465,10 +465,10 @@ export default function HomeworkPortalPage() {
               onClick={() => setStatusFilter(st)}
             >
               {st === 'ALL' && 'All Statuses'}
-              {st === 'pending' && '⏳ Pending'}
-              {st === 'submitted' && '📩 Submitted'}
-              {st === 'evaluated' && '✅ Evaluated'}
-              {st === 'overdue' && '⚠️ Overdue'}
+              {st === 'pending' && <><Clock size={13} className="inline mr-1" />Pending</>}
+              {st === 'submitted' && <><Send size={13} className="inline mr-1" />Submitted</>}
+              {st === 'evaluated' && <><CheckCircle2 size={13} className="inline mr-1" />Evaluated</>}
+              {st === 'overdue' && <><AlertTriangle size={13} className="inline mr-1" />Overdue</>}
             </button>
           ))}
 
@@ -713,7 +713,7 @@ export default function HomeworkPortalPage() {
               {/* AI Hint Assistant Callout */}
               <div className={styles.aiCallout}>
                 <div className={styles.aiHeader}>
-                  <span>✨ Need a hint or formula? Ask VidyaBot AI</span>
+                  <span><Sparkles size={14} className="inline mr-1 text-amber-500" /> Need a hint or formula? Ask VidyaBot AI</span>
                   <button
                     type="button"
                     className={styles.btnAI}
@@ -793,14 +793,14 @@ export default function HomeworkPortalPage() {
                 style={{ borderRadius: '0', border: 'none', borderBottom: assignTab === 'manual' ? '2px solid var(--color-primary)' : 'none', background: 'transparent' }}
                 onClick={() => setAssignTab('manual')}
               >
-                ✏️ Manual Form
+                <Pencil size={14} className="inline mr-1" /> Manual Form
               </button>
               <button
                 className={styles.pill}
                 style={{ borderRadius: '0', border: 'none', borderBottom: assignTab === 'ai' ? '2px solid #7c3aed' : 'none', background: 'transparent', color: '#7c3aed', fontWeight: 'bold' }}
                 onClick={() => setAssignTab('ai')}
               >
-                ✨ AI Homework Generator
+                <Sparkles size={14} className="inline mr-1 text-violet-500" /> AI Homework Generator
               </button>
             </div>
 
@@ -809,7 +809,7 @@ export default function HomeworkPortalPage() {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
                   <div className={styles.aiCallout}>
                     <div className={styles.aiHeader}>
-                      <span>🤖 AI Homework Question Generator</span>
+                      <span><Bot size={16} className="inline mr-1 text-indigo-500" /> AI Homework Question Generator</span>
                     </div>
                     <p style={{ fontSize: 'var(--font-size-xs)', margin: 0, color: 'var(--color-text-secondary)' }}>
                       Automatically generate high-quality homework questions tailored for Indian curriculum standards.

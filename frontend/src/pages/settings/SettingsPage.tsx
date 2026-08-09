@@ -280,7 +280,7 @@ export default function SettingsPage() {
                     <td>{y.end_date}</td>
                     <td>
                       <span className={`${styles.badge} ${y.is_current ? styles.badgeGreen : styles.badgeGray}`}>
-                        {y.is_current ? '★ Current' : y.status}
+                        {y.is_current ? <><Star size={11} fill="currentColor" className="inline mr-1" /> Current</> : y.status}
                       </span>
                     </td>
                     <td>

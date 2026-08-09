@@ -12,6 +12,7 @@ import { StatusBadge } from '../../components/shared/StatusBadge';
 import { SearchBar } from '../../components/shared/SearchBar';
 import { Modal } from '../../components/shared/Modal';
 import { EmptyState } from '../../components/shared/EmptyState';
+import { FileText, Folder, Clock, Calendar, Briefcase, BarChart2, CalendarDays, DollarSign, AlertTriangle } from 'lucide-react';
 import type { TableColumn } from '../../types';
 import styles from './LeavePage.module.css';
 
@@ -29,6 +30,14 @@ const CUR_YEAR = '2025-2026';
 
 const LEAVE_TABS = ['My Applications', 'All Applications', 'My Balance', 'Holiday Calendar', 'Leave Types'] as const;
 type LeaveTab = typeof LEAVE_TABS[number];
+
+const LEAVE_TAB_ICONS: Record<LeaveTab, React.ReactNode> = {
+  'My Applications': <FileText size={15} />,
+  'All Applications': <Folder size={15} />,
+  'My Balance': <Clock size={15} />,
+  'Holiday Calendar': <Calendar size={15} />,
+  'Leave Types': <Briefcase size={15} />,
+};
 
 export default function LeavePage() {
   const [tab, setTab] = useState<LeaveTab>('My Applications');
@@ -268,7 +277,7 @@ export default function LeavePage() {
   return (
     <div className={styles.page}>
       <PageHeader
-        icon="🏖️"
+        icon={<Briefcase size={24} />}
         title="Leave Management"
         subtitle="Apply for leave, manage holiday calendar and approve requests"
         breadcrumbs={[{ label: 'Dashboard', href: '/dashboard' }, { label: 'Leave' }]}
@@ -284,7 +293,7 @@ export default function LeavePage() {
       <div className={styles.tabs}>
         {LEAVE_TABS.map(t => (
           <button key={t} className={`${styles.tab} ${tab === t ? styles.activeTab : ''}`}
-            onClick={() => setTab(t)}>{t}</button>
+            onClick={() => setTab(t)}>{LEAVE_TAB_ICONS[t]} {t}</button>
         ))}
       </div>
 
@@ -305,7 +314,7 @@ export default function LeavePage() {
           </div>
           <div className={styles.tableCard}>
             <DataTable columns={myAppColumns} data={filteredMyApps} loading={loading}
-              keyExtractor={r => r.id} emptyMessage="No leave applications found. Click '+ Apply Leave' to submit your first application." emptyIcon="🏖️" />
+              keyExtractor={r => r.id} emptyMessage="No leave applications found. Click '+ Apply Leave' to submit your first application." emptyIcon={<Briefcase size={44} />} />
           </div>
         </div>
       )}
@@ -336,7 +345,7 @@ export default function LeavePage() {
       {tab === 'My Balance' && (
         <div className={styles.balanceGrid}>
           {balances.length === 0 ? (
-            <EmptyState icon="📊" title="No leave balance found" description="Contact admin to initialize your leave balance" size="md" />
+            <EmptyState icon={<BarChart2 size={44} />} title="No leave balance found" description="Contact admin to initialize your leave balance" size="md" />
           ) : balances.map(b => (
             <div key={b.id} className={styles.balanceCard}>
               <div className={styles.balanceTitle}>{b.leave_type_name}</div>
@@ -372,7 +381,7 @@ export default function LeavePage() {
               },
             ] as TableColumn<Holiday>[]}
             data={holidays} loading={loading}
-            keyExtractor={r => r.id} emptyMessage="No holidays defined. Click '+ Holiday' to add." emptyIcon="📅"
+            keyExtractor={r => r.id} emptyMessage="No holidays defined. Click '+ Holiday' to add." emptyIcon={<CalendarDays size={44} />}
           />
         </div>
       )}
@@ -381,12 +390,12 @@ export default function LeavePage() {
       {tab === 'Leave Types' && (
         <div className={styles.leaveTypesGrid}>
           {leaveTypes.length === 0 ? (
-            <EmptyState icon="📋" title="No leave types found" description="Contact admin to create leave types" size="md" />
+            <EmptyState icon={<Briefcase size={44} />} title="No leave types found" description="Contact admin to create leave types" size="md" />
           ) : leaveTypes.map(lt => (
             <div key={lt.id} className={styles.typeCard}>
               <div className={styles.typeHeader}>
                 <div className={styles.typeCode}>{lt.code}</div>
-                <span className={styles.typePaid}>{lt.is_paid ? '💰 Paid' : 'Unpaid'}</span>
+                <span className={styles.typePaid}>{lt.is_paid ? <><DollarSign size={12} className="inline" /> Paid</> : 'Unpaid'}</span>
               </div>
               <div className={styles.typeName}>{lt.name}</div>
               <div className={styles.typeQuota}>{lt.annual_quota} days / year</div>
@@ -415,8 +424,8 @@ export default function LeavePage() {
             </select>
           </div>
           {leaveTypes.length === 0 && (
-            <p style={{ color: 'var(--color-warning)', fontSize: '0.8rem', margin: '0 0 8px' }}>
-              ⚠️ No leave types available. Ask admin to create leave types first.
+            <p style={{ color: 'var(--color-warning)', fontSize: '0.8rem', margin: '0 0 8px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <AlertTriangle size={14} /> No leave types available. Ask admin to create leave types first.
             </p>
           )}
           <div className={styles.fg}><label className={styles.lbl}>Academic Year</label>

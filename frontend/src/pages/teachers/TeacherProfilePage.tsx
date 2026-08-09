@@ -728,7 +728,7 @@ export default function TeacherProfilePage() {
               {teacher.subjects ? (
                 <div className={styles.chipCloud}>
                   {teacher.subjects.split(',').map((sub, i) => (
-                    <span key={i} className={styles.subjectTag}>📚 {sub.trim()}</span>
+                    <span key={i} className={styles.subjectTag}><BookOpen size={13} className="inline mr-1" /> {sub.trim()}</span>
                   ))}
                 </div>
               ) : (
@@ -742,7 +742,7 @@ export default function TeacherProfilePage() {
               {teacher.classes_assigned ? (
                 <div className={styles.chipCloud}>
                   {teacher.classes_assigned.split(',').map((cls, i) => (
-                    <span key={i} className={styles.classTag}>🏫 Class {cls.trim()}</span>
+                    <span key={i} className={styles.classTag}><Building2 size={13} className="inline mr-1" /> Class {cls.trim()}</span>
                   ))}
                 </div>
               ) : (

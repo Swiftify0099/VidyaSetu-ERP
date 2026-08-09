@@ -25,7 +25,7 @@ interface PageHeaderProps {
   subtitle?: string;
   breadcrumbs?: Breadcrumb[];
   actions?: React.ReactNode;
-  icon?: string;
+  icon?: string | React.ReactNode;
   badge?: React.ReactNode;
 }
 

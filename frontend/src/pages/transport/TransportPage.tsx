@@ -213,7 +213,7 @@ export default function TransportPage() {
                       </td>
                       <td className={fitnessAlert ? styles.textDanger : ''}>
                         {v.fitness_expiry ?? '—'}
-                        {fitnessAlert && ' ⚠️'}
+                        {fitnessAlert && <AlertTriangle size={14} className="inline ml-1 text-amber-500" />}
                       </td>
                       <td>
                         <span className={`${styles.badge} ${v.status === 'active' ? styles.badgeActive : styles.badgeMaint}`}>

@@ -23,29 +23,30 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useNotificationContext } from '../../contexts/NotificationContext';
 import notificationService, { AppNotification } from '../../services/notificationService';
 import { scheduleDelayedSystemNotification } from '../../utils/notificationUtils';
+import { NotificationCategoryIcon } from '../../components/shared/NotificationCategoryIcon';
 import styles from './NotificationCenterPage.module.css';
 
 // ── Category config ────────────────────────────────────────
 
 const CATEGORIES = [
-  { key: 'all',         label: 'All',        emoji: '🔔' },
-  { key: 'exam',        label: 'Exam',       emoji: '🎓' },
-  { key: 'attendance',  label: 'Attendance', emoji: '📋' },
-  { key: 'fee',         label: 'Finance',    emoji: '💰' },
-  { key: 'leave',       label: 'Leave',      emoji: '🏖️' },
-  { key: 'library',     label: 'Library',    emoji: '📚' },
-  { key: 'homework',    label: 'Homework',   emoji: '📝' },
-  { key: 'notice',      label: 'Notices',    emoji: '📢' },
-  { key: 'security',    label: 'Security',   emoji: '🔐' },
-  { key: 'system',      label: 'System',     emoji: '⚙️' },
+  { key: 'all',         label: 'All' },
+  { key: 'exam',        label: 'Exam' },
+  { key: 'attendance',  label: 'Attendance' },
+  { key: 'fee',         label: 'Finance' },
+  { key: 'leave',       label: 'Leave' },
+  { key: 'library',     label: 'Library' },
+  { key: 'homework',    label: 'Homework' },
+  { key: 'notice',      label: 'Notices' },
+  { key: 'security',    label: 'Security' },
+  { key: 'system',      label: 'System' },
 ];
 
 const PRIORITIES = [
-  { key: '',         label: 'All Priority' },
-  { key: 'critical', label: '🚨 Critical' },
-  { key: 'high',     label: '🔴 High' },
-  { key: 'medium',   label: '🟡 Medium' },
-  { key: 'low',      label: '⚪ Low' },
+  { key: '',         label: 'All Priority', icon: <Bell size={14} /> },
+  { key: 'critical', label: 'Critical',     icon: <Flame size={14} className="text-rose-500" /> },
+  { key: 'high',     label: 'High',         icon: <AlertTriangle size={14} className="text-amber-500" /> },
+  { key: 'medium',   label: 'Medium',       icon: <ShieldAlert size={14} className="text-blue-500" /> },
+  { key: 'low',      label: 'Low',          icon: <CheckCircle2 size={14} className="text-slate-400" /> },
 ];
 
 export default function NotificationCenterPage() {
@@ -455,7 +456,7 @@ export default function NotificationCenterPage() {
                 onClick={() => setCategory(cat.key)}
                 id={`notif-cat-${cat.key}`}
               >
-                <span>{cat.emoji}</span>
+                <NotificationCategoryIcon category={cat.key} size={15} />
                 {cat.label}
                 {catBreakdown[cat.key] ? (
                   <span className={styles.filterBadge}>{catBreakdown[cat.key]}</span>
@@ -473,6 +474,7 @@ export default function NotificationCenterPage() {
                 onClick={() => setPriority(p.key)}
                 id={`notif-pri-${p.key || 'all'}`}
               >
+                {p.icon}
                 {p.label}
               </button>
             ))}
@@ -516,7 +518,7 @@ export default function NotificationCenterPage() {
           ) : notifications.length === 0 ? (
             <div className={styles.empty}>
               <div className={styles.emptyIcon}>
-                {category !== 'all' ? notificationService.getCategoryIcon(category) : '🔔'}
+                <NotificationCategoryIcon category={category} size={28} />
               </div>
               <div className={styles.emptyTitle}>No notifications found</div>
               <div className={styles.emptyBody}>
@@ -545,7 +547,7 @@ export default function NotificationCenterPage() {
                 {!notif.is_read && <div className={styles.unreadDot} />}
 
                 <div className={styles.notifIconWrap}>
-                  {notificationService.getCategoryIcon(notif.category)}
+                  <NotificationCategoryIcon category={notif.category} size={18} />
                 </div>
 
                 <div className={styles.notifBody}>

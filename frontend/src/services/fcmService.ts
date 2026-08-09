@@ -68,6 +68,27 @@ export interface NotificationSendResult {
   message_id?: string;
 }
 
+export interface NotificationLogRecord {
+  id: number;
+  uuid?: string;
+  sender_id?: number;
+  user_id?: number;
+  recipient_id?: number;
+  recipient_role?: string;
+  recipient_count?: number;
+  title: string;
+  body: string;
+  category?: string;
+  priority?: string;
+  target_type?: string;
+  delivery_status?: string;
+  error_message?: string;
+  sent_via?: string;
+  status?: string;
+  sent_at?: string;
+  created_at?: string;
+}
+
 // ── Device detection helpers ─────────────────────────────────
 
 function detectDeviceInfo(): FCMDeviceInfo {

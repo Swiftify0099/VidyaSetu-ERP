@@ -5,7 +5,7 @@
  * achievements, and generate behaviour reports.
  */
 import { useState, useEffect, useCallback } from 'react';
-import { ShieldAlert, Star, AlertTriangle, BookOpen, Plus, Search, Filter, RefreshCw, Download } from 'lucide-react';
+import { ShieldAlert, Star, AlertTriangle, BookOpen, Plus, Search, Filter, RefreshCw, Download, FileText } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../../services/api';
 import {
@@ -41,9 +41,9 @@ const CATEGORIES = {
 };
 
 const TYPE_CONFIG = {
-  positive: { icon: '⭐', label: 'Positive',  color: '#059669', bg: '#d1fae5' },
-  negative: { icon: '⚠️', label: 'Negative',  color: '#dc2626', bg: '#fee2e2' },
-  neutral:  { icon: '📝', label: 'Neutral',   color: '#6b7280', bg: '#f3f4f6' },
+  positive: { icon: <Star size={13} />, label: 'Positive',  color: '#059669', bg: '#d1fae5' },
+  negative: { icon: <AlertTriangle size={13} />, label: 'Negative',  color: '#dc2626', bg: '#fee2e2' },
+  neutral:  { icon: <FileText size={13} />, label: 'Neutral',   color: '#6b7280', bg: '#f3f4f6' },
 };
 
 const STANDARDS = ['1','2','3','4','5','6','7','8','9','10','11','12'];

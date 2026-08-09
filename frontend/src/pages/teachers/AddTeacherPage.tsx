@@ -4,7 +4,7 @@ import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import toast from 'react-hot-toast';
-import { ChevronLeft, ChevronRight, Save, User, Briefcase, MapPin, BookOpen, CreditCard } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Save, User, Briefcase, MapPin, BookOpen, CreditCard, Lightbulb, CheckCircle2 } from 'lucide-react';
 import teacherService from '../../services/teacherService';
 import styles from '../../pages/students/AddStudentPage.module.css'; // reuse same CSS
 
@@ -129,7 +129,7 @@ export default function AddTeacherPage() {
       if (payload.grade_pay) payload.grade_pay = Number(payload.grade_pay);
 
       const result = await teacherService.create(payload);
-      toast.success(`✅ Staff added! Employee ID: ${result.employee_id}`);
+      toast.success(`Staff added! Employee ID: ${result.employee_id}`);
       navigate(`/teachers/${result.id}`);
     } catch (err: any) {
       const resp = err?.response?.data;
@@ -298,7 +298,7 @@ export default function AddTeacherPage() {
                 <F label="D.Ed. Year of Passing" id="d_ed_year"><Inp id="d_ed_year" type="number" placeholder="e.g. 2010" min={1970} max={2030}/></F>
               </div>
               <div className={styles.reviewBox}>
-                <div className={styles.reviewTitle}>💡 Additional qualifications can be added from the teacher profile after saving.</div>
+                <div className={styles.reviewTitle}><Lightbulb size={16} className="inline mr-1" /> Additional qualifications can be added from the teacher profile after saving.</div>
               </div>
             </div>
           )}
@@ -333,7 +333,7 @@ export default function AddTeacherPage() {
                 <F label="Branch Name" id="bank_branch"><Inp id="bank_branch" placeholder="Branch name and location"/></F>
               </div>
               <div className={styles.reviewBox}>
-                <div className={styles.reviewTitle}>✅ Ready to Submit</div>
+                <div className={styles.reviewTitle}><CheckCircle2 size={16} className="inline mr-1 text-emerald-500" /> Ready to Submit</div>
                 <p className={styles.reviewText}>An Employee ID will be auto-assigned. All details can be updated from the profile.</p>
               </div>
             </div>
