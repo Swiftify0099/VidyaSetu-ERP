@@ -24,6 +24,10 @@ const FCM_PERMISSION_DENIED_KEY = 'vidyasetu_fcm_denied';
 // ── Env vars ─────────────────────────────────────────────────
 const VAPID_KEY = import.meta.env.VITE_FIREBASE_VAPID_KEY as string | undefined;
 
+function getVapidKey(): string | undefined {
+  return (import.meta.env.VITE_FIREBASE_VAPID_KEY as string | undefined) || VAPID_KEY;
+}
+
 // ── Types ─────────────────────────────────────────────────────
 
 export interface FCMDeviceInfo {
@@ -196,7 +200,8 @@ const fcmService = {
       }
 
       // Step 3 — Validate VAPID key
-      if (!VAPID_KEY) {
+      const activeVapidKey = getVapidKey();
+      if (!activeVapidKey) {
         console.error(
           '[FCM] VITE_FIREBASE_VAPID_KEY is missing from .env\n' +
           '→ Get it from Firebase Console → Project Settings → Cloud Messaging → Web Push certificates'
@@ -233,7 +238,7 @@ const fcmService = {
 
       // Step 6 — Get the FCM registration token
       const token = await getToken(messaging, {
-        vapidKey: VAPID_KEY,
+        vapidKey: activeVapidKey,
         serviceWorkerRegistration: swRegistration,
       });
 
@@ -436,9 +441,10 @@ const fcmService = {
     // On next app startup, the token is fetched fresh from Firebase.
     // If it differs from the cached one, we re-register automatically.
     const cachedToken = this.getCachedToken();
-    if (!cachedToken) return;
+    const activeVapidKey = getVapidKey();
+    if (!activeVapidKey) return;
 
-    getToken(messaging, { vapidKey: VAPID_KEY }).then((freshToken: string) => {
+    getToken(messaging, { vapidKey: activeVapidKey }).then((freshToken: string) => {
       if (freshToken && freshToken !== cachedToken) {
         console.log('[FCM] 🔄 Token rotated — re-registering with backend.');
         this.cacheToken(freshToken);
