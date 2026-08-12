@@ -5,7 +5,7 @@
  * achievements, and generate behaviour reports.
  */
 import { useState, useEffect, useCallback } from 'react';
-import { ShieldAlert, Star, AlertTriangle, BookOpen, Plus, Search, Filter, RefreshCw, Download, FileText } from 'lucide-react';
+import { ShieldAlert, Star, AlertTriangle, BookOpen, Plus, Search, Filter, RefreshCw, Download, FileText, Bell, CheckCircle2, ChevronDown } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../../services/api';
 import {
@@ -200,15 +200,25 @@ export default function BehaviourLogPage() {
       {/* Stats Row */}
       <div className={styles.statsRow}>
         {[
-          { icon: '⭐', label: 'Positive', value: stats.positive, color: '#059669', bg: '#d1fae5' },
-          { icon: '⚠️', label: 'Negative', value: stats.negative, color: '#dc2626', bg: '#fee2e2' },
-          { icon: '🔔', label: 'Open', value: stats.open, color: '#d97706', bg: '#fef3c7' },
-          { icon: '✅', label: 'Resolved', value: stats.resolved, color: '#6b7280', bg: '#f3f4f6' },
+          { icon: <Star size={20} />, label: 'Positive', value: stats.positive, color: 'var(--color-success)', sub: 'Good behaviour & awards' },
+          { icon: <AlertTriangle size={20} />, label: 'Negative', value: stats.negative, color: 'var(--color-danger)', sub: 'Incidents & warnings' },
+          { icon: <Bell size={20} />, label: 'Open', value: stats.open, color: 'var(--color-warning)', sub: 'Pending follow-up' },
+          { icon: <CheckCircle2 size={20} />, label: 'Resolved', value: stats.resolved, color: 'var(--color-primary)', sub: 'Action completed' },
         ].map(s => (
-          <div key={s.label} className={styles.statCard} style={{ borderTopColor: s.color }}>
-            <span style={{ fontSize: '1.4rem' }}>{s.icon}</span>
-            <span className={styles.statValue} style={{ color: s.color }}>{s.value}</span>
-            <span className={styles.statLabel}>{s.label}</span>
+          <div key={s.label} className={styles.statCard} style={{ '--card-color': s.color } as React.CSSProperties}>
+            <div className={styles.statHeader}>
+              <div className={styles.statIconWrap}>{s.icon}</div>
+              <div className={styles.statMenuWrap}>
+                <button className={styles.statMenuBtn} aria-label="Options">
+                  <ChevronDown size={16} />
+                </button>
+              </div>
+            </div>
+            <div className={styles.statBody}>
+              <div className={styles.statValue}>{s.value}</div>
+              <div className={styles.statLabel}>{s.label}</div>
+              <div className={styles.statSub}>{s.sub}</div>
+            </div>
           </div>
         ))}
       </div>

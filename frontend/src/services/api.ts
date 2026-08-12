@@ -47,10 +47,14 @@ api.interceptors.response.use(
         refreshQueue = [];
         original.headers.Authorization = `Bearer ${newToken}`;
         return api(original);
-      } catch (refreshErr) {
-        authService.clearStorage();
-        if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
-          window.location.href = '/login';
+      } catch (refreshErr: any) {
+        refreshQueue = [];
+        const isAuthError = refreshErr?.response?.status === 401 || refreshErr?.response?.status === 400 || refreshErr?.response?.status === 403;
+        if (isAuthError) {
+          authService.clearStorage();
+          if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
+            window.location.href = '/login';
+          }
         }
         return Promise.reject(refreshErr);
       } finally {

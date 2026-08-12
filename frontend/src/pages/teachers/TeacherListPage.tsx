@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   Plus, Search, Filter, Download, Eye, Edit2, Trash2,
   Users, UserCheck, UserX, GraduationCap, Briefcase,
-  RefreshCw, ChevronLeft, ChevronRight, CalendarOff,
+  RefreshCw, ChevronLeft, ChevronRight, ChevronDown, CalendarOff,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import teacherService, { Teacher, TeacherStats } from '../../services/teacherService';
@@ -54,7 +54,10 @@ export default function TeacherListPage() {
   }, [page, search, filterType, filterStatus, filterGender]);
 
   const loadStats = useCallback(async () => {
-    try { setStats(await teacherService.getStats()); } catch {}
+    try {
+      const s = await teacherService.getStats();
+      setStats(s);
+    } catch {}
   }, []);
 
   useEffect(() => { loadTeachers(); }, [loadTeachers]);
@@ -105,17 +108,25 @@ export default function TeacherListPage() {
       {stats && (
         <div className={styles.statsRow}>
           {[
-            { label: 'Total Staff',    value: stats.total,           color: 'var(--color-primary)',  icon: <Users size={18}/> },
-            { label: 'Active',         value: stats.active,          color: 'var(--color-success)',  icon: <UserCheck size={18}/> },
-            { label: 'Teaching',       value: stats.teaching,        color: 'var(--color-info)',     icon: <GraduationCap size={18}/> },
-            { label: 'Non-Teaching',   value: stats.non_teaching,    color: 'var(--color-secondary)',icon: <Briefcase size={18}/> },
-            { label: 'On Leave Today', value: stats.on_leave_today,  color: 'var(--color-warning)',  icon: <CalendarOff size={18}/> },
-            { label: 'Male / Female',  value: `${stats.male} / ${stats.female}`, color: 'var(--color-text-secondary)', icon: <Users size={18}/> },
+            { label: 'Total Staff',    value: stats.total,           color: 'var(--color-primary)',  icon: <Users size={20}/>, sub: 'Registered members' },
+            { label: 'Active',         value: stats.active,          color: 'var(--color-success)',  icon: <UserCheck size={20}/>, sub: 'Currently active' },
+            { label: 'Teaching',       value: stats.teaching,        color: 'var(--color-info)',     icon: <GraduationCap size={20}/>, sub: 'Academic faculty' },
+            { label: 'Non-Teaching',   value: stats.non_teaching,    color: 'var(--color-secondary)',icon: <Briefcase size={20}/>, sub: 'Support & admin' },
           ].map(s => (
-            <div key={s.label} className={styles.statCard} style={{ '--c': s.color } as React.CSSProperties}>
-              <div className={styles.statIcon} style={{ color: s.color }}>{s.icon}</div>
-              <div className={styles.statVal}>{s.value}</div>
-              <div className={styles.statLbl}>{s.label}</div>
+            <div key={s.label} className={styles.statCard} style={{ '--card-color': s.color } as React.CSSProperties}>
+              <div className={styles.statHeader}>
+                <div className={styles.statIconWrap}>{s.icon}</div>
+                <div className={styles.statMenuWrap}>
+                  <button className={styles.statMenuBtn} aria-label="Options">
+                    <ChevronDown size={16} />
+                  </button>
+                </div>
+              </div>
+              <div className={styles.statBody}>
+                <div className={styles.statValue}>{s.value}</div>
+                <div className={styles.statLabel}>{s.label}</div>
+                <div className={styles.statSub}>{s.sub}</div>
+              </div>
             </div>
           ))}
         </div>

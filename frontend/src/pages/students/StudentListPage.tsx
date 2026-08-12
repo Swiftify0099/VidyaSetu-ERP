@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
   Plus, Search, Filter, Download, Eye, Edit2, Trash2,
-  GraduationCap, RefreshCw, ChevronLeft, ChevronRight,
+  GraduationCap, RefreshCw, ChevronLeft, ChevronRight, ChevronDown,
   UserCheck, UserX, Users, FileText, MoreVertical,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -64,19 +64,16 @@ export default function StudentListPage() {
 
   const loadStats = useCallback(async () => {
     try {
-      const s = await studentService.getStats();
-      setStats(s);
-    } catch {}
+      const data = await studentService.getStats();
+      setStats(data);
+    } catch {
+      // Silently catch stats failure
+    }
   }, []);
 
   useEffect(() => { loadStudents(); }, [loadStudents]);
   useEffect(() => { loadStats(); }, [loadStats]);
-
-  // Debounced search
-  useEffect(() => {
-    const t = setTimeout(() => { setPage(1); }, 400);
-    return () => clearTimeout(t);
-  }, [search]);
+  useEffect(() => { setPage(1); }, [search, filterStd, filterDiv, filterStatus]);
 
   const handleDelete = async (id: number, name: string) => {
     if (!confirm(`Delete student "${name}"? This action cannot be undone.`)) return;
@@ -112,16 +109,25 @@ export default function StudentListPage() {
       {stats && (
         <div className={styles.statsRow}>
           {[
-            { label: 'Total Students', value: stats.total, icon: <Users size={18}/>, color: 'var(--color-primary)' },
-            { label: 'Active', value: stats.active, icon: <UserCheck size={18}/>, color: 'var(--color-success)' },
-            { label: 'Boys', value: stats.boys, icon: <GraduationCap size={18}/>, color: 'var(--color-info)' },
-            { label: 'Girls', value: stats.girls, icon: <GraduationCap size={18}/>, color: 'var(--color-secondary)' },
-            { label: 'Left / Transferred', value: stats.left, icon: <UserX size={18}/>, color: 'var(--color-danger)' },
+            { label: 'Total Students', value: stats.total, icon: <Users size={20}/>, color: 'var(--color-primary)', sub: 'Registered students' },
+            { label: 'Active', value: stats.active, icon: <UserCheck size={20}/>, color: 'var(--color-success)', sub: 'Currently enrolled' },
+            { label: 'Boys', value: stats.boys, icon: <GraduationCap size={20}/>, color: 'var(--color-info)', sub: 'Male students' },
+            { label: 'Girls', value: stats.girls, icon: <GraduationCap size={20}/>, color: 'var(--color-secondary)', sub: 'Female students' },
           ].map(s => (
-            <div key={s.label} className={styles.statCard} style={{ '--c': s.color } as React.CSSProperties}>
-              <div className={styles.statIcon}>{s.icon}</div>
-              <div className={styles.statVal}>{s.value}</div>
-              <div className={styles.statLbl}>{s.label}</div>
+            <div key={s.label} className={styles.statCard} style={{ '--card-color': s.color } as React.CSSProperties}>
+              <div className={styles.statHeader}>
+                <div className={styles.statIconWrap}>{s.icon}</div>
+                <div className={styles.statMenuWrap}>
+                  <button className={styles.statMenuBtn} aria-label="Options">
+                    <ChevronDown size={16} />
+                  </button>
+                </div>
+              </div>
+              <div className={styles.statBody}>
+                <div className={styles.statValue}>{s.value}</div>
+                <div className={styles.statLabel}>{s.label}</div>
+                <div className={styles.statSub}>{s.sub}</div>
+              </div>
             </div>
           ))}
         </div>

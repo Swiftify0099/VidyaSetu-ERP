@@ -39,9 +39,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           authService.storeUser(freshUser);
           // Re-initialize FCM on session restore (handles token rotation)
           void fcmService.init();
-        } catch {
-          authService.clearStorage();
-          setUser(null);
+        } catch (err: any) {
+          const status = err?.response?.status;
+          if (status === 401 || status === 403) {
+            authService.clearStorage();
+            setUser(null);
+          } else {
+            // Keep stored user session so page reloads remain on current tab/route
+            setUser(storedUser);
+          }
         }
       }
       setIsLoading(false);

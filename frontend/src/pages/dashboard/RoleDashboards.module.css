@@ -12,57 +12,62 @@
 /* ── Stats Grid ──────────────────────────────────────────────── */
 .statsGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
   gap: 1rem;
+}
+
+@media (min-width: 1280px) {
+  .statsGrid {
+    grid-template-columns: repeat(4, 1fr);
+  }
 }
 
 /* ── Stat Card ───────────────────────────────────────────────── */
 .statCard {
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-xl);
-  padding: 1.25rem 1.125rem;
+  background: rgba(248, 250, 252, 0.7);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  border-radius: 16px;
+  padding: 16px 20px;
   cursor: default;
-  transition: all 0.2s;
+  transition: all 0.3s ease;
   position: relative;
-  overflow: hidden;
+  overflow: visible;
+  box-shadow:
+    6px 6px 14px rgba(0, 0, 0, 0.04),
+    -6px -6px 14px rgba(255, 255, 255, 0.8),
+    inset 1.5px 1.5px 3px rgba(255, 255, 255, 0.8);
 }
 
 .statCard[role="button"] { cursor: pointer; }
 
-.statCard[role="button"]:hover {
+.statCard:hover {
   transform: translateY(-2px);
-  box-shadow: var(--shadow-md);
-  border-color: var(--card-color, var(--color-primary));
-}
-
-.statCard::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 3px;
-  background: var(--card-color, var(--color-primary));
-  border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+  box-shadow:
+    10px 10px 20px rgba(0, 0, 0, 0.06),
+    -10px -10px 20px rgba(255, 255, 255, 0.9),
+    inset 1.5px 1.5px 3px rgba(255, 255, 255, 0.8);
+  border-color: rgba(255, 255, 255, 0.9);
 }
 
 .statHeader {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  margin-bottom: 0.75rem;
+  margin-bottom: 12px;
 }
 
 .statIconWrap {
-  width: 38px;
-  height: 38px;
-  border-radius: var(--radius-lg);
-  background: color-mix(in srgb, var(--card-color, var(--color-primary)) 12%, transparent);
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--card-color, var(--color-primary)) 40%, white), var(--card-color, var(--color-primary)));
+  color: white;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--card-color, var(--color-primary));
+  box-shadow: 0 6px 14px color-mix(in srgb, var(--card-color, var(--color-primary)) 40%, transparent);
   flex-shrink: 0;
 }
 
@@ -87,29 +92,30 @@
   font-size: 1.75rem;
   font-weight: 800;
   color: var(--color-text-primary);
-  line-height: 1;
-  margin-bottom: 0.25rem;
+  line-height: 1.1;
+  margin-bottom: 4px;
   letter-spacing: -0.02em;
 }
 
 .statValueLoading {
   font-size: 1.75rem;
   font-weight: 800;
-  color: var(--color-border);
-  line-height: 1;
-  margin-bottom: 0.25rem;
+  color: var(--color-text-muted);
+  line-height: 1.1;
+  margin-bottom: 4px;
 }
 
 .statLabel {
-  font-size: 0.78rem;
-  color: var(--color-text-secondary);
-  font-weight: 500;
+  font-size: 0.875rem;
+  color: var(--color-text-primary);
+  font-weight: 600;
+  line-height: 1.25;
 }
 
 .statSub {
-  font-size: 0.7rem;
+  font-size: 0.75rem;
   color: var(--color-text-muted);
-  margin-top: 0.2rem;
+  margin-top: 2px;
 }
 
 /* ── Middle Grid ─────────────────────────────────────────────── */

@@ -96,8 +96,14 @@
 /* Stats Cards Grid */
 .statsGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-  gap: var(--space-6);
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--space-4);
+}
+
+@media (min-width: 1280px) {
+  .statsGrid {
+    grid-template-columns: repeat(4, 1fr);
+  }
 }
 
 .statCard {
@@ -105,42 +111,42 @@
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
   border: 1px solid rgba(255, 255, 255, 0.7);
-  border-radius: 24px;
-  padding: 24px;
+  border-radius: 16px;
+  padding: 16px 20px;
   transition: all 0.3s ease;
   position: relative;
   overflow: visible; /* Needed for dropdown */
   box-shadow:
-    8px 8px 16px rgba(0, 0, 0, 0.04),
-    -8px -8px 16px rgba(255, 255, 255, 0.8),
-    inset 2px 2px 4px rgba(255, 255, 255, 0.8);
+    6px 6px 14px rgba(0, 0, 0, 0.04),
+    -6px -6px 14px rgba(255, 255, 255, 0.8),
+    inset 1.5px 1.5px 3px rgba(255, 255, 255, 0.8);
 }
 
 .statCard:hover {
-  transform: translateY(-3px);
+  transform: translateY(-2px);
   box-shadow:
-    12px 12px 24px rgba(0, 0, 0, 0.06),
-    -12px -12px 24px rgba(255, 255, 255, 0.9),
-    inset 2px 2px 4px rgba(255, 255, 255, 0.8);
+    10px 10px 20px rgba(0, 0, 0, 0.06),
+    -10px -10px 20px rgba(255, 255, 255, 0.9),
+    inset 1.5px 1.5px 3px rgba(255, 255, 255, 0.8);
 }
 
 .statHeader {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  margin-bottom: 24px;
+  margin-bottom: 12px;
 }
 
 .statIconWrap {
-  width: 52px;
-  height: 52px;
-  border-radius: 16px;
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
   background: linear-gradient(135deg, color-mix(in srgb, var(--card-color) 40%, white), var(--card-color));
   color: white;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 8px 20px color-mix(in srgb, var(--card-color) 50%, transparent);
+  box-shadow: 0 6px 14px color-mix(in srgb, var(--card-color) 40%, transparent);
 }
 
 /* Menu Dropdown Styles */
@@ -149,8 +155,8 @@
 }
 
 .statMenuBtn {
-  width: 32px;
-  height: 32px;
+  width: 30px;
+  height: 30px;
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.5);
   border: 1px solid rgba(255, 255, 255, 0.8);
@@ -219,34 +225,35 @@
 }
 
 .statValue {
-  font-size: 2.2rem;
+  font-size: 1.75rem;
   font-weight: 800;
   color: var(--color-text-primary);
   line-height: 1.1;
-  letter-spacing: -0.03em;
-  margin-bottom: 8px;
+  letter-spacing: -0.02em;
+  margin-bottom: 4px;
   display: flex;
   align-items: center;
   gap: 8px;
 }
 
 .statValueLoading {
-  font-size: 2.2rem;
+  font-size: 1.75rem;
   font-weight: 800;
   color: var(--color-text-muted);
   line-height: 1.1;
-  margin-bottom: 8px;
-}
-
-.statLabel {
-  font-size: 1.05rem;
-  color: var(--color-text-primary);
-  font-weight: 600;
   margin-bottom: 4px;
 }
 
+.statLabel {
+  font-size: 0.875rem;
+  color: var(--color-text-primary);
+  font-weight: 600;
+  margin-bottom: 2px;
+  line-height: 1.25;
+}
+
 .statSub {
-  font-size: 0.85rem;
+  font-size: 0.75rem;
   color: var(--color-text-muted);
 }
 

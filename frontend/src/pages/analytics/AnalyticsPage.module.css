@@ -53,35 +53,49 @@
 .overviewContent, .reportContent { display: flex; flex-direction: column; gap: var(--space-5); }
 
 /* ── Hero Strip ──────────────────────────────────────────── */
-.heroStrip { display: grid; grid-template-columns: repeat(auto-fill, minmax(185px, 1fr)); gap: var(--space-4); }
+.heroStrip { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--space-4); }
+
+@media (min-width: 1280px) {
+  .heroStrip { grid-template-columns: repeat(4, 1fr); }
+}
 
 .heroCard {
-  background: var(--color-surface); border: 1px solid var(--color-border);
-  border-radius: var(--radius-xl); padding: var(--space-5);
-  position: relative; overflow: hidden;
-  transition: all var(--transition-base); box-shadow: var(--shadow-xs);
+  background: rgba(248, 250, 252, 0.7);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  border-radius: 16px; padding: 16px 20px;
+  position: relative; overflow: visible;
+  transition: all 0.3s ease; box-shadow:
+    6px 6px 14px rgba(0, 0, 0, 0.04),
+    -6px -6px 14px rgba(255, 255, 255, 0.8),
+    inset 1.5px 1.5px 3px rgba(255, 255, 255, 0.8);
 }
-.heroCard::before {
-  content: ''; position: absolute; top: 0; left: 0; right: 0;
-  height: 4px; background: var(--kc);
+.heroCard:hover {
+  transform: translateY(-2px);
+  box-shadow:
+    10px 10px 20px rgba(0, 0, 0, 0.06),
+    -10px -10px 20px rgba(255, 255, 255, 0.9),
+    inset 1.5px 1.5px 3px rgba(255, 255, 255, 0.8);
+  border-color: rgba(255, 255, 255, 0.9);
 }
-.heroCard:hover { transform: translateY(-3px); box-shadow: var(--shadow-card-hover); }
 
 .heroCardIcon {
-  width: 44px; height: 44px; border-radius: var(--radius-lg);
-  background: color-mix(in srgb, var(--kc) 12%, transparent);
+  width: 42px; height: 42px; border-radius: 12px;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--kc, var(--color-primary)) 40%, white), var(--kc, var(--color-primary)));
   display: flex; align-items: center; justify-content: center;
-  color: var(--kc); margin-bottom: var(--space-3);
+  color: white; margin-bottom: 8px;
+  box-shadow: 0 6px 14px color-mix(in srgb, var(--kc, var(--color-primary)) 40%, transparent); flex-shrink: 0;
 }
 .heroVal {
-  font-size: clamp(1.5rem, 3vw, 2.2rem); font-weight: var(--font-weight-bold);
+  font-size: 1.75rem; font-weight: 800;
   color: var(--color-text-primary); line-height: 1.1; letter-spacing: -0.02em;
 }
 .heroLabel {
-  font-size: var(--font-size-sm); font-weight: var(--font-weight-semibold);
-  color: var(--color-text-primary); margin-top: var(--space-2);
+  font-size: 0.875rem; font-weight: 600;
+  color: var(--color-text-primary); margin-top: 2px;
 }
-.heroNote { font-size: var(--font-size-xs); color: var(--color-text-muted); margin-top: 3px; }
+.heroNote { font-size: 0.75rem; color: var(--color-text-muted); margin-top: 2px; }
 
 /* ── Charts Row ──────────────────────────────────────────── */
 .chartsRow { display: grid; grid-template-columns: 1fr auto; gap: var(--space-5); }

@@ -1,14 +1,102 @@
 .page { padding: var(--space-6); display: flex; flex-direction: column; gap: var(--space-5); }
-.statsRow { display: flex; gap: var(--space-4); flex-wrap: wrap; }
-.statCard {
-  flex: 1; min-width: 140px; background: var(--color-surface);
-  border-radius: var(--radius-lg); padding: var(--space-4);
-  display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-1);
-  border-top: 3px solid transparent;
-  box-shadow: var(--shadow-sm);
+.statsRow { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--space-4); }
+
+@media (min-width: 1280px) {
+  .statsRow { grid-template-columns: repeat(4, 1fr); }
 }
-.statValue { font-size: 1.6rem; font-weight: 800; line-height: 1; }
-.statLabel { font-size: 0.75rem; color: var(--color-text-secondary); font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
+
+.statCard {
+  background: rgba(248, 250, 252, 0.7);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  border-radius: 16px;
+  padding: 16px 20px;
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: visible;
+  box-shadow:
+    6px 6px 14px rgba(0, 0, 0, 0.04),
+    -6px -6px 14px rgba(255, 255, 255, 0.8),
+    inset 1.5px 1.5px 3px rgba(255, 255, 255, 0.8);
+}
+.statCard:hover {
+  transform: translateY(-2px);
+  box-shadow:
+    10px 10px 20px rgba(0, 0, 0, 0.06),
+    -10px -10px 20px rgba(255, 255, 255, 0.9),
+    inset 1.5px 1.5px 3px rgba(255, 255, 255, 0.8);
+}
+
+.statHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.statIconWrap {
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--card-color) 40%, white), var(--card-color));
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 6px 14px color-mix(in srgb, var(--card-color) 40%, transparent);
+}
+
+.statMenuWrap {
+  position: relative;
+}
+
+.statMenuBtn {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  box-shadow: 2px 2px 5px rgba(0,0,0,0.03), -2px -2px 5px rgba(255,255,255,0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.statMenuBtn:hover {
+  background: rgba(255, 255, 255, 0.8);
+  color: var(--color-text-primary);
+}
+
+.statBody {
+  display: flex;
+  flex-direction: column;
+}
+
+.statValue {
+  font-size: 1.75rem;
+  font-weight: 800;
+  color: var(--color-text-primary);
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  margin-bottom: 4px;
+}
+
+.statLabel {
+  font-size: 0.875rem;
+  color: var(--color-text-primary);
+  font-weight: 600;
+  margin-bottom: 2px;
+  line-height: 1.25;
+}
+
+.statSub {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+}
 
 .toolbar { display: flex; gap: var(--space-3); align-items: center; flex-wrap: wrap; }
 .toolbarLeft { display: flex; gap: var(--space-2); flex: 1; flex-wrap: wrap; align-items: center; }

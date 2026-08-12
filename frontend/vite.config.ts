@@ -30,25 +30,19 @@ export default defineConfig(({ mode }) => {
         '/api': {
           target: backendTarget,
           changeOrigin: true,
-          secure: true,
+          secure: false,
           ws: false,
-          // Ensure path is passed through exactly — no rewriting
           rewrite: (path) => path,
           configure: (proxy) => {
             proxy.on('error', (err) => {
               console.error('[proxy error]', err.message);
-            });
-            proxy.on('proxyReq', (proxyReq) => {
-              // Remove origin/referer so backend doesn't apply CORS logic
-              proxyReq.removeHeader('origin');
-              proxyReq.removeHeader('referer');
             });
           },
         },
         '/storage': {
           target: backendTarget,
           changeOrigin: true,
-          secure: true,
+          secure: false,
           rewrite: (path) => path,
         },
       },
