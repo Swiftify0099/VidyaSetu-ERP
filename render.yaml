@@ -26,7 +26,7 @@ services:
       - key: FRONTEND_URL
         value: https://vidyasetu.pages.dev
       - key: ALLOWED_ORIGINS
-        value: https://vidyasetu.pages.dev,http://localhost:5173,http://localhost:3000
+        value: https://vidyasetu.pages.dev,http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173,http://127.0.0.1:3000
       - key: UPLOAD_BASE_DIR
         value: ./storage
       - key: MAX_FILE_SIZE_MB
@@ -57,9 +57,9 @@ services:
 
     envVars:
       - key: VITE_API_URL
-        value: https://vidyasetu-backend.onrender.com/api/v1
+        value: https://vidyasetu-erp.onrender.com/api/v1
       - key: VITE_STORAGE_URL
-        value: https://vidyasetu-backend.onrender.com/storage
+        value: https://vidyasetu-erp.onrender.com/storage
       - key: VITE_APP_NAME
         value: VidyaSetu ERP
       - key: VITE_APP_VERSION

@@ -1,13 +1,14 @@
 import axios from 'axios';
 import authService from './authService';
 
-export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL || 'https://vidyasetu-erp.onrender.com/api/v1';
-export const STORAGE_BASE_URL = import.meta.env.VITE_STORAGE_URL || 'https://vidyasetu-erp.onrender.com/storage';
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL || '/api/v1';
+export const STORAGE_BASE_URL = import.meta.env.VITE_STORAGE_URL || '/storage';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
   headers: { 'Content-Type': 'application/json' },
-  timeout: 30000,
+  // 90s timeout — Render free-tier backend can take up to 90s to cold-start.
+  timeout: 90000,
 });
 
 // Request interceptor — attach token
