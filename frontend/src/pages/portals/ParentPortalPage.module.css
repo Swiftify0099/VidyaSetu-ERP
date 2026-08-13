@@ -209,10 +209,10 @@
 }
 
 .overviewCard {
-  background: rgba(248, 250, 252, 0.7);
+  background: var(--card-bg);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.7);
+  border: 1px solid var(--card-border);
   border-radius: 16px;
   padding: 16px 20px;
   display: flex;
@@ -222,19 +222,14 @@
   position: relative;
   overflow: visible;
   transition: all 0.3s ease;
-  box-shadow:
-    6px 6px 14px rgba(0, 0, 0, 0.04),
-    -6px -6px 14px rgba(255, 255, 255, 0.8),
-    inset 1.5px 1.5px 3px rgba(255, 255, 255, 0.8);
+  box-shadow: var(--card-shadow);
 }
 
 .overviewCard:hover {
   transform: translateY(-2px);
-  box-shadow:
-    10px 10px 20px rgba(0, 0, 0, 0.06),
-    -10px -10px 20px rgba(255, 255, 255, 0.9),
-    inset 1.5px 1.5px 3px rgba(255, 255, 255, 0.8);
-  border-color: rgba(255, 255, 255, 0.9);
+  background: var(--card-bg-hover);
+  border-color: var(--card-border-hover);
+  box-shadow: var(--card-shadow-hover);
 }
 
 .overviewIcon {

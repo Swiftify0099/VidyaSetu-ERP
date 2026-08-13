@@ -6,26 +6,22 @@
 }
 
 .statCard {
-  background: rgba(248, 250, 252, 0.7);
+  background: var(--card-bg);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.7);
+  border: 1px solid var(--card-border);
   border-radius: 16px;
   padding: 16px 20px;
   transition: all 0.3s ease;
   position: relative;
   overflow: visible;
-  box-shadow:
-    6px 6px 14px rgba(0, 0, 0, 0.04),
-    -6px -6px 14px rgba(255, 255, 255, 0.8),
-    inset 1.5px 1.5px 3px rgba(255, 255, 255, 0.8);
+  box-shadow: var(--card-shadow);
 }
 .statCard:hover {
   transform: translateY(-2px);
-  box-shadow:
-    10px 10px 20px rgba(0, 0, 0, 0.06),
-    -10px -10px 20px rgba(255, 255, 255, 0.9),
-    inset 1.5px 1.5px 3px rgba(255, 255, 255, 0.8);
+  background: var(--card-bg-hover);
+  border-color: var(--card-border-hover);
+  box-shadow: var(--card-shadow-hover);
 }
 
 .statHeader {
@@ -45,30 +41,6 @@
   align-items: center;
   justify-content: center;
   box-shadow: 0 6px 14px color-mix(in srgb, var(--card-color) 40%, transparent);
-}
-
-.statMenuWrap {
-  position: relative;
-}
-
-.statMenuBtn {
-  width: 30px;
-  height: 30px;
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.5);
-  border: 1px solid rgba(255, 255, 255, 0.8);
-  box-shadow: 2px 2px 5px rgba(0,0,0,0.03), -2px -2px 5px rgba(255,255,255,0.8);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--color-text-muted);
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.statMenuBtn:hover {
-  background: rgba(255, 255, 255, 0.8);
-  color: var(--color-text-primary);
 }
 
 .statBody {

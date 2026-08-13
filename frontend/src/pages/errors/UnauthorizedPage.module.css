@@ -105,6 +105,6 @@
 
 .helpText {
   font-size: 11px;
-  color: #475569;
+  color: var(--color-text-muted);
   margin: 0;
 }

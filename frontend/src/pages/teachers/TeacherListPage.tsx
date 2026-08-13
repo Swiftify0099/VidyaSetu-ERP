@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   Plus, Search, Filter, Download, Eye, Edit2, Trash2,
   Users, UserCheck, UserX, GraduationCap, Briefcase,
-  RefreshCw, ChevronLeft, ChevronRight, ChevronDown, CalendarOff,
+  RefreshCw, ChevronLeft, ChevronRight, CalendarOff,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import teacherService, { Teacher, TeacherStats } from '../../services/teacherService';
@@ -81,6 +81,14 @@ export default function TeacherListPage() {
   const getPhotoUrl = (path?: string) =>
     path ? `${import.meta.env.VITE_STORAGE_URL}/${path}` : null;
 
+  const getInitials = (name?: string, fallback = 'TS'): string => {
+    if (!name || typeof name !== 'string') return fallback;
+    const parts = name.trim().split(/\s+/).filter(Boolean);
+    if (parts.length === 0) return fallback;
+    if (parts.length === 1) return parts[0].substring(0, 2).toUpperCase();
+    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  };
+
   const empTypeBadge = (t: string) => {
     const map: Record<string, string> = {
       teaching: styles.badgePrimary,
@@ -102,35 +110,35 @@ export default function TeacherListPage() {
     return map[s] || styles.badgeMuted;
   };
 
+  const displayStats = stats || {
+    total: total || teachers.length,
+    active: teachers.filter(t => t.status === 'active').length,
+    teaching: teachers.filter(t => t.employee_type === 'teaching').length,
+    non_teaching: teachers.filter(t => t.employee_type === 'non_teaching').length,
+  };
+
   return (
     <div className={styles.page}>
       {/* ── Stats ─────────────────────────────────────────── */}
-      {stats && (
-        <div className={styles.statsRow}>
-          {[
-            { label: 'Total Staff',    value: stats.total,           color: 'var(--color-primary)',  icon: <Users size={20}/>, sub: 'Registered members' },
-            { label: 'Active',         value: stats.active,          color: 'var(--color-success)',  icon: <UserCheck size={20}/>, sub: 'Currently active' },
-            { label: 'Teaching',       value: stats.teaching,        color: 'var(--color-info)',     icon: <GraduationCap size={20}/>, sub: 'Academic faculty' },
-            { label: 'Non-Teaching',   value: stats.non_teaching,    color: 'var(--color-secondary)',icon: <Briefcase size={20}/>, sub: 'Support & admin' },
-          ].map(s => (
-            <div key={s.label} className={styles.statCard} style={{ '--card-color': s.color } as React.CSSProperties}>
-              <div className={styles.statHeader}>
-                <div className={styles.statIconWrap}>{s.icon}</div>
-                <div className={styles.statMenuWrap}>
-                  <button className={styles.statMenuBtn} aria-label="Options">
-                    <ChevronDown size={16} />
-                  </button>
-                </div>
-              </div>
-              <div className={styles.statBody}>
-                <div className={styles.statValue}>{s.value}</div>
-                <div className={styles.statLabel}>{s.label}</div>
-                <div className={styles.statSub}>{s.sub}</div>
-              </div>
+      <div className={styles.statsRow}>
+        {[
+          { label: 'Total Staff',    value: displayStats.total ?? '—',        color: 'var(--color-primary)',  icon: <Users size={20}/>, sub: 'Registered members' },
+          { label: 'Active',         value: displayStats.active ?? '—',       color: 'var(--color-success)',  icon: <UserCheck size={20}/>, sub: 'Currently active' },
+          { label: 'Teaching',       value: displayStats.teaching ?? '—',     color: 'var(--color-info)',     icon: <GraduationCap size={20}/>, sub: 'Academic faculty' },
+          { label: 'Non-Teaching',   value: displayStats.non_teaching ?? '—', color: 'var(--color-secondary)',icon: <Briefcase size={20}/>, sub: 'Support & admin' },
+        ].map(s => (
+          <div key={s.label} className={styles.statCard} style={{ '--card-color': s.color } as React.CSSProperties}>
+            <div className={styles.statHeader}>
+              <div className={styles.statIconWrap}>{s.icon}</div>
             </div>
-          ))}
-        </div>
-      )}
+            <div className={styles.statBody}>
+              <div className={styles.statValue}>{s.value}</div>
+              <div className={styles.statLabel}>{s.label}</div>
+              <div className={styles.statSub}>{s.sub}</div>
+            </div>
+          </div>
+        ))}
+      </div>
 
       {/* ── Toolbar ──────────────────────────────────────── */}
       <div className={styles.toolbar}>
@@ -222,10 +230,20 @@ export default function TeacherListPage() {
               <tr key={t.id} className={styles.row}>
                 <td>
                   <div className={styles.avatar}>
-                    {getPhotoUrl(t.photo_path)
-                      ? <img src={getPhotoUrl(t.photo_path)!} alt={t.full_name} />
-                      : <span>{t.salutation ? t.salutation[0] : t.full_name.charAt(0)}</span>
-                    }
+                    {getPhotoUrl(t.photo_path) ? (
+                      <img
+                        src={getPhotoUrl(t.photo_path)!}
+                        alt={t.full_name}
+                        onError={(e) => {
+                          (e.target as HTMLElement).style.display = 'none';
+                          if (e.currentTarget.parentElement) {
+                            e.currentTarget.parentElement.innerText = getInitials(t.full_name);
+                          }
+                        }}
+                      />
+                    ) : (
+                      <span>{getInitials(t.full_name)}</span>
+                    )}
                   </div>
                 </td>
                 <td><span className={styles.empId}>{t.employee_id}</span></td>

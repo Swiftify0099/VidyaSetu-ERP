@@ -71,6 +71,19 @@
   --glass-blur: blur(16px);
   --glass-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.07);
 
+  /* Card Theme Tokens — Light Theme */
+  --card-bg: rgba(248, 250, 252, 0.75);
+  --card-bg-hover: rgba(255, 255, 255, 0.95);
+  --card-border: rgba(255, 255, 255, 0.8);
+  --card-border-hover: rgba(255, 255, 255, 1);
+  --card-shadow: 6px 6px 14px rgba(0, 0, 0, 0.04), -6px -6px 14px rgba(255, 255, 255, 0.8), inset 1.5px 1.5px 3px rgba(255, 255, 255, 0.8);
+  --card-shadow-hover: 10px 10px 20px rgba(0, 0, 0, 0.06), -10px -10px 20px rgba(255, 255, 255, 0.9), inset 1.5px 1.5px 3px rgba(255, 255, 255, 0.8);
+  --card-menu-btn-bg: rgba(255, 255, 255, 0.6);
+  --card-menu-btn-border: rgba(255, 255, 255, 0.8);
+  --card-dropdown-bg: rgba(255, 255, 255, 0.95);
+  --card-dropdown-border: rgba(222, 226, 230, 0.6);
+  --card-icon-bg-mix: white;
+
   /* Gradients */
   --gradient-primary: linear-gradient(135deg, hsl(var(--hue-primary), 83%, 53%), hsl(var(--hue-secondary), 83%, 58%));
   --gradient-surface: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
@@ -164,47 +177,100 @@
 
 /* ── Dark Theme ──────────────────────────────────────────── */
 [data-theme="dark"] {
+  color-scheme: dark;
+
   --color-primary: hsl(var(--hue-primary), 90%, 62%);
   --color-primary-hover: hsl(var(--hue-primary), 90%, 70%);
-  --color-primary-light: rgba(59, 130, 246, 0.15);
-  --color-primary-subtle: rgba(59, 130, 246, 0.25);
+  --color-primary-light: rgba(59, 130, 246, 0.18);
+  --color-primary-subtle: rgba(59, 130, 246, 0.28);
   --color-primary-dark: hsl(var(--hue-primary), 90%, 75%);
 
   --color-success: hsl(142, 69%, 55%);
-  --color-success-light: rgba(34, 197, 94, 0.15);
-  --color-success-border: rgba(34, 197, 94, 0.3);
+  --color-success-light: rgba(34, 197, 94, 0.18);
+  --color-success-border: rgba(34, 197, 94, 0.35);
   --color-warning: hsl(38, 92%, 58%);
-  --color-warning-light: rgba(245, 158, 11, 0.15);
-  --color-warning-border: rgba(245, 158, 11, 0.3);
+  --color-warning-light: rgba(245, 158, 11, 0.18);
+  --color-warning-border: rgba(245, 158, 11, 0.35);
   --color-danger: hsl(0, 84%, 65%);
-  --color-danger-light: rgba(239, 68, 68, 0.15);
-  --color-danger-border: rgba(239, 68, 68, 0.3);
+  --color-danger-light: rgba(239, 68, 68, 0.18);
+  --color-danger-border: rgba(239, 68, 68, 0.35);
   --color-info: hsl(199, 89%, 58%);
-  --color-info-light: rgba(14, 165, 233, 0.15);
-  --color-info-border: rgba(14, 165, 233, 0.3);
+  --color-info-light: rgba(14, 165, 233, 0.18);
+  --color-info-border: rgba(14, 165, 233, 0.35);
 
   --color-surface: #0f172a;
   --color-surface-2: #1e293b;
   --color-surface-3: #334155;
   --color-background: #090d16;
-  --color-border: #1e293b;
+  --color-border: #334155;
   --color-border-subtle: #1e293b;
-  --color-border-strong: #334155;
+  --color-border-strong: #475569;
   --color-divider: rgba(51, 65, 85, 0.6);
 
   --color-text-primary: #f8fafc;
-  --color-text-secondary: #94a3b8;
-  --color-text-muted: #64748b;
-  --color-text-disabled: #475569;
+  --color-text-secondary: #cbd5e1;
+  --color-text-muted: #94a3b8;
+  --color-text-disabled: #64748b;
 
   --glass-bg: rgba(15, 23, 42, 0.85);
   --glass-bg-subtle: rgba(15, 23, 42, 0.65);
-  --glass-border: rgba(255, 255, 255, 0.08);
+  --glass-border: rgba(255, 255, 255, 0.12);
+
+  /* Card Theme Tokens — Dark Theme */
+  --card-bg: rgba(30, 41, 59, 0.75);
+  --card-bg-hover: rgba(30, 41, 59, 0.92);
+  --card-border: rgba(255, 255, 255, 0.14);
+  --card-border-hover: rgba(255, 255, 255, 0.25);
+  --card-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5), inset 1px 1px 1px rgba(255, 255, 255, 0.08);
+  --card-shadow-hover: 0 15px 30px -5px rgba(0, 0, 0, 0.7), inset 1px 1px 1px rgba(255, 255, 255, 0.18);
+  --card-menu-btn-bg: rgba(255, 255, 255, 0.08);
+  --card-menu-btn-border: rgba(255, 255, 255, 0.15);
+  --card-dropdown-bg: rgba(30, 41, 59, 0.95);
+  --card-dropdown-border: rgba(255, 255, 255, 0.18);
+  --card-icon-bg-mix: #0f172a;
 
   --gradient-sidebar: linear-gradient(180deg, #090d16 0%, #030712 100%);
-  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.4), 0 1px 2px rgba(0, 0, 0, 0.3);
-  --shadow-card-hover: 0 12px 28px -6px rgba(0, 0, 0, 0.5);
+  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.5), 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-card-hover: 0 12px 28px -6px rgba(0, 0, 0, 0.6);
   --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.5), 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+/* ── Dark Mode Systemic Visibility Overrides ──────────────── */
+[data-theme="dark"] input:not([type="checkbox"]):not([type="radio"]),
+[data-theme="dark"] select,
+[data-theme="dark"] textarea {
+  background-color: var(--color-surface-2) !important;
+  color: var(--color-text-primary) !important;
+  border-color: var(--color-border-strong) !important;
+}
+
+[data-theme="dark"] select option {
+  background-color: #1e293b !important;
+  color: #f8fafc !important;
+}
+
+[data-theme="dark"] input::placeholder,
+[data-theme="dark"] textarea::placeholder {
+  color: var(--color-text-muted) !important;
+}
+
+[data-theme="dark"] table {
+  color: var(--color-text-primary);
+}
+
+[data-theme="dark"] th {
+  background-color: #0f172a !important;
+  color: #cbd5e1 !important;
+  border-bottom-color: #334155 !important;
+}
+
+[data-theme="dark"] td {
+  border-bottom-color: #1e293b !important;
+  color: var(--color-text-primary) !important;
+}
+
+[data-theme="dark"] tr:hover td {
+  background-color: rgba(51, 65, 85, 0.35) !important;
 }
 
 /* ── Global Reset ────────────────────────────────────────── */

@@ -65,16 +65,6 @@ interface StatCardProps {
 }
 
 function StatCard({ label, value, icon, color, trend, sub, loading, onClick }: StatCardProps) {
-  const [menuOpen, setMenuOpen] = useState(false);
-
-  // Close menu when clicking outside (simple approach for this component)
-  useEffect(() => {
-    if (!menuOpen) return;
-    const close = () => setMenuOpen(false);
-    window.addEventListener('click', close);
-    return () => window.removeEventListener('click', close);
-  }, [menuOpen]);
-
   return (
     <div
       className={styles.statCard}
@@ -82,28 +72,6 @@ function StatCard({ label, value, icon, color, trend, sub, loading, onClick }: S
     >
       <div className={styles.statHeader}>
         <div className={styles.statIconWrap}>{icon}</div>
-        <div className={styles.statMenuWrap} onClick={(e) => e.stopPropagation()}>
-          <button
-            className={styles.statMenuBtn}
-            onClick={() => setMenuOpen(!menuOpen)}
-            aria-label="Options"
-          >
-            <ChevronDown size={16} />
-          </button>
-          {menuOpen && (
-            <div className={styles.statDropdown}>
-              <button onClick={() => { setMenuOpen(false); /* Export logic here */ }}>
-                <FileText size={14} /> Export PDF
-              </button>
-              <button onClick={() => { setMenuOpen(false); onClick?.(); }}>
-                <Activity size={14} /> View Details
-              </button>
-              <button onClick={() => { setMenuOpen(false); /* Alert logic here */ }}>
-                <Bell size={14} /> Set Alert
-              </button>
-            </div>
-          )}
-        </div>
       </div>
       
       <div 

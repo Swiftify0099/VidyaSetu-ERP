@@ -5,7 +5,7 @@
  * achievements, and generate behaviour reports.
  */
 import { useState, useEffect, useCallback } from 'react';
-import { ShieldAlert, Star, AlertTriangle, BookOpen, Plus, Search, Filter, RefreshCw, Download, FileText, Bell, CheckCircle2, ChevronDown } from 'lucide-react';
+import { ShieldAlert, Star, AlertTriangle, BookOpen, Plus, Search, Filter, RefreshCw, Download, FileText, Bell, CheckCircle2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../../services/api';
 import {
@@ -208,11 +208,6 @@ export default function BehaviourLogPage() {
           <div key={s.label} className={styles.statCard} style={{ '--card-color': s.color } as React.CSSProperties}>
             <div className={styles.statHeader}>
               <div className={styles.statIconWrap}>{s.icon}</div>
-              <div className={styles.statMenuWrap}>
-                <button className={styles.statMenuBtn} aria-label="Options">
-                  <ChevronDown size={16} />
-                </button>
-              </div>
             </div>
             <div className={styles.statBody}>
               <div className={styles.statValue}>{s.value}</div>
