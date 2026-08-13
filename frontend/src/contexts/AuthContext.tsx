@@ -55,15 +55,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     initAuth();
   }, []);
 
-  // ── Login ──────────────────────────────────────────────────────
+  // ── Login ──────────────────────────────────────────────────
   const login = useCallback(async (credentials: LoginCredentials) => {
     const response = await authService.login(credentials);
-    setUser(response.user);
-    // Initialize FCM after login — request permission + register token with backend
-    // Runs in background; never blocks the login flow.
-    void fcmService.init();
-    const roleCode = response.user.roles?.[0]?.code;
-    navigate(getPortalPath(roleCode ?? ''), { replace: true });
+
+    // New device — backend requires email verification before issuing session
+    if ('requires_verification' in response && response.requires_verification) {
+      navigate(`/auth/verify-pending?id=${response.login_attempt_id}`, { replace: true });
+      return;
+    }
+
+    // Normal successful login
+    if ('user' in response) {
+      setUser(response.user);
+      // Initialize FCM after login — request permission + register token with backend
+      // Runs in background; never blocks the login flow.
+      void fcmService.init();
+      const roleCode = response.user.roles?.[0]?.code;
+      navigate(getPortalPath(roleCode ?? ''), { replace: true });
+    }
   }, [navigate]);
 
   // ── Logout ─────────────────────────────────────────────────────

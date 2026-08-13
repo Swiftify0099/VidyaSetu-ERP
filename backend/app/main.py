@@ -50,6 +50,7 @@ from app.modules.ai.router import router as ai_router
 from app.modules.behaviour.router import router as behaviour_router
 from app.modules.transport.router import router as transport_router
 from app.modules.fcm.router import router as fcm_router
+from app.modules.device_security.router import router as device_security_router
 from app.shared.storage import StorageService
 
 # ── Logging ───────────────────────────────────────────────────
@@ -89,6 +90,7 @@ async def lifespan(app: FastAPI):
         import app.modules.leave.models, app.modules.lesson_plan.models, app.modules.behaviour.models
         import app.modules.transport.models
         import app.modules.fcm.models  # FCM device tokens + notification logs
+        import app.modules.device_security.models  # Trusted devices + login events
         BaseModel.metadata.create_all(bind=engine)
         from sqlalchemy import text
         with engine.begin() as conn:
@@ -248,6 +250,7 @@ app.include_router(ai_router,              prefix=API_PREFIX)
 app.include_router(behaviour_router,       prefix=API_PREFIX)
 app.include_router(transport_router,       prefix=API_PREFIX)
 app.include_router(fcm_router,             prefix=API_PREFIX)
+app.include_router(device_security_router, prefix=API_PREFIX)  # Device Security
 
 
 # ── Root Endpoint ─────────────────────────────────────────────

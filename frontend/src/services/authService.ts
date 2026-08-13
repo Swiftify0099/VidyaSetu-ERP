@@ -1,4 +1,5 @@
 import api from './api';
+import { buildDeviceContext } from './deviceService';
 
 export interface AuthRole {
   id: number;
@@ -35,14 +36,26 @@ export interface LoginCredentials {
 const TOKEN_KEY = 'vidyasetu_access_token';
 const REFRESH_KEY = 'vidyasetu_refresh_token';
 const USER_KEY = 'vidyasetu_user';
+const PENDING_ATTEMPT_KEY = 'vidyasetu_pending_attempt_id';
 
 const authService = {
-  async login(credentials: LoginCredentials): Promise<{ user: AuthUser; access_token: string }> {
-    const res = await api.post('/auth/login', credentials);
+  async login(credentials: LoginCredentials): Promise<{ user: AuthUser; access_token: string } | { requires_verification: true; login_attempt_id: string }> {
+    const deviceContext = buildDeviceContext();
+    const res = await api.post('/auth/login', { ...credentials, ...deviceContext });
     const { data } = res.data;
+
+    // HTTP 202 — new device, verification required
+    if (res.status === 202 || data?.requires_verification) {
+      const attemptId = data?.login_attempt_id || '';
+      localStorage.setItem(PENDING_ATTEMPT_KEY, attemptId);
+      return { requires_verification: true, login_attempt_id: attemptId };
+    }
+
+    // HTTP 200 — normal successful login
     localStorage.setItem(TOKEN_KEY, data.access_token);
     localStorage.setItem(REFRESH_KEY, data.refresh_token);
     localStorage.setItem(USER_KEY, JSON.stringify(data.user));
+    localStorage.removeItem(PENDING_ATTEMPT_KEY);
     return { user: data.user, access_token: data.access_token };
   },
 

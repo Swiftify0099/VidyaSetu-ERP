@@ -16,6 +16,14 @@ const LoginPage        = lazy(() => import('./pages/auth/LoginPage'));
 const NotFoundPage     = lazy(() => import('./pages/errors/NotFoundPage'));
 const UnauthorizedPage = lazy(() => import('./pages/errors/UnauthorizedPage'));
 
+// ── Device Security (public — accessed before auth is complete) ─
+const DeviceVerificationPendingPage = lazy(() => import('./pages/auth/DeviceVerificationPendingPage'));
+const DeviceVerifyCallbackPage      = lazy(() => import('./pages/auth/DeviceVerifyCallbackPage'));
+const DeviceRejectCallbackPage      = lazy(() => import('./pages/auth/DeviceRejectCallbackPage'));
+
+// ── Device Security (protected) ───────────────────────────────
+const MyDevicesPage = lazy(() => import('./pages/security/MyDevicesPage'));
+
 // ── Layouts ───────────────────────────────────────────────────
 const DashboardLayout  = lazy(() => import('./layouts/DashboardLayout'));
 
@@ -123,11 +131,19 @@ export default function App() {
                 <Route path="/login"        element={<LoginPage />} />
                 <Route path="/unauthorized" element={<UnauthorizedPage />} />
 
+                {/* ── Device Verification (public — before auth) ─ */}
+                <Route path="/auth/verify-pending"  element={<DeviceVerificationPendingPage />} />
+                <Route path="/auth/verify-device"   element={<DeviceVerifyCallbackPage />} />
+                <Route path="/auth/reject-device"   element={<DeviceRejectCallbackPage />} />
+
                 {/* ── Protected (all roles) ──────────────────── */}
                 <Route element={<ProtectedRoute />}>
 
                   {/* Root → role-based redirect */}
                   <Route path="/" element={<RolePortalRedirect />} />
+
+                  {/* ── Security ─────────────────────────── */}
+                  <Route path="/security/devices" element={<MyDevicesPage />} />
 
                   {/* ── Student Portal ──────────────────────── */}
                   <Route element={<RoleGuard allowedRoles={['student', 'super_admin', 'admin', 'principal', 'vice_principal', 'teacher', 'class_teacher', 'clerk']}>
