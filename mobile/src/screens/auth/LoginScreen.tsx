@@ -8,7 +8,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet,
   KeyboardAvoidingView, Platform, ScrollView,
-  Alert, StatusBar, Dimensions, Animated,
+  Alert, StatusBar, Dimensions, Animated, Image,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/FontAwesome5';
@@ -93,15 +93,15 @@ export default function LoginScreen() {
   }, [error]);
 
   const T = {
-    appName:    lang === 'mr' ? 'EduShakti One' : 'EduShakti One',
-    subtitle:   lang === 'mr' ? 'एंटरप्राइझ ERP प्लॅटफॉर्म' : 'Enterprise ERP Platform',
+    appName:    lang === 'mr' ? 'VidyaSetu' : 'VidyaSetu',
+    subtitle:   lang === 'mr' ? 'अद्ययावत शैक्षणिक व्यवस्थापन ERP' : 'Smart Educational ERP Platform',
     welcome:    lang === 'mr' ? 'स्वागत आहे' : 'Welcome back',
     signIn:     lang === 'mr' ? 'साइन इन करा' : 'Sign In',
     username:   lang === 'mr' ? 'युजरनेम / मोबाईल' : 'Username / Mobile',
     password:   lang === 'mr' ? 'पासवर्ड' : 'Password',
     loginBtn:   lang === 'mr' ? 'लॉगिन करा' : 'Login',
     forgotPass: lang === 'mr' ? 'पासवर्ड विसरलात?' : 'Forgot password?',
-    poweredBy:  lang === 'mr' ? 'द्वारे संचालित EduShakti v1.0' : 'Powered by EduShakti v1.0',
+    poweredBy:  lang === 'mr' ? 'द्वारे संचालित VidyaSetu ERP v1.0' : 'Powered by VidyaSetu ERP v1.0',
     errorTitle: lang === 'mr' ? 'त्रुटी' : 'Login Failed',
     required:   lang === 'mr' ? 'हे क्षेत्र आवश्यक आहे' : 'This field is required',
   };
@@ -152,7 +152,11 @@ export default function LoginScreen() {
           {/* Logo + Title */}
           <View style={styles.heroContent}>
             <View style={styles.logoWrap}>
-              <Text style={styles.logoText}>ES</Text>
+              <Image
+                source={require('../../assets/icon.png')}
+                style={styles.logoImg}
+                resizeMode="cover"
+              />
             </View>
             <Text style={styles.appName}>{T.appName}</Text>
             <Text style={styles.appSubtitle}>{T.subtitle}</Text>
@@ -273,22 +277,22 @@ const styles = StyleSheet.create({
     marginTop: spacing.xl,
   },
   logoWrap: {
-    width: 80,
-    height: 80,
-    borderRadius: 22,
-    backgroundColor: 'rgba(255,255,255,0.2)',
+    width: 88,
+    height: 88,
+    borderRadius: 24,
+    backgroundColor: 'rgba(255,255,255,0.15)',
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1.5,
-    borderColor: 'rgba(255,255,255,0.35)',
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.4)',
     marginBottom: spacing.base,
-    ...shadows.lg,
+    overflow: 'hidden',
+    ...shadows.xl,
   },
-  logoText: {
-    color: '#fff',
-    fontSize: typography.size['3xl'],
-    fontWeight: typography.weight.black,
-    letterSpacing: -1,
+  logoImg: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 22,
   },
   appName: {
     color: '#fff',

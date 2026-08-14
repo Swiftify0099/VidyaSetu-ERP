@@ -5,7 +5,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  RefreshControl, ActivityIndicator, Platform,
+  RefreshControl, ActivityIndicator, Platform, Image,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import { useAuthStore } from '../../store/authStore';
@@ -82,12 +82,18 @@ export default function DashboardScreen({ navigation }: { navigation: any }) {
         end={{ x: 1, y: 1 }}
       >
         <View style={styles.headerContent}>
-          <View>
-            <Text style={styles.greeting}>
-              {new Date().getHours() < 12 ? '🌅 Good Morning' : new Date().getHours() < 17 ? '☀️ Good Afternoon' : '🌙 Good Evening'}
-            </Text>
-            <Text style={styles.userName}>{user?.full_name?.split(' ')[0]}</Text>
-            <Text style={styles.userRole}>{user?.roles?.[0]?.name ?? 'User'}</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+            <Image
+              source={require('../../assets/icon.png')}
+              style={styles.headerAppIcon}
+            />
+            <View>
+              <Text style={styles.greeting}>
+                {new Date().getHours() < 12 ? '🌅 Good Morning' : new Date().getHours() < 17 ? '☀️ Good Afternoon' : '🌙 Good Evening'}
+              </Text>
+              <Text style={styles.userName}>{user?.full_name?.split(' ')[0]}</Text>
+              <Text style={styles.userRole}>{user?.roles?.[0]?.name ?? 'User'}</Text>
+            </View>
           </View>
           <View style={styles.headerRight}>
             <TouchableOpacity
@@ -188,7 +194,15 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: 28,
     borderBottomRightRadius: 28,
   },
-  headerContent: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
+  headerContent: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  headerAppIcon: {
+    width: 46,
+    height: 46,
+    borderRadius: 13,
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.4)',
+    backgroundColor: 'rgba(255,255,255,0.1)',
+  },
   greeting: { color: 'rgba(255,255,255,0.8)', fontSize: 13, fontWeight: '500' },
   userName: { color: '#fff', fontSize: 24, fontWeight: '800', marginTop: 2 },
   userRole: { color: 'rgba(255,255,255,0.7)', fontSize: 12, marginTop: 2 },
