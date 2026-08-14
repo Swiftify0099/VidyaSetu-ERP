@@ -24,9 +24,13 @@ services:
       - key: APP_VERSION
         value: "1.0.0"
       - key: FRONTEND_URL
-        value: https://vidyasetu-erp.vidyasetu001.workers.dev
+        value: https://vidyasetu-erp.pages.dev
       - key: ALLOWED_ORIGINS
-        value: https://vidyasetu-erp.vidyasetu001.workers.dev,https://vidyasetu.pages.dev,http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173,http://127.0.0.1:3000
+        value: https://vidyasetu-erp.pages.dev,https://vidyasetu.pages.dev,https://vidyasetu-erp.vidyasetu001.workers.dev,http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173,http://127.0.0.1:3000
+      - key: BACKEND_URL
+        value: https://vidyasetu-erp.onrender.com
+      - key: DEVICE_SECURITY_ENABLED
+        value: "false"
       - key: UPLOAD_BASE_DIR
         value: ./storage
       - key: MAX_FILE_SIZE_MB
