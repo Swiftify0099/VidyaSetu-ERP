@@ -101,6 +101,39 @@ async def get_me(current_user: AuthUser, db: DBSession):
     return APIResponse.ok(data=user_data.model_dump(), message="User profile retrieved.")
 
 
+@router.patch("/me", response_model=APIResponse)
+async def update_my_profile(
+    body: dict,
+    current_user: AuthUser,
+    db: DBSession,
+):
+    """Update the currently authenticated user's own profile (full_name, mobile, email)."""
+    from sqlalchemy import select
+    from app.modules.auth.models import User
+    from app.shared.audit import AuditService
+
+    user = db.scalar(select(User).where(User.id == current_user.user_id))
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found.")
+
+    if "full_name" in body and body["full_name"]:
+        user.full_name = str(body["full_name"]).strip()
+    if "mobile" in body:
+        user.mobile = str(body["mobile"]).strip() or None
+    if "email" in body:
+        user.email = str(body["email"]).strip() or None
+
+    user.updated_by = current_user.user_id
+    AuditService.log(
+        db, action="PROFILE_UPDATED", module="auth",
+        user_id=user.id, user_name=user.full_name,
+        description="User updated their own profile.",
+    )
+    db.commit()
+
+    return APIResponse.ok(message="Profile updated successfully.")
+
+
 @router.post("/forgot-password", response_model=APIResponse)
 async def forgot_password(body: ForgotPasswordRequest, db: DBSession):
     """

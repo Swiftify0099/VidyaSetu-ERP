@@ -7,5 +7,7 @@
     ],
     "python.autoComplete.extraPaths": [
         "${workspaceFolder}/backend"
-    ]
+    ],
+    "python.analysis.venvPath": "${workspaceFolder}/backend",
+    "python.analysis.venv": ".venv"
 }

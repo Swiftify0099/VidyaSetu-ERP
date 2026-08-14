@@ -225,6 +225,26 @@ export const authAPI = {
 };
 
 // ─────────────────────────────────────────────────────────
+// PROFILE API (current user self-service)
+// ─────────────────────────────────────────────────────────
+export const profileAPI = {
+  /** GET /auth/me — fetch current user profile */
+  getMyProfile: () => api.get('/auth/me'),
+
+  /** PATCH /auth/me — update full_name, mobile, email */
+  updateProfile: (data: { full_name?: string; mobile?: string; email?: string }) =>
+    api.patch('/auth/me', data),
+
+  /** PATCH /auth/change-password — change own password */
+  changePassword: (current_password: string, new_password: string) =>
+    api.patch('/auth/change-password', {
+      current_password,
+      new_password,
+      confirm_password: new_password,
+    }),
+};
+
+// ─────────────────────────────────────────────────────────
 // STUDENTS API
 // ─────────────────────────────────────────────────────────
 export const studentsAPI = {
