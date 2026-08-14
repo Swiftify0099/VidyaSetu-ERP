@@ -83,6 +83,7 @@ jobs:
           DATABASE_URL: postgresql://postgres:test_password@localhost:5432/vidyasetu_test
           SECRET_KEY: test-secret-key-for-ci-only
           APP_ENV: testing
+                    PYTHONPATH: .
 
       - name: Upload coverage report
         uses: codecov/codecov-action@v4
