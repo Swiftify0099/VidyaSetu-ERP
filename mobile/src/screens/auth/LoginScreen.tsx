@@ -55,7 +55,7 @@ function FloatingOrb({ size, top, left, color, delay }: {
 // ─────────────────────────────────────────────────────────────────────────────
 // Main Component
 // ─────────────────────────────────────────────────────────────────────────────
-export default function LoginScreen() {
+export default function LoginScreen({ navigation }: { navigation: any }) {
   const { login, isLoading, error, clearError } = useAuthStore();
   const { colors, isDark } = useTheme();
 
@@ -117,7 +117,7 @@ export default function LoginScreen() {
 
   const handleLogin = () => {
     if (!validate()) return;
-    login(username.trim(), password);
+    login(username.trim(), password, navigation);
   };
 
   const gradientColors = isDark

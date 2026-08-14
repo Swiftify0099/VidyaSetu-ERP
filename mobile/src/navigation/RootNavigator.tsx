@@ -15,7 +15,8 @@ import { useTheme } from '../theme/ThemeContext';
 import PremiumTabBar from '../components/navigation/PremiumTabBar';
 
 // ── Auth ──────────────────────────────────────────────────────────────────────
-import LoginScreen from '../screens/auth/LoginScreen';
+import LoginScreen               from '../screens/auth/LoginScreen';
+import DeviceVerificationScreen  from '../screens/auth/DeviceVerificationScreen';
 
 // ── Shared Screens ────────────────────────────────────────────────────────────
 import ProfileScreen       from '../screens/profile/ProfileScreen';
@@ -542,7 +543,14 @@ export default function RootNavigator() {
     <NavigationContainer theme={navTheme as any}>
       <Stack.Navigator screenOptions={{ headerShown: false, animation: 'fade' }}>
         {!isAuthenticated ? (
-          <Stack.Screen name="Login" component={LoginScreen} />
+          <>
+            <Stack.Screen name="Login"              component={LoginScreen} />
+            <Stack.Screen
+              name="DeviceVerification"
+              component={DeviceVerificationScreen}
+              options={{ animation: 'slide_from_bottom' }}
+            />
+          </>
         ) : (
           <Stack.Screen name="Main" component={MainNavigator} />
         )}

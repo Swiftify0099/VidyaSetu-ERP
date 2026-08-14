@@ -30,6 +30,13 @@ import app.modules.communication.models
 import app.modules.inventory.models
 import app.modules.qr.models
 import app.modules.ai.models
+import app.modules.device_security.models
+import app.modules.fcm.models
+import app.modules.behaviour.models
+import app.modules.video.models
+import app.modules.transport.models
+import app.modules.leave.models
+import app.modules.lesson_plan.models
 import app.shared.audit
 
 # Alembic Config
