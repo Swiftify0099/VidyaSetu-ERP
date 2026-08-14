@@ -157,7 +157,7 @@ app.add_middleware(SlowAPIMiddleware)
 # Build the allowed origins list from settings (env vars on Render override .env)
 cors_origins = [o for o in settings.allowed_origins_list if o.strip()]
 
-# Safety fallback: always include common Cloudflare Pages patterns
+# Safety fallback: always include known Cloudflare Pages patterns
 _default_cf_origins = [
     "https://vidyasetu-erp.pages.dev",
     "https://vidyasetu.pages.dev",
@@ -172,11 +172,14 @@ logger.info(f"   CORS Origins: {cors_origins}")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=cors_origins,
+    # Regex: allow ALL Cloudflare Pages/Workers subdomains (handles preview deploys too)
+    allow_origin_regex=r"https://.*\.(pages\.dev|workers\.dev)$",
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"],
     allow_headers=["*"],
     expose_headers=["Content-Disposition"],
 )
+
 
 
 # ── Security Headers Middleware ───────────────────────────────
