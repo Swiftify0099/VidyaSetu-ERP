@@ -13,6 +13,7 @@ import './theme/tokens.css';
 
 // ── Auth ──────────────────────────────────────────────────────
 const LoginPage        = lazy(() => import('./pages/auth/LoginPage'));
+const ProfilePage      = lazy(() => import('./pages/auth/ProfilePage'));
 const NotFoundPage     = lazy(() => import('./pages/errors/NotFoundPage'));
 const UnauthorizedPage = lazy(() => import('./pages/errors/UnauthorizedPage'));
 
@@ -230,6 +231,9 @@ export default function App() {
                     <Route path="/ai-hub"           element={<AIAssistantPage />} />
                     {/* Notification Center — All logged-in users */}
                     <Route path="/notifications"    element={<NotificationCenterPage />} />
+                    {/* User Profile & Password — All logged-in users of every role */}
+                    <Route path="/profile"          element={<ProfilePage />} />
+                    <Route path="/auth/change-password" element={<ProfilePage />} />
                     {/* Transport — Transport Incharge / Admin / Principal */}
                     <Route path="/transport"         element={<RoleGuard allowedRoles={['super_admin','admin','principal','transport_incharge']}><TransportPage /></RoleGuard>} />
                   </Route>

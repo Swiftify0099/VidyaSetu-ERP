@@ -102,6 +102,16 @@ const authService = {
     localStorage.setItem(USER_KEY, JSON.stringify(user));
   },
 
+  async updateMyProfile(data: { full_name?: string; mobile?: string; email?: string }): Promise<void> {
+    const res = await api.patch('/auth/me', data);
+    return res.data;
+  },
+
+  async changePassword(data: { current_password: string; new_password: string; confirm_password: string }): Promise<void> {
+    const res = await api.patch('/auth/change-password', data);
+    return res.data;
+  },
+
   clearStorage(): void {
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(REFRESH_KEY);
