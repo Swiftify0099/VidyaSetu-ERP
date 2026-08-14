@@ -47,10 +47,18 @@ export default function LoginPage() {
       if (err?.code === 'ECONNABORTED' || err?.message?.includes('timeout')) {
         message = 'Server is waking up, please wait a moment and try again.';
       } else {
-        message =
-          err?.response?.data?.detail ||
-          err?.response?.data?.message ||
-          t('auth.invalid_credentials');
+        const detail = err?.response?.data?.detail;
+        if (typeof detail === 'string') {
+          message = detail;
+        } else if (detail && typeof detail === 'object' && detail.message) {
+          message = String(detail.message);
+        } else if (Array.isArray(detail) && detail.length > 0 && detail[0]?.msg) {
+          message = String(detail[0].msg);
+        } else if (err?.response?.data?.message) {
+          message = String(err.response.data.message);
+        } else {
+          message = t('auth.invalid_credentials');
+        }
       }
       toast.error(message);
     } finally {

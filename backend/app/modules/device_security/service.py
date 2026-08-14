@@ -267,8 +267,9 @@ class DeviceService:
             .with_for_update()  # Row-level lock — prevents race conditions
         ).all())
 
-        # +1 for the device being added
-        total_after_add = len(active_devices) + 1
+        # Count active devices accurately (whether new device is already in query or not)
+        existing_ids = {dev.id for dev in active_devices}
+        total_after_add = len(active_devices) if new_device_id in existing_ids else len(active_devices) + 1
 
         if total_after_add <= cls._max_devices():
             return None  # No eviction needed
@@ -678,18 +679,22 @@ class DeviceSecurityOrchestrator:
     ) -> DeviceCheckResult:
         """
         No device ID sent (legacy client or first login without device ID support).
-        If user has no registered devices, treat this as their primary device setup.
+        If user has no registered devices or user has no email configured,
+        auto-register and trust this device up to the active device limit.
         """
+        from app.modules.auth.models import User
+        user = db.get(User, user_id)
+        user_has_email = bool(user and user.email and user.email.strip())
         has_devices = DeviceService.has_any_device(db, user_id)
 
-        if not has_devices:
-            # First login ever for this user — register this as primary device
-            # Use a generated installation ID since client didn't send one
+        if not has_devices or not user_has_email:
+            # First login ever or user has no email for verification — trust device
             generated_id = f"legacy-{uuid.uuid4()}"
             device = DeviceService.register_new_device(
                 db, user_id, generated_id, device_meta,
-                make_primary=True, make_trusted=True
+                make_primary=not has_devices, make_trusted=True
             )
+            DeviceService.enforce_device_limit(db, user_id, device.id)
             LoginEventService.record(
                 db,
                 event_type=LoginEventType.DEVICE_REGISTERED,
@@ -708,7 +713,7 @@ class DeviceSecurityOrchestrator:
                 risk_score=0,
             )
         else:
-            # User has devices but didn't send a device ID — require verification
+            # User has devices and has email — require verification
             return cls._create_verification(
                 db, user_id, device_id=None, login_attempt_id=login_attempt_id,
                 failed_attempts=failed_attempts, device_meta=device_meta,
@@ -778,7 +783,33 @@ class DeviceSecurityOrchestrator:
                 risk_score=risk,
             )
 
-        # Known but pending/untrusted — require verification
+        # Known but pending/untrusted — check if user has email
+        from app.modules.auth.models import User
+        user = db.get(User, user_id)
+        user_has_email = bool(user and user.email and user.email.strip())
+
+        if not user_has_email:
+            # Auto-trust since user has no email for verification
+            DeviceService.trust_device(db, device)
+            LoginEventService.record(
+                db, event_type=LoginEventType.LOGIN_SUCCESS,
+                user_id=user_id, device_id=device.id,
+                login_attempt_id=login_attempt_id,
+                ip_address=ip, user_agent=ua,
+                device_type=device_meta.get("device_type"),
+                platform=device_meta.get("platform"),
+                browser=device_meta.get("browser_name"),
+                os=device_meta.get("os_version"),
+                risk_score=0,
+                status="SUCCESS",
+            )
+            return DeviceCheckResult(
+                is_trusted=True, requires_verification=False,
+                device=device, login_attempt_id=login_attempt_id,
+                verification_token=None, verification_request=None,
+                risk_score=0,
+            )
+
         return cls._create_verification(
             db, user_id, device_id=device.id,
             login_attempt_id=login_attempt_id,
@@ -792,15 +823,18 @@ class DeviceSecurityOrchestrator:
         failed_attempts, device_meta, ip, ua
     ) -> DeviceCheckResult:
         """Handle a login from a completely new (unregistered) device."""
-
+        from app.modules.auth.models import User
+        user = db.get(User, user_id)
+        user_has_email = bool(user and user.email and user.email.strip())
         has_devices = DeviceService.has_any_device(db, user_id)
 
-        if not has_devices:
-            # First device ever — register as primary and trust immediately
+        if not has_devices or not user_has_email:
+            # First device ever OR user has no registered email — register & trust immediately
             device = DeviceService.register_new_device(
                 db, user_id, device_installation_id, device_meta,
-                make_primary=True, make_trusted=True
+                make_primary=not has_devices, make_trusted=True
             )
+            DeviceService.enforce_device_limit(db, user_id, device.id)
             LoginEventService.record(
                 db,
                 event_type=LoginEventType.DEVICE_REGISTERED,
@@ -819,7 +853,7 @@ class DeviceSecurityOrchestrator:
                 risk_score=0,
             )
 
-        # User has existing devices — new device needs verification
+        # User has existing devices AND has email — new device needs verification
         # Register the device as PENDING (don't trust yet)
         device = DeviceService.register_new_device(
             db, user_id, device_installation_id, device_meta,
