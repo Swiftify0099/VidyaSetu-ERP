@@ -22,32 +22,59 @@ const TAB_ICONS: Record<string, { icon: string; faName: string; emoji: string }>
   Home:          { icon: 'home',            faName: 'home',          emoji: '🏠' },
   Students:      { icon: 'user-graduate',   faName: 'graduation-cap',emoji: '🎓' },
   Attendance:    { icon: 'clipboard-check', faName: 'check-square',  emoji: '📋' },
-  Notifications: { icon: 'bell',            faName: 'bell',          emoji: '🔔' },
-  Profile:       { icon: 'user-circle',     faName: 'user-circle',   emoji: '👤' },
-  Marks:         { icon: 'pen',             faName: 'pencil',        emoji: '✏️' },
+  Analytics:     { icon: 'chart-line',      faName: 'line-chart',    emoji: '📈' },
+  Homework:      { icon: 'tasks',           faName: 'tasks',         emoji: '📝' },
   Plans:         { icon: 'book-open',       faName: 'book',          emoji: '📖' },
-  Timetable:     { icon: 'calendar-alt',    faName: 'calendar',      emoji: '📅' },
-  Results:       { icon: 'chart-bar',       faName: 'bar-chart',     emoji: '📊' },
+  Results:       { icon: 'award',           faName: 'trophy',        emoji: '🏆' },
   Fees:          { icon: 'rupee-sign',      faName: 'money',         emoji: '💰' },
   Notices:       { icon: 'bullhorn',        faName: 'bullhorn',      emoji: '📢' },
-  Reports:       { icon: 'chart-pie',       faName: 'pie-chart',     emoji: '📈' },
+  Reports:       { icon: 'chart-pie',       faName: 'pie-chart',     emoji: '📊' },
   Library:       { icon: 'book',            faName: 'book',          emoji: '📚' },
   Search:        { icon: 'search',          faName: 'search',        emoji: '🔍' },
   Office:        { icon: 'building',        faName: 'building',      emoji: '🏢' },
   Communication: { icon: 'comments',        faName: 'comments',      emoji: '💬' },
-  Homework:      { icon: 'tasks',           faName: 'tasks',         emoji: '📝' },
   Transport:     { icon: 'bus',             faName: 'bus',           emoji: '🚌' },
+  Profile:       { icon: 'user-circle',     faName: 'user-circle',   emoji: '👤' },
+  Notifications: { icon: 'bell',            faName: 'bell',          emoji: '🔔' },
+  Marks:         { icon: 'pen',             faName: 'pencil',        emoji: '✏️' },
+  Timetable:     { icon: 'calendar-alt',    faName: 'calendar',      emoji: '📅' },
+  Admission:     { icon: 'user-plus',       faName: 'user-plus',     emoji: '👥' },
+  Exams:         { icon: 'file-alt',        faName: 'file-text',     emoji: '📝' },
+  Leave:         { icon: 'calendar-minus',  faName: 'calendar-o',    emoji: '🏖️' },
 };
 
 function SmartTabIcon({ iconInfo, color, size, focused }: { iconInfo: { icon: string; faName: string; emoji: string }; color: string; size: number; focused: boolean }) {
-  return (
-    <FontAwesome5
-      name={iconInfo.icon}
-      size={size}
-      color={color}
-      solid
-    />
-  );
+  const [fa5Error, setFa5Error] = useState(false);
+
+  if (fa5Error) {
+    return (
+      <FontAwesome
+        name={iconInfo.faName || 'circle'}
+        size={size}
+        color={color}
+      />
+    );
+  }
+
+  try {
+    return (
+      <FontAwesome5
+        name={iconInfo.icon || 'circle'}
+        size={size}
+        color={color}
+        solid
+        onLayout={() => {}}
+      />
+    );
+  } catch {
+    return (
+      <FontAwesome
+        name={iconInfo.faName || 'circle'}
+        size={size}
+        color={color}
+      />
+    );
+  }
 }
 
 function TabItem({
@@ -95,7 +122,7 @@ function TabItem({
       {focused && (
         <View style={[styles.activePill, { backgroundColor: `${activeColor}18` }]} />
       )}
-      <Animated.View style={iconStyle}>
+      <Animated.View style={[styles.iconContainer, iconStyle]}>
         <SmartTabIcon
           iconInfo={iconInfo}
           size={focused ? 20 : 18}
@@ -106,7 +133,7 @@ function TabItem({
       <Text
         style={[
           styles.tabLabel,
-          { color: focused ? activeColor : inactiveColor, fontWeight: focused ? '700' : '500' },
+          { color: focused ? activeColor : inactiveColor, fontWeight: focused ? '700' : '600' },
         ]}
         numberOfLines={1}
       >
@@ -197,6 +224,12 @@ const styles = StyleSheet.create({
     gap: 3,
     position: 'relative',
     minHeight: 48,
+  },
+  iconContainer: {
+    width: 26,
+    height: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   activePill: {
     position: 'absolute',
