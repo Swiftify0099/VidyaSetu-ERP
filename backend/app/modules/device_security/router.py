@@ -173,13 +173,14 @@ async def verify_device_login(
 ):
     """
     Process 'Yes, This Is Me' verification.
-    
+
     - Validates token (hash check, expiry, rate limit)
-    - Trusts the device
-    - Enforces max-3 device limit (may evict oldest non-primary)
-    - Creates full JWT session
+    - Trusts the new device and marks it as PRIMARY
+    - Revokes ALL other existing devices (single-device policy)
+    - Invalidates all old sessions (forces old device offline immediately)
+    - Creates a fresh JWT session for the new device
     - Returns access_token + refresh_token
-    
+
     Rate limited: 10 requests/minute per IP.
     """
     success, error_reason, vr, device = DeviceSecurityOrchestrator.complete_verification(

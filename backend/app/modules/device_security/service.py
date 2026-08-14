@@ -141,7 +141,7 @@ class DeviceService:
     to prevent race conditions from concurrent logins.
     """
 
-    MAX_ACTIVE_DEVICES = 3  # Override via settings.MAX_TRUSTED_DEVICES
+    MAX_ACTIVE_DEVICES = 1  # Override via settings.MAX_TRUSTED_DEVICES
 
     @classmethod
     def _max_devices(cls) -> int:
@@ -244,16 +244,15 @@ class DeviceService:
         cls, db: Session, user_id: int, new_device_id: int
     ) -> Optional[UserDevice]:
         """
-        Enforce the maximum-3 device rule.
-        
-        If adding a new device would exceed the limit:
+        Enforce the maximum device rule (default: 1 device per user).
+
+        When a new device joins and we are at or over the limit:
           1. Lock all device rows for this user (SELECT FOR UPDATE)
-          2. Find the oldest non-primary active device
-          3. Revoke it atomically
-          4. Return the revoked device (for logging)
-        
+          2. Revoke ALL other active/pending devices (not just the oldest)
+          3. Return the last revoked device (for logging)
+
         This is called INSIDE a transaction, before commit.
-        The FOR UPDATE lock prevents concurrent logins from creating > 3 devices.
+        The FOR UPDATE lock prevents concurrent logins from creating > limit devices.
         """
         # Lock all active device rows for this user
         active_devices = list(db.scalars(
@@ -267,37 +266,69 @@ class DeviceService:
             .with_for_update()  # Row-level lock — prevents race conditions
         ).all())
 
-        # Count active devices accurately (whether new device is already in query or not)
         existing_ids = {dev.id for dev in active_devices}
         total_after_add = len(active_devices) if new_device_id in existing_ids else len(active_devices) + 1
 
         if total_after_add <= cls._max_devices():
             return None  # No eviction needed
 
-        # Find the oldest non-primary device to evict
-        evict_candidate = None
+        last_evicted = None
         for dev in active_devices:
-            if not dev.is_primary and dev.id != new_device_id:
-                evict_candidate = dev
-                break
+            if dev.id != new_device_id:
+                cls._revoke_device_internal(db, dev)
+                logger.info(
+                    f"[DeviceSecurity] Evicted device id={dev.id} "
+                    f"for user_id={user_id} (device limit enforcement)"
+                )
+                last_evicted = dev
 
-        if evict_candidate is None:
-            # All devices are primary (shouldn't happen, but be safe)
-            # Evict the oldest non-new device
-            for dev in active_devices:
-                if dev.id != new_device_id:
-                    evict_candidate = dev
-                    break
+        return last_evicted
 
-        if evict_candidate:
-            cls._revoke_device_internal(db, evict_candidate)
-            logger.info(
-                f"[DeviceSecurity] Evicted device id={evict_candidate.id} "
-                f"for user_id={user_id} (device limit enforcement)"
+    @classmethod
+    def revoke_all_other_devices(
+        cls, db: Session, user_id: int, keep_device_id: int
+    ) -> list[UserDevice]:
+        """
+        Revoke ALL active/trusted/pending devices for a user EXCEPT the given one.
+        Called after a new device is verified to enforce single-device policy.
+        Returns list of revoked devices.
+        """
+        devices_to_revoke = list(db.scalars(
+            select(UserDevice)
+            .where(
+                UserDevice.user_id == user_id,
+                UserDevice.id != keep_device_id,
+                UserDevice.status != DeviceStatus.REVOKED,
+                UserDevice.is_deleted == False,
             )
-            return evict_candidate
+            .with_for_update()
+        ).all())
 
-        return None
+        for dev in devices_to_revoke:
+            cls._revoke_device_internal(db, dev)
+            logger.info(
+                f"[DeviceSecurity] Revoked old device id={dev.id} for user_id={user_id} "
+                f"(single-device policy: new primary device id={keep_device_id})"
+            )
+
+        return devices_to_revoke
+
+    @classmethod
+    def invalidate_all_sessions(
+        cls, db: Session, user_id: int
+    ) -> None:
+        """
+        Invalidate (soft-delete) all active UserSession rows for a user.
+        Called when a new device takes over as primary, so old sessions are kicked.
+        """
+        from sqlalchemy import update as sa_update
+        from app.modules.auth.models import UserSession
+        db.execute(
+            sa_update(UserSession)
+            .where(UserSession.user_id == user_id, UserSession.is_active == True)
+            .values(is_active=False, is_deleted=True)
+        )
+        logger.info(f"[DeviceSecurity] Invalidated all sessions for user_id={user_id} (new primary device)")
 
     @classmethod
     def _revoke_device_internal(cls, db: Session, device: UserDevice) -> None:
@@ -979,19 +1010,31 @@ class DeviceSecurityOrchestrator:
         if device:
             DeviceService.trust_device(db, device)
 
-            # Enforce max-3 device limit (with row lock)
-            evicted = DeviceService.enforce_device_limit(db, vr.user_id, device.id)
-            if evicted:
+            # ── Single-device policy: revoke ALL other devices ──
+            # New device becomes the sole active device and is made primary.
+            revoked_list = DeviceService.revoke_all_other_devices(db, vr.user_id, device.id)
+            for revoked in revoked_list:
                 LoginEventService.record(
                     db,
                     event_type=LoginEventType.DEVICE_REVOKED,
                     user_id=vr.user_id,
-                    device_id=evicted.id,
+                    device_id=revoked.id,
                     login_attempt_id=vr.login_attempt_id,
                     ip_address=ip,
-                    failure_reason="Auto-evicted: max device limit reached",
+                    failure_reason="Auto-revoked: single-device policy (new primary device verified)",
                     status="SUCCESS",
                 )
+
+            # Make the new device the primary device
+            device.is_primary = True
+
+            # Invalidate all existing sessions so old device is forced offline
+            DeviceService.invalidate_all_sessions(db, vr.user_id)
+
+            logger.info(
+                f"[DeviceSecurity] New primary device set: device_id={device.id}, "
+                f"user_id={vr.user_id}. {len(revoked_list)} old device(s) revoked."
+            )
 
         VerificationService.mark_verified(db, vr)
 

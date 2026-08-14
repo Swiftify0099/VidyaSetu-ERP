@@ -161,7 +161,7 @@ export default function MyDevicesPage() {
           className={`${styles.tab} ${activeTab === 'devices' ? styles.tabActive : ''}`}
           onClick={() => setActiveTab('devices')}
         >
-          <Monitor size={15} /> Trusted Devices ({activeDevices.length}/3)
+          <Monitor size={15} /> Trusted Device ({activeDevices.length}/1)
         </button>
         <button
           className={`${styles.tab} ${activeTab === 'events' ? styles.tabActive : ''}`}
@@ -181,7 +181,7 @@ export default function MyDevicesPage() {
               {/* Device Limit Info */}
               <div className={styles.limitBanner}>
                 <ShieldCheck size={15} />
-                <span>You can have up to <strong>3 active trusted devices</strong>. Adding a 4th will automatically revoke the oldest non-primary device.</span>
+                <span>Single-Device Policy: Only <strong>1 active device</strong> is allowed per account. When logging in from a new device, email verification is required and will make the new device your active primary device, revoking all previous sessions.</span>
               </div>
 
               {/* Active Devices */}
