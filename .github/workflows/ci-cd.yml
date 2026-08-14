@@ -56,6 +56,8 @@ jobs:
           cat > .env << EOF
           DATABASE_URL=postgresql://postgres:test_password@localhost:5432/vidyasetu_test
           SECRET_KEY=test-secret-key-for-ci-only
+          APP_SECRET_KEY=test-secret-key-for-ci-only
+          JWT_SECRET_KEY=test-secret-key-for-ci-only
           APP_ENV=testing
           APP_DEBUG=false
           SCHOOL_NAME=Test School
