@@ -145,7 +145,7 @@ export default function ParentDashboardScreen({ navigation }: { navigation: any 
               />
               <StatCard
                 label="Fee Pending"
-                value={feesPending > 0 ? `₹${(feesPending/1000).toFixed(1)}K` : '✓ Paid'}
+                value={feesPending > 0 ? `₹${(feesPending/1000).toFixed(1)}K` : 'Fully Paid'}
                 icon="rupee-sign"
                 color={feesPending > 0 ? colors.danger : colors.success}
               />

@@ -112,6 +112,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
       if (accessToken && user) {
         set({ accessToken, user, isAuthenticated: true, isLoading: false });
+        mobileFcmService.init().catch(console.warn);
       } else {
         set({ isLoading: false });
       }

@@ -1,21 +1,35 @@
 /**
- * VidyaSetu Mobile — Student Detail Screen
- * ==========================================
- * Full student profile view with attendance, fee status, and recent results.
- * Accessible to: Admin, Principal, Teacher, Class Teacher, Clerk, Accountant
+ * VidyaSetu Mobile — Student Detail Screen (Premium Redesign)
+ * ============================================================
+ * Comprehensive student profile view with attendance breakdown, fee status,
+ * personal & guardian details, and quick module links.
  */
 import React, { useEffect, useState, useCallback } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  ActivityIndicator, RefreshControl, Platform,
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  RefreshControl,
+  Platform,
 } from 'react-native';
+import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/FontAwesome5';
 import { useTheme } from '../../theme/ThemeContext';
 import { studentsAPI, financeAPI } from '../../services/api';
-import { shadows } from '../../theme';
-import PremiumCard from '../../components/ui/PremiumCard';
-import SectionHeader from '../../components/ui/SectionHeader';
-import SkeletonLoader from '../../components/ui/SkeletonLoader';
+import { spacing, radius, typography, shadows } from '../../theme';
+import { formatDateLong, formatCurrency } from '../../utils/formatters';
+import {
+  AppCard,
+  AppBadge,
+  AppAvatar,
+  AppSectionHeader,
+  AppStatCard,
+  AppProgress,
+  AppSkeleton,
+  AppErrorState,
+} from '../../components/ui';
 
 interface StudentDetail {
   id: number;
@@ -52,19 +66,29 @@ interface FeeOverview {
   status: string;
 }
 
-export default function StudentDetailScreen({ navigation, route }: { navigation: any; route: any }) {
-  const { studentId, studentName } = route?.params ?? {};
-  const { colors } = useTheme();
+export default function StudentDetailScreen({
+  navigation,
+  route,
+}: {
+  navigation: any;
+  route: any;
+}) {
+  const { studentId } = route?.params ?? {};
+  const { colors, roleAccent } = useTheme();
 
   const [student, setStudent]       = useState<StudentDetail | null>(null);
   const [attendance, setAttendance] = useState<AttendanceSummary | null>(null);
   const [fees, setFees]             = useState<FeeOverview | null>(null);
   const [loading, setLoading]       = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [error, setError]           = useState<string | null>(null);
+  const [error, setError]           = useState<any>(null);
 
   const load = useCallback(async () => {
-    if (!studentId) { setError('No student selected.'); setLoading(false); return; }
+    if (!studentId) {
+      setError({ message: 'No student specified' });
+      setLoading(false);
+      return;
+    }
     setError(null);
     try {
       const [studRes, attRes, feeRes] = await Promise.allSettled([
@@ -76,7 +100,7 @@ export default function StudentDetailScreen({ navigation, route }: { navigation:
       if (studRes.status === 'fulfilled') {
         setStudent(studRes.value.data?.data ?? null);
       } else {
-        setError('Could not load student details.');
+        setError(studRes.reason);
       }
 
       if (attRes.status === 'fulfilled') {
@@ -105,15 +129,21 @@ export default function StudentDetailScreen({ navigation, route }: { navigation:
         });
       }
     } catch (e) {
-      setError('Failed to load student data.');
+      setError(e);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
   }, [studentId]);
 
-  useEffect(() => { load(); }, [load]);
-  const onRefresh = () => { setRefreshing(true); load(); };
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    load();
+  };
 
   const pct = attendance?.percentage ?? 0;
   const attColor = pct >= 75 ? colors.success : pct >= 60 ? colors.warning : colors.danger;
@@ -121,161 +151,262 @@ export default function StudentDetailScreen({ navigation, route }: { navigation:
 
   if (loading) {
     return (
-      <View style={[s.root, { backgroundColor: colors.background }]}>
-        <SkeletonLoader />
+      <View style={[styles.root, { backgroundColor: colors.background, padding: spacing.base }]}>
+        <AppSkeleton variant="profile" />
+        <View style={{ height: 16 }} />
+        <AppSkeleton variant="card" count={2} />
       </View>
     );
   }
 
   if (error || !student) {
     return (
-      <View style={[s.root, s.center, { backgroundColor: colors.background }]}>
-        <Text style={{ fontSize: 40 }}>🙁</Text>
-        <Text style={[s.errorText, { color: colors.textSecondary }]}>{error ?? 'Student not found.'}</Text>
-        <TouchableOpacity style={[s.retryBtn, { backgroundColor: colors.primary }]} onPress={load}>
-          <Text style={s.retryText}>Retry</Text>
-        </TouchableOpacity>
+      <View style={[styles.root, { backgroundColor: colors.background }]}>
+        <AppErrorState
+          error={error}
+          title="Student Profile Unavailable"
+          message="Could not load student information. Please verify connection and retry."
+          onRetry={load}
+          onSecondaryAction={() => navigation.goBack()}
+          style={{ flex: 1 }}
+        />
       </View>
     );
   }
 
-  const info = (label: string, value?: string | null) => value ? (
-    <View style={s.infoRow}>
-      <Text style={[s.infoLabel, { color: colors.textSecondary }]}>{label}</Text>
-      <Text style={[s.infoValue, { color: colors.text }]}>{value}</Text>
-    </View>
-  ) : null;
+  const renderInfoRow = (label: string, value?: string | null, icon?: string) => {
+    if (!value) return null;
+    return (
+      <View style={[styles.infoRow, { borderBottomColor: colors.divider }]}>
+        <View style={styles.infoLabelRow}>
+          {icon && <Icon name={icon} size={11} color={colors.textTertiary} style={{ marginRight: 6 }} />}
+          <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>{label}</Text>
+        </View>
+        <Text style={[styles.infoValue, { color: colors.text }]}>{value}</Text>
+      </View>
+    );
+  };
 
   return (
-    <View style={[s.root, { backgroundColor: colors.background }]}>
+    <View style={[styles.root, { backgroundColor: colors.background }]}>
       <ScrollView
         showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={colors.primary}
+            colors={[colors.primary]}
+          />
+        }
       >
-        {/* ── Hero Header ───────────────────────────────────────── */}
-        <View style={[s.hero, { backgroundColor: colors.primary }]}>
-          <View style={s.avatarCircle}>
-            <Text style={s.avatarText}>{student.full_name.charAt(0).toUpperCase()}</Text>
+        {/* ── Hero Profile Header ───────────────────────────────── */}
+        <LinearGradient
+          colors={roleAccent.gradient}
+          style={[styles.hero, { paddingTop: Platform.OS === 'ios' ? 56 : 40 }]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+        >
+          <View style={styles.heroTop}>
+            <AppAvatar
+              name={student.full_name}
+              size="lg"
+              roleColor="#ffffff"
+            />
+            <View style={styles.heroInfo}>
+              <Text style={styles.heroName}>{student.full_name}</Text>
+              <Text style={styles.heroSub}>
+                Standard {student.standard}-{student.division} • Roll #{student.roll_number}
+              </Text>
+              <View style={styles.heroBadgeRow}>
+                <View style={[styles.grBadge, { backgroundColor: 'rgba(255,255,255,0.18)' }]}>
+                  <Text style={styles.grText}>GR: {student.gr_number}</Text>
+                </View>
+                <AppBadge
+                  label={student.is_active ? 'Active' : 'Inactive'}
+                  variant={student.is_active ? 'success' : 'danger'}
+                  size="sm"
+                  rounded
+                />
+              </View>
+            </View>
           </View>
-          <View style={s.heroInfo}>
-            <Text style={s.heroName}>{student.full_name}</Text>
-            <Text style={s.heroSub}>
-              Std {student.standard}-{student.division}  ·  Roll #{student.roll_number}
-            </Text>
-            <Text style={s.heroGR}>GR: {student.gr_number}</Text>
-          </View>
-          <View style={[s.activePill, { backgroundColor: student.is_active ? '#d1fae5' : '#fee2e2' }]}>
-            <Text style={[s.activePillText, { color: student.is_active ? '#059669' : '#dc2626' }]}>
-              {student.is_active ? 'Active' : 'Inactive'}
-            </Text>
-          </View>
-        </View>
+        </LinearGradient>
 
-        <View style={s.body}>
-          {/* ── Stats Row ──────────────────────────────────────── */}
-          <View style={s.statsRow}>
-            <View style={[s.statBox, { borderColor: attColor }]}>
-              <Text style={[s.statVal, { color: attColor }]}>{pct}%</Text>
-              <Text style={[s.statLbl, { color: colors.textSecondary }]}>Attendance</Text>
-              <Text style={[s.statSub, { color: colors.textSecondary }]}>
-                {attendance?.present ?? 0}P / {attendance?.absent ?? 0}A
-              </Text>
-            </View>
-            <View style={[s.statBox, { borderColor: balColor }]}>
-              <Text style={[s.statVal, { color: balColor }]}>
-                ₹{(fees?.balance ?? 0).toLocaleString('en-IN')}
-              </Text>
-              <Text style={[s.statLbl, { color: colors.textSecondary }]}>Fee Balance</Text>
-              <Text style={[s.statSub, { color: colors.textSecondary }]}>
-                Paid ₹{(fees?.total_paid ?? 0).toLocaleString('en-IN')}
-              </Text>
-            </View>
+        <View style={styles.body}>
+          {/* ── Key Metrics Grid ───────────────────────────────── */}
+          <View style={styles.statsRow}>
+            <AppStatCard
+              label="Attendance Rate"
+              value={`${pct}%`}
+              icon="clipboard-check"
+              color={attColor}
+              subtitle={`${attendance?.present ?? 0}P / ${attendance?.absent ?? 0}A`}
+            />
+            <AppStatCard
+              label="Fee Dues"
+              value={formatCurrency(fees?.balance ?? 0)}
+              icon="rupee-sign"
+              color={balColor}
+              subtitle={`Paid ${formatCurrency(fees?.total_paid ?? 0)}`}
+            />
           </View>
+
+          {/* Turnout Progress */}
+          <AppCard variant="bordered" padding={14}>
+            <AppSectionHeader title="Academic Attendance" icon="chart-line" />
+            <AppProgress
+              value={pct}
+              label="Yearly Attendance Turnout"
+              color={attColor}
+            />
+          </AppCard>
 
           {/* ── Personal Info ─────────────────────────────────── */}
-          <PremiumCard style={s.card}>
-            <SectionHeader title="Personal Information" />
-            {info('Gender',        student.gender)}
-            {info('Date of Birth', student.dob ? new Date(student.dob).toLocaleDateString('en-IN') : null)}
-            {info('Blood Group',   student.blood_group)}
-            {info('Mobile',        student.mobile)}
-            {info('Email',         student.email)}
-            {info('Address',       student.address)}
-            {info('Admission',     student.admission_date ? new Date(student.admission_date).toLocaleDateString('en-IN') : null)}
-          </PremiumCard>
+          <AppCard variant="bordered" padding={14}>
+            <AppSectionHeader title="Personal Information" icon="user" />
+            {renderInfoRow('Gender', student.gender, 'venus-mars')}
+            {renderInfoRow('Date of Birth', student.dob ? formatDateLong(student.dob) : null, 'birthday-cake')}
+            {renderInfoRow('Blood Group', student.blood_group, 'tint')}
+            {renderInfoRow('Mobile Phone', student.mobile, 'phone')}
+            {renderInfoRow('Email Address', student.email, 'envelope')}
+            {renderInfoRow('Residential Address', student.address, 'map-marker-alt')}
+            {renderInfoRow('Admission Date', student.admission_date ? formatDateLong(student.admission_date) : null, 'calendar')}
+          </AppCard>
 
           {/* ── Guardian Info ────────────────────────────────── */}
           {(student.guardian_name || student.guardian_mobile) && (
-            <PremiumCard style={s.card}>
-              <SectionHeader title="Guardian" />
-              {info('Name',   student.guardian_name)}
-              {info('Mobile', student.guardian_mobile)}
-            </PremiumCard>
+            <AppCard variant="bordered" padding={14}>
+              <AppSectionHeader title="Parent / Guardian" icon="user-friends" />
+              {renderInfoRow('Guardian Name', student.guardian_name, 'user')}
+              {renderInfoRow('Contact Mobile', student.guardian_mobile, 'phone')}
+            </AppCard>
           )}
 
-          {/* ── Quick Actions ─────────────────────────────────── */}
-          <PremiumCard style={s.card}>
-            <SectionHeader title="Quick Actions" />
-            <View style={s.actionsRow}>
+          {/* ── Module Quick Shortcuts ────────────────────────── */}
+          <AppCard variant="bordered" padding={14}>
+            <AppSectionHeader title="Student Records & History" icon="folder-open" />
+            <View style={styles.actionsRow}>
               <TouchableOpacity
-                style={[s.actionBtn, { backgroundColor: '#ede9fe' }]}
+                style={[styles.actionBtn, { backgroundColor: colors.primaryBg }]}
                 onPress={() => navigation?.navigate('ExamResults', { studentId: student.id })}
+                activeOpacity={0.75}
               >
-                <Icon name="chart-bar" size={18} color="#7c3aed" />
-                <Text style={[s.actionText, { color: '#7c3aed' }]}>Results</Text>
+                <Icon name="award" size={18} color={colors.primary} />
+                <Text style={[styles.actionText, { color: colors.primary }]}>Results</Text>
               </TouchableOpacity>
+
               <TouchableOpacity
-                style={[s.actionBtn, { backgroundColor: '#d1fae5' }]}
+                style={[styles.actionBtn, { backgroundColor: colors.successBg }]}
                 onPress={() => navigation?.navigate('Leave', { studentId: student.id })}
+                activeOpacity={0.75}
               >
-                <Icon name="calendar-times" size={18} color="#059669" />
-                <Text style={[s.actionText, { color: '#059669' }]}>Leave</Text>
+                <Icon name="calendar-minus" size={18} color={colors.success} />
+                <Text style={[styles.actionText, { color: colors.success }]}>Leave</Text>
               </TouchableOpacity>
+
               <TouchableOpacity
-                style={[s.actionBtn, { backgroundColor: '#fef3c7' }]}
+                style={[styles.actionBtn, { backgroundColor: colors.warningBg }]}
                 onPress={() => navigation?.navigate('BehaviourLog', { studentId: student.id })}
+                activeOpacity={0.75}
               >
-                <Icon name="clipboard-list" size={18} color="#d97706" />
-                <Text style={[s.actionText, { color: '#d97706' }]}>Behaviour</Text>
+                <Icon name="clipboard-list" size={18} color={colors.warning} />
+                <Text style={[styles.actionText, { color: colors.warning }]}>Behaviour</Text>
               </TouchableOpacity>
             </View>
-          </PremiumCard>
+          </AppCard>
         </View>
       </ScrollView>
     </View>
   );
 }
 
-const s = StyleSheet.create({
-  root: { flex: 1 },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
-  errorText: { fontSize: 14, textAlign: 'center', lineHeight: 22, paddingHorizontal: 32 },
-  retryBtn: { paddingHorizontal: 24, paddingVertical: 10, borderRadius: 10, marginTop: 4 },
-  retryText: { color: '#fff', fontWeight: '700' },
-  // Hero
-  hero: { padding: 24, paddingTop: Platform.OS === 'ios' ? 56 : 36, flexDirection: 'row', alignItems: 'center', gap: 16 },
-  avatarCircle: { width: 60, height: 60, borderRadius: 30, backgroundColor: 'rgba(255,255,255,0.25)', alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: 'rgba(255,255,255,0.5)' },
-  avatarText: { fontSize: 24, fontWeight: '900', color: '#fff' },
-  heroInfo: { flex: 1 },
-  heroName: { fontSize: 18, fontWeight: '900', color: '#fff' },
-  heroSub: { fontSize: 12, color: 'rgba(255,255,255,0.8)', marginTop: 2 },
-  heroGR: { fontSize: 11, color: 'rgba(255,255,255,0.6)', marginTop: 2 },
-  activePill: { borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4 },
-  activePillText: { fontSize: 11, fontWeight: '700' },
-  // Body
-  body: { padding: 16, gap: 12 },
-  statsRow: { flexDirection: 'row', gap: 12 },
-  statBox: { flex: 1, backgroundColor: '#fff', borderRadius: 16, padding: 16, alignItems: 'center', borderWidth: 2, ...shadows.sm },
-  statVal: { fontSize: 22, fontWeight: '900' },
-  statLbl: { fontSize: 12, fontWeight: '700', marginTop: 4 },
-  statSub: { fontSize: 10, marginTop: 2 },
-  card: { marginBottom: 0 },
-  // Info rows
-  infoRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 8, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#e5e7eb' },
-  infoLabel: { fontSize: 12, fontWeight: '600' },
-  infoValue: { fontSize: 13, fontWeight: '700', maxWidth: '60%', textAlign: 'right' },
-  // Actions
-  actionsRow: { flexDirection: 'row', gap: 10, marginTop: 8 },
-  actionBtn: { flex: 1, alignItems: 'center', padding: 14, borderRadius: 14, gap: 6 },
-  actionText: { fontSize: 11, fontWeight: '700' },
+const styles = StyleSheet.create({
+  root: {
+    flex: 1,
+  },
+  hero: {
+    padding: spacing.xl,
+    overflow: 'hidden',
+  },
+  heroTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.base,
+  },
+  heroInfo: {
+    flex: 1,
+  },
+  heroName: {
+    fontSize: typography.size.xl,
+    fontWeight: typography.weight.extrabold,
+    color: '#ffffff',
+  },
+  heroSub: {
+    fontSize: typography.size.xs,
+    color: 'rgba(255,255,255,0.85)',
+    marginTop: 2,
+  },
+  heroBadgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginTop: spacing.xs,
+  },
+  grBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: radius.sm,
+  },
+  grText: {
+    color: '#ffffff',
+    fontSize: typography.size['2xs'],
+    fontWeight: typography.weight.bold,
+  },
+  body: {
+    padding: spacing.base,
+    gap: spacing.md,
+    paddingBottom: spacing['3xl'],
+  },
+  statsRow: {
+    flexDirection: 'row',
+    gap: spacing.md,
+  },
+  infoRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: spacing.sm + 2,
+    borderBottomWidth: 1,
+  },
+  infoLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  infoLabel: {
+    fontSize: typography.size.xs,
+    fontWeight: typography.weight.medium,
+  },
+  infoValue: {
+    fontSize: typography.size.sm,
+    fontWeight: typography.weight.semibold,
+    maxWidth: '55%',
+    textAlign: 'right',
+  },
+  actionsRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginTop: spacing.xs,
+  },
+  actionBtn: {
+    flex: 1,
+    alignItems: 'center',
+    padding: spacing.md,
+    borderRadius: radius.lg,
+    gap: 6,
+  },
+  actionText: {
+    fontSize: typography.size.xs,
+    fontWeight: typography.weight.bold,
+  },
 });

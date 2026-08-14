@@ -1,6 +1,7 @@
 /**
  * VidyaSetu Mobile — Utility Formatters
  */
+import { getCleanErrorMessage } from '../services/apiError';
 
 /** Format Indian Rupee currency */
 export function formatCurrency(amount: number | string): string {
@@ -144,10 +145,5 @@ export function daysUntil(date: string | Date): number {
 
 /** Extract error message from API error */
 export function getErrorMessage(error: any, fallback = 'Something went wrong'): string {
-  return (
-    error?.response?.data?.detail ??
-    error?.response?.data?.message ??
-    error?.message ??
-    fallback
-  );
+  return getCleanErrorMessage(error, fallback);
 }

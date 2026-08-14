@@ -1,14 +1,31 @@
 /**
- * VidyaSetu Mobile — My Results Screen (Student)
- * ================================================
- * Detailed examination marksheets, class rank, subject breakdowns & grades.
+ * VidyaSetu Mobile — My Results Screen (Student Portal - Premium Redesign)
+ * =========================================================================
+ * Detailed examination marksheets, class rank, subject breakdowns & letter grades.
  */
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import {
-  View, Text, StyleSheet, FlatList, RefreshControl, ActivityIndicator, TouchableOpacity,
+  View,
+  Text,
+  StyleSheet,
+  FlatList,
+  RefreshControl,
+  TouchableOpacity,
+  Platform,
 } from 'react-native';
+import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/FontAwesome5';
+import { useTheme } from '../../theme/ThemeContext';
 import { studentPortalAPI } from '../../services/api';
+import { spacing, radius, typography, shadows } from '../../theme';
+import { formatDateLong } from '../../utils/formatters';
+import {
+  AppCard,
+  AppBadge,
+  AppProgress,
+  AppEmptyState,
+  AppSkeleton,
+} from '../../components/ui';
 
 interface SubjectMark {
   subject: string;
@@ -52,6 +69,7 @@ const GRADE_COLOR: Record<string, string> = {
 };
 
 export default function MyResultsScreen() {
+  const { colors, roleAccent } = useTheme();
   const [examResults, setExamResults] = useState<ExamResult[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -62,8 +80,12 @@ export default function MyResultsScreen() {
     try {
       const res = await studentPortalAPI.getMyResults();
       const data = res.data?.data;
-      const list: ExamResult[] = Array.isArray(data?.results) ? data.results : Array.isArray(data) ? data : [];
-      
+      const list: ExamResult[] = Array.isArray(data?.results)
+        ? data.results
+        : Array.isArray(data)
+        ? data
+        : [];
+
       setExamResults(list);
       if (list.length > 0) {
         setExpandedExam(list[0].exam_id);
@@ -78,154 +100,266 @@ export default function MyResultsScreen() {
     }
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    load();
+  }, [load]);
 
-  if (loading) return <View style={s.center}><ActivityIndicator color="#4f46e5" size="large" /></View>;
+  const onRefresh = () => {
+    setRefreshing(true);
+    load();
+  };
 
   return (
-    <View style={s.page}>
-      {/* Overall Banner */}
-      <View style={s.banner}>
-        <Text style={s.bannerTitle}>📊 Academic Marksheets & Performance</Text>
-        <Text style={s.bannerSub}>VidyaSetu ERP — Student Evaluation</Text>
-        <View style={s.overallBadge}>
-          <Text style={s.overallValue}>{overallPerc > 0 ? `${overallPerc}%` : '—'}</Text>
-          <Text style={s.overallLabel}>Avg Percentage</Text>
+    <View style={[styles.root, { backgroundColor: colors.background }]}>
+      {/* Overall Cumulative Banner */}
+      <LinearGradient
+        colors={roleAccent.gradient}
+        style={[styles.banner, { paddingTop: Platform.OS === 'ios' ? 24 : spacing.xl }]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+      >
+        <Text style={styles.bannerTitle}>Academic Evaluation & Marksheets</Text>
+        <Text style={styles.bannerSub}>Cumulative Examination Performance</Text>
+
+        <View style={styles.overallBadge}>
+          <Text style={styles.overallValue}>{overallPerc > 0 ? `${overallPerc}%` : '—'}</Text>
+          <Text style={styles.overallLabel}>Average Score</Text>
         </View>
-      </View>
+      </LinearGradient>
 
-      <FlatList
-        data={examResults}
-        keyExtractor={(item) => String(item.exam_id)}
-        contentContainerStyle={{ padding: 14, paddingBottom: 40 }}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor="#4f46e5" />}
-        ListEmptyComponent={
-          <View style={s.center}>
-            <Text style={{ fontSize: 40, marginBottom: 12 }}>📝</Text>
-            <Text style={s.emptyText}>No examination results published yet</Text>
-          </View>
-        }
-        renderItem={({ item }) => {
-          const isExpanded = expandedExam === item.exam_id;
-          const gradeColor = GRADE_COLOR[item.grade || 'A1'] ?? '#6366f1';
-          const perc = Math.round(item.percentage || 0);
+      {loading ? (
+        <View style={{ padding: spacing.base }}>
+          <AppSkeleton variant="card" count={3} />
+        </View>
+      ) : (
+        <FlatList
+          data={examResults}
+          keyExtractor={item => String(item.exam_id)}
+          contentContainerStyle={{ padding: spacing.base, paddingBottom: 100 }}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor={roleAccent.primary}
+              colors={[roleAccent.primary]}
+            />
+          }
+          ItemSeparatorComponent={() => <View style={{ height: 10 }} />}
+          ListEmptyComponent={
+            <AppEmptyState
+              icon="file-signature"
+              title="No Results Declared"
+              description="No assessment reports or terminal exam marks published yet."
+              style={{ flex: 1 }}
+            />
+          }
+          renderItem={({ item }) => {
+            const isExpanded = expandedExam === item.exam_id;
+            const gradeColor = GRADE_COLOR[item.grade || 'A1'] ?? colors.primary;
+            const perc = Math.round(item.percentage || 0);
 
-          return (
-            <View style={s.card}>
-              <TouchableOpacity
-                activeOpacity={0.8}
-                onPress={() => setExpandedExam(isExpanded ? null : item.exam_id)}
-                style={s.cardHeader}
-              >
-                <View style={{ flex: 1 }}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                    <Text style={s.examTitle}>{item.exam_type}</Text>
-                    {item.rank != null && (
-                      <View style={s.rankPill}>
-                        <Icon name="trophy" size={10} color="#f59e0b" solid />
-                        <Text style={s.rankText}>Rank #{item.rank}</Text>
-                      </View>
-                    )}
-                  </View>
-                  <Text style={s.examSub}>
-                    Std {item.standard}{item.division ? `-${item.division}` : ''} • {item.result_date ? new Date(item.result_date).toLocaleDateString('en-IN') : 'Declared'}
-                  </Text>
-                </View>
-                <View style={{ alignItems: 'flex-end', gap: 4 }}>
-                  <View style={[s.gradeBadge, { backgroundColor: `${gradeColor}18` }]}>
-                    <Text style={[s.gradeText, { color: gradeColor }]}>{item.grade || 'PASS'}</Text>
-                  </View>
-                  <Text style={s.examPerc}>{item.total_marks} / {item.total_max} ({perc}%)</Text>
-                </View>
-              </TouchableOpacity>
-
-              {/* Progress bar */}
-              <View style={s.progressBg}>
-                <View style={[s.progressFill, { width: `${Math.min(perc, 100)}%`, backgroundColor: gradeColor }]} />
-              </View>
-
-              {/* Remarks */}
-              {item.remarks && (
-                <Text style={s.remarksText}>💡 {item.remarks}</Text>
-              )}
-
-              {/* Expandable Subject Breakdown */}
-              {isExpanded && (
-                <View style={s.subjectsContainer}>
-                  <Text style={s.subjectsHeader}>Subject Breakdown:</Text>
-                  {item.subjects.map((sub, sIdx) => {
-                    const subGradeColor = GRADE_COLOR[sub.grade || 'A1'] ?? '#64748b';
-                    const subPerc = Math.round((sub.marks_obtained / sub.max_marks) * 100);
-
-                    return (
-                      <View key={sIdx} style={s.subjectRow}>
-                        <View style={{ flex: 1 }}>
-                          <Text style={s.subjectName}>{sub.subject}</Text>
-                          {sub.subject_marathi && (
-                            <Text style={s.subjectMarathi}>{sub.subject_marathi}</Text>
-                          )}
-                          {sub.theory_marks != null && sub.practical_marks != null && sub.practical_marks > 0 && (
-                            <Text style={s.breakdownText}>
-                              Theory: {sub.theory_marks} | Practical: {sub.practical_marks}
-                            </Text>
-                          )}
+            return (
+              <AppCard variant="bordered" padding={0}>
+                {/* Exam Header */}
+                <TouchableOpacity
+                  activeOpacity={0.8}
+                  onPress={() => setExpandedExam(isExpanded ? null : item.exam_id)}
+                  style={styles.cardHeader}
+                >
+                  <View style={{ flex: 1, gap: 4 }}>
+                    <View style={styles.titleRow}>
+                      <Text style={[styles.examTitle, { color: colors.text }]}>{item.exam_type}</Text>
+                      {item.rank != null && (
+                        <View style={[styles.rankPill, { backgroundColor: '#fef3c7' }]}>
+                          <Icon name="trophy" size={9} color="#d97706" solid />
+                          <Text style={styles.rankText}>Rank #{item.rank}</Text>
                         </View>
-                        <View style={{ alignItems: 'flex-end' }}>
-                          <Text style={s.subjectMarks}>
-                            {sub.is_absent ? 'ABSENT' : `${sub.marks_obtained} / ${sub.max_marks}`}
-                          </Text>
-                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 }}>
-                            <Text style={[s.subjectGrade, { color: subGradeColor }]}>{sub.grade || `${subPerc}%`}</Text>
-                            <View style={[s.passBadge, { backgroundColor: sub.is_pass ? '#d1fae5' : '#fee2e2' }]}>
-                              <Text style={[s.passText, { color: sub.is_pass ? '#059669' : '#dc2626' }]}>
-                                {sub.is_pass ? 'PASS' : 'FAIL'}
-                              </Text>
-                            </View>
+                      )}
+                    </View>
+                    <Text style={[styles.examSub, { color: colors.textSecondary }]}>
+                      Std {item.standard}
+                      {item.division ? `-${item.division}` : ''} •{' '}
+                      {item.result_date ? formatDateLong(item.result_date) : 'Declared'}
+                    </Text>
+                  </View>
+
+                  <View style={{ alignItems: 'flex-end', gap: 4 }}>
+                    <AppBadge
+                      label={item.grade || 'PASS'}
+                      variant={item.all_pass ? 'success' : 'danger'}
+                      size="md"
+                      rounded
+                    />
+                    <Text style={[styles.examPerc, { color: colors.text }]}>
+                      {item.total_marks} / {item.total_max} ({perc}%)
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+
+                {/* Expanded Subject Breakdown */}
+                {isExpanded && (
+                  <View style={[styles.breakdownWrap, { borderTopColor: colors.border, backgroundColor: colors.surfaceAlt }]}>
+                    <View style={styles.tableHeader}>
+                      <Text style={[styles.colHead, { flex: 2, color: colors.textTertiary }]}>Subject</Text>
+                      <Text style={[styles.colHead, { flex: 1, textAlign: 'center', color: colors.textTertiary }]}>
+                        Marks
+                      </Text>
+                      <Text style={[styles.colHead, { flex: 1, textAlign: 'right', color: colors.textTertiary }]}>
+                        Grade
+                      </Text>
+                    </View>
+
+                    {item.subjects?.map((s, idx) => {
+                      const sGradeColor = GRADE_COLOR[s.grade || 'B1'] ?? colors.text;
+                      return (
+                        <View
+                          key={idx}
+                          style={[
+                            styles.subjectRow,
+                            idx < item.subjects.length - 1 && { borderBottomColor: colors.border, borderBottomWidth: StyleSheet.hairlineWidth },
+                          ]}
+                        >
+                          <View style={{ flex: 2 }}>
+                            <Text style={[styles.subjectName, { color: colors.text }]}>{s.subject}</Text>
+                            {s.is_absent && (
+                              <Text style={[styles.absentLabel, { color: colors.danger }]}>ABSENT</Text>
+                            )}
+                          </View>
+
+                          <View style={{ flex: 1, alignItems: 'center' }}>
+                            <Text style={[styles.subjectMarks, { color: colors.text }]}>
+                              {s.is_absent ? '—' : `${s.marks_obtained}/${s.max_marks}`}
+                            </Text>
+                          </View>
+
+                          <View style={{ flex: 1, alignItems: 'flex-end' }}>
+                            <Text style={[styles.subjectGrade, { color: sGradeColor }]}>
+                              {s.grade || (s.is_pass ? 'P' : 'F')}
+                            </Text>
                           </View>
                         </View>
-                      </View>
-                    );
-                  })}
-                </View>
-              )}
-            </View>
-          );
-        }}
-      />
+                      );
+                    })}
+                  </View>
+                )}
+              </AppCard>
+            );
+          }}
+        />
+      )}
     </View>
   );
 }
 
-const s = StyleSheet.create({
-  page: { flex: 1, backgroundColor: '#f8fafc' },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 60, paddingBottom: 40 },
-  banner: { backgroundColor: '#4f46e5', padding: 20, alignItems: 'center', borderBottomLeftRadius: 20, borderBottomRightRadius: 20 },
-  bannerTitle: { color: '#fff', fontSize: 16, fontWeight: '900' },
-  bannerSub: { color: 'rgba(255,255,255,0.75)', fontSize: 12, marginTop: 4, marginBottom: 12 },
-  overallBadge: { backgroundColor: '#fff', borderRadius: 50, width: 92, height: 92, alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 8, elevation: 4 },
-  overallValue: { fontSize: 24, fontWeight: '900', color: '#4f46e5' },
-  overallLabel: { fontSize: 10, color: '#6b7280', fontWeight: '700' },
-  card: { backgroundColor: '#fff', borderRadius: 16, padding: 16, marginBottom: 12, shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 6, elevation: 2 },
-  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
-  examTitle: { fontSize: 15, fontWeight: '800', color: '#1e293b', flexShrink: 1 },
-  examSub: { fontSize: 12, color: '#64748b', marginTop: 3 },
-  rankPill: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#fef3c7', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 12 },
-  rankText: { fontSize: 11, fontWeight: '800', color: '#d97706' },
-  gradeBadge: { borderRadius: 16, paddingHorizontal: 12, paddingVertical: 4 },
-  gradeText: { fontSize: 14, fontWeight: '900' },
-  examPerc: { fontSize: 12, fontWeight: '700', color: '#475569', marginTop: 4 },
-  progressBg: { height: 6, backgroundColor: '#f1f5f9', borderRadius: 3, overflow: 'hidden', marginTop: 12, marginBottom: 8 },
-  progressFill: { height: 6, borderRadius: 3 },
-  remarksText: { fontSize: 12, color: '#475569', fontStyle: 'italic', marginTop: 4 },
-  subjectsContainer: { marginTop: 14, paddingTop: 12, borderTopWidth: 1, borderTopColor: '#f1f5f9' },
-  subjectsHeader: { fontSize: 13, fontWeight: '800', color: '#334155', marginBottom: 8 },
-  subjectRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: '#f8fafc' },
-  subjectName: { fontSize: 13, fontWeight: '700', color: '#1e293b' },
-  subjectMarathi: { fontSize: 11, color: '#64748b' },
-  breakdownText: { fontSize: 10, color: '#94a3b8', marginTop: 1 },
-  subjectMarks: { fontSize: 13, fontWeight: '800', color: '#1e293b' },
-  subjectGrade: { fontSize: 12, fontWeight: '800' },
-  passBadge: { borderRadius: 10, paddingHorizontal: 6, paddingVertical: 1 },
-  passText: { fontSize: 9, fontWeight: '900' },
-  emptyText: { fontSize: 13, color: '#6b7280', textAlign: 'center' },
+const styles = StyleSheet.create({
+  root: {
+    flex: 1,
+  },
+  banner: {
+    padding: spacing.xl,
+    borderBottomLeftRadius: radius['2xl'],
+    borderBottomRightRadius: radius['2xl'],
+    alignItems: 'center',
+    ...shadows.md,
+  },
+  bannerTitle: {
+    fontSize: typography.size.lg,
+    fontWeight: typography.weight.bold,
+    color: '#ffffff',
+  },
+  bannerSub: {
+    fontSize: typography.size.xs,
+    color: 'rgba(255,255,255,0.85)',
+    marginTop: 2,
+  },
+  overallBadge: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.sm,
+    borderRadius: radius.xl,
+    marginTop: spacing.md,
+  },
+  overallValue: {
+    fontSize: typography.size['2xl'],
+    fontWeight: typography.weight.extrabold,
+    color: '#ffffff',
+  },
+  overallLabel: {
+    fontSize: typography.size['2xs'],
+    color: 'rgba(255,255,255,0.85)',
+    marginTop: 2,
+    textTransform: 'uppercase',
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: spacing.base,
+  },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  examTitle: {
+    fontSize: typography.size.base,
+    fontWeight: typography.weight.bold,
+  },
+  rankPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: radius.full,
+  },
+  rankText: {
+    fontSize: typography.size['2xs'],
+    fontWeight: typography.weight.bold,
+    color: '#d97706',
+  },
+  examSub: {
+    fontSize: typography.size.xs,
+  },
+  examPerc: {
+    fontSize: typography.size.xs,
+    fontWeight: typography.weight.semibold,
+  },
+  breakdownWrap: {
+    borderTopWidth: 1,
+    padding: spacing.md,
+    borderBottomLeftRadius: radius.lg,
+    borderBottomRightRadius: radius.lg,
+  },
+  tableHeader: {
+    flexDirection: 'row',
+    paddingBottom: 6,
+  },
+  colHead: {
+    fontSize: typography.size['2xs'],
+    fontWeight: typography.weight.bold,
+    textTransform: 'uppercase',
+  },
+  subjectRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+  },
+  subjectName: {
+    fontSize: typography.size.xs,
+    fontWeight: typography.weight.semibold,
+  },
+  absentLabel: {
+    fontSize: typography.size['2xs'],
+    fontWeight: typography.weight.bold,
+  },
+  subjectMarks: {
+    fontSize: typography.size.xs,
+    fontWeight: typography.weight.semibold,
+  },
+  subjectGrade: {
+    fontSize: typography.size.xs,
+    fontWeight: typography.weight.extrabold,
+  },
 });

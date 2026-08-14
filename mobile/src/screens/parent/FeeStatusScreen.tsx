@@ -1,18 +1,40 @@
 /**
- * VidyaSetu Mobile — Fee Status Screen (Parent)
- * ===============================================
- * Parent sees their child(ren)'s fee status.
- * If multiple children, shows a child selector.
- * Uses: GET /parent-portal/children/{childId}/fees
+ * VidyaSetu Mobile — Fee Status Screen (Parent Portal - Premium Redesign)
+ * =======================================================================
+ * Detailed tuition, exam, transport, and term fee status with balance breakdown
+ * and child switching.
  */
 import React, { useEffect, useState, useCallback } from 'react';
 import {
-  View, Text, StyleSheet, FlatList, RefreshControl,
-  ActivityIndicator, TouchableOpacity, ScrollView,
+  View,
+  Text,
+  StyleSheet,
+  FlatList,
+  RefreshControl,
+  ScrollView,
+  Platform,
 } from 'react-native';
+import LinearGradient from 'react-native-linear-gradient';
+import Icon from 'react-native-vector-icons/FontAwesome5';
+import { useTheme } from '../../theme/ThemeContext';
 import { parentAPI } from '../../services/api';
+import { spacing, radius, typography, shadows } from '../../theme';
+import { formatCurrency, formatDateLong } from '../../utils/formatters';
+import {
+  AppCard,
+  AppBadge,
+  AppChip,
+  AppEmptyState,
+  AppSkeleton,
+} from '../../components/ui';
 
-interface Child { id: number; full_name: string; standard?: string; division?: string; }
+interface Child {
+  id: number;
+  full_name: string;
+  standard?: string;
+  division?: string;
+}
+
 interface FeeRecord {
   fee_head?: string;
   fee_type?: string;
@@ -23,14 +45,15 @@ interface FeeRecord {
   due_date?: string;
 }
 
-const STATUS_STYLE: Record<string, { bg: string; color: string }> = {
-  paid:     { bg: '#d1fae5', color: '#059669' },
-  partial:  { bg: '#fef3c7', color: '#d97706' },
-  pending:  { bg: '#fee2e2', color: '#dc2626' },
-  overdue:  { bg: '#fce7f3', color: '#be185d' },
+const STATUS_CONFIG: Record<string, { label: string; variant: 'success' | 'warning' | 'danger' | 'neutral' }> = {
+  paid:    { label: 'Paid in Full', variant: 'success' },
+  partial: { label: 'Partially Paid', variant: 'warning' },
+  pending: { label: 'Pending Payment', variant: 'danger' },
+  overdue: { label: 'Overdue Dues', variant: 'danger' },
 };
 
 export default function FeeStatusScreen() {
+  const { colors, roleAccent } = useTheme();
   const [children, setChildren] = useState<Child[]>([]);
   const [selectedChildId, setSelectedChildId] = useState<number | null>(null);
   const [records, setRecords] = useState<FeeRecord[]>([]);
@@ -38,9 +61,7 @@ export default function FeeStatusScreen() {
   const [loadingChildren, setLoadingChildren] = useState(true);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
-  // Step 1: Load children list
   useEffect(() => {
     (async () => {
       try {
@@ -50,23 +71,19 @@ export default function FeeStatusScreen() {
         setChildren(list);
         if (list.length > 0) setSelectedChildId(list[0].id);
       } catch {
-        setError('Could not load children list.');
+        // ignore
       } finally {
         setLoadingChildren(false);
       }
     })();
   }, []);
 
-  // Step 2: Load fees for selected child
   const loadFees = useCallback(async () => {
     if (!selectedChildId) return;
     setLoading(true);
-    setError(null);
     try {
       const res = await parentAPI.getChildFees(selectedChildId, { academic_year: '2025-2026' });
       const d = res.data?.data;
-      // Response can be: { records: [...], total_due, total_paid, balance }
-      // or a direct array of fee records
       let recs: FeeRecord[] = [];
       if (Array.isArray(d)) {
         recs = d;
@@ -80,7 +97,6 @@ export default function FeeStatusScreen() {
       const totalPaid = d?.total_paid ?? recs.reduce((s, r) => s + (r.amount_paid ?? 0), 0);
       setTotals({ due: totalDue, paid: totalPaid, balance: d?.balance ?? (totalDue - totalPaid) });
     } catch {
-      setError('Could not load fee information.');
       setRecords([]);
     } finally {
       setLoading(false);
@@ -92,17 +108,28 @@ export default function FeeStatusScreen() {
     if (selectedChildId !== null) loadFees();
   }, [loadFees, selectedChildId]);
 
-  const onRefresh = () => { setRefreshing(true); loadFees(); };
+  const onRefresh = () => {
+    setRefreshing(true);
+    loadFees();
+  };
 
   if (loadingChildren) {
-    return <View style={s.center}><ActivityIndicator color="#dc2626" size="large" /></View>;
+    return (
+      <View style={{ padding: spacing.base, backgroundColor: colors.background, flex: 1 }}>
+        <AppSkeleton variant="card" count={3} />
+      </View>
+    );
   }
 
   if (children.length === 0) {
     return (
-      <View style={s.center}>
-        <Text style={{ fontSize: 36 }}>👶</Text>
-        <Text style={s.emptyText}>No children linked to your account.</Text>
+      <View style={[styles.page, { backgroundColor: colors.background }]}>
+        <AppEmptyState
+          icon="child"
+          title="No Linked Children"
+          description="No student profiles are currently connected to your parent account."
+          style={{ flex: 1 }}
+        />
       </View>
     );
   }
@@ -110,96 +137,122 @@ export default function FeeStatusScreen() {
   const selectedChild = children.find(c => c.id === selectedChildId);
 
   return (
-    <View style={s.page}>
-      {/* Header */}
-      <View style={s.banner}>
-        <Text style={s.title}>💰 Fee Status</Text>
+    <View style={[styles.page, { backgroundColor: colors.background }]}>
+      {/* Header Summary Banner */}
+      <LinearGradient
+        colors={roleAccent.gradient}
+        style={styles.banner}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+      >
+        <Text style={styles.title}>Fee Summary</Text>
         {selectedChild && (
-          <Text style={s.sub}>
+          <Text style={styles.sub}>
             {selectedChild.full_name}
-            {selectedChild.standard ? ` · Std ${selectedChild.standard}${selectedChild.division ? `-${selectedChild.division}` : ''}` : ''}
+            {selectedChild.standard ? ` • Std ${selectedChild.standard}${selectedChild.division ? `-${selectedChild.division}` : ''}` : ''}
           </Text>
         )}
-        {!loading && (
-          <View style={s.totalsRow}>
-            <View style={s.total}>
-              <Text style={[s.tv, { color: '#fcd34d' }]}>₹{totals.due.toLocaleString('en-IN')}</Text>
-              <Text style={s.tl}>Total Due</Text>
-            </View>
-            <View style={s.total}>
-              <Text style={[s.tv, { color: '#6ee7b7' }]}>₹{totals.paid.toLocaleString('en-IN')}</Text>
-              <Text style={s.tl}>Paid</Text>
-            </View>
-            <View style={s.total}>
-              <Text style={[s.tv, { color: totals.balance > 0 ? '#fca5a5' : '#6ee7b7' }]}>
-                ₹{totals.balance.toLocaleString('en-IN')}
-              </Text>
-              <Text style={s.tl}>Balance</Text>
-            </View>
-          </View>
-        )}
-      </View>
 
-      {/* Child selector */}
+        <View style={styles.totalsRow}>
+          <View style={styles.totalBox}>
+            <Text style={[styles.tv, { color: '#fde68a' }]}>{formatCurrency(totals.due)}</Text>
+            <Text style={styles.tl}>Total Demanded</Text>
+          </View>
+          <View style={styles.totalBox}>
+            <Text style={[styles.tv, { color: '#6ee7b7' }]}>{formatCurrency(totals.paid)}</Text>
+            <Text style={styles.tl}>Paid So Far</Text>
+          </View>
+          <View style={styles.totalBox}>
+            <Text style={[styles.tv, { color: totals.balance > 0 ? '#fca5a5' : '#6ee7b7' }]}>
+              {formatCurrency(totals.balance)}
+            </Text>
+            <Text style={styles.tl}>Balance Due</Text>
+          </View>
+        </View>
+      </LinearGradient>
+
+      {/* Child Switcher Chips */}
       {children.length > 1 && (
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.childBar} contentContainerStyle={s.childBarContent}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={[styles.childBar, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}
+          contentContainerStyle={styles.childBarContent}
+        >
           {children.map(child => (
-            <TouchableOpacity
+            <AppChip
               key={child.id}
-              style={[s.childChip, selectedChildId === child.id && s.childChipActive]}
+              label={child.full_name.split(' ')[0]}
+              selected={selectedChildId === child.id}
               onPress={() => setSelectedChildId(child.id)}
-            >
-              <Text style={[s.childChipText, selectedChildId === child.id && s.childChipTextActive]}>
-                {child.full_name.split(' ')[0]}
-              </Text>
-            </TouchableOpacity>
+            />
           ))}
         </ScrollView>
       )}
 
       {loading ? (
-        <View style={s.center}><ActivityIndicator color="#dc2626" size="large" /></View>
-      ) : error ? (
-        <View style={s.center}>
-          <Text style={{ fontSize: 30 }}>⚠️</Text>
-          <Text style={s.emptyText}>{error}</Text>
-          <TouchableOpacity style={s.retryBtn} onPress={loadFees}>
-            <Text style={s.retryText}>Retry</Text>
-          </TouchableOpacity>
+        <View style={{ padding: spacing.base }}>
+          <AppSkeleton variant="card" count={4} />
         </View>
       ) : (
         <FlatList
           data={records}
           keyExtractor={(_, i) => String(i)}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#dc2626" />}
-          contentContainerStyle={{ padding: 12, paddingBottom: 24 }}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor={roleAccent.primary}
+            />
+          }
+          contentContainerStyle={{ padding: spacing.base, paddingBottom: 40 }}
+          ItemSeparatorComponent={() => <View style={{ height: 8 }} />}
           ListEmptyComponent={
-            <View style={s.center}>
-              <Text style={{ fontSize: 36 }}>✅</Text>
-              <Text style={s.emptyText}>No pending fees found.</Text>
-            </View>
+            <AppEmptyState
+              icon="check-circle"
+              title="All Fees Cleared"
+              description="No outstanding or pending fee dues found for this academic cycle."
+              style={{ flex: 1 }}
+            />
           }
           renderItem={({ item }) => {
-            const st = STATUS_STYLE[item.status] ?? STATUS_STYLE.pending;
-            const heading = item.fee_head ?? item.fee_type ?? 'Fee';
-            const balance = item.balance ?? (item.amount_due - item.amount_paid);
+            const st = STATUS_CONFIG[item.status] ?? { label: item.status, variant: 'neutral' as const };
+            const heading = item.fee_head ?? item.fee_type ?? 'Institutional Fee';
+            const balance = item.balance ?? ((item.amount_due ?? 0) - (item.amount_paid ?? 0));
             return (
-              <View style={s.card}>
-                <View style={s.cardTop}>
-                  <Text style={s.feeHead}>{heading}</Text>
-                  <View style={[s.badge, { backgroundColor: st.bg }]}>
-                    <Text style={[s.badgeText, { color: st.color }]}>{item.status}</Text>
+              <AppCard variant="bordered" padding={14}>
+                <View style={{ gap: 8 }}>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Text style={[styles.feeHead, { color: colors.text }]}>{heading}</Text>
+                    <AppBadge label={st.label} variant={st.variant} size="sm" rounded />
                   </View>
+                  <View style={[styles.cardBottom, { backgroundColor: colors.surfaceAlt }]}>
+                    <View>
+                      <Text style={[styles.amtLbl, { color: colors.textTertiary }]}>Demanded</Text>
+                      <Text style={[styles.amtVal, { color: colors.text }]}>
+                        {formatCurrency(item.amount_due ?? 0)}
+                      </Text>
+                    </View>
+                    <View>
+                      <Text style={[styles.amtLbl, { color: colors.textTertiary }]}>Paid</Text>
+                      <Text style={[styles.amtVal, { color: colors.success }]}>
+                        {formatCurrency(item.amount_paid ?? 0)}
+                      </Text>
+                    </View>
+                    <View>
+                      <Text style={[styles.amtLbl, { color: colors.textTertiary }]}>Balance</Text>
+                      <Text style={[styles.amtVal, { color: balance > 0 ? colors.danger : colors.success }]}>
+                        {formatCurrency(balance)}
+                      </Text>
+                    </View>
+                  </View>
+                  {item.due_date ? (
+                    <Text style={[styles.due, { color: colors.textTertiary }]}>
+                      Due Date: {formatDateLong(item.due_date)}
+                    </Text>
+                  ) : null}
                 </View>
-                <View style={s.cardBottom}>
-                  <Text style={s.amount}>Due: ₹{(item.amount_due ?? 0).toLocaleString('en-IN')}</Text>
-                  <Text style={s.paidText}>Paid: ₹{(item.amount_paid ?? 0).toLocaleString('en-IN')}</Text>
-                  <Text style={[s.balanceText, { color: balance > 0 ? '#dc2626' : '#059669' }]}>
-                    Bal: ₹{balance.toLocaleString('en-IN')}
-                  </Text>
-                </View>
-                {item.due_date ? <Text style={s.due}>Due Date: {item.due_date}</Text> : null}
-              </View>
+              </AppCard>
             );
           }}
         />
@@ -208,33 +261,77 @@ export default function FeeStatusScreen() {
   );
 }
 
-const s = StyleSheet.create({
-  page: { flex: 1, backgroundColor: '#f8fafc' },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 40, gap: 8 },
-  emptyText: { fontSize: 13, color: '#6b7280', textAlign: 'center', lineHeight: 20, paddingHorizontal: 32 },
-  banner: { backgroundColor: '#dc2626', padding: 20 },
-  title: { color: '#fff', fontSize: 18, fontWeight: '900' },
-  sub: { color: 'rgba(255,255,255,0.7)', fontSize: 12, marginTop: 2, marginBottom: 14 },
-  totalsRow: { flexDirection: 'row', gap: 20 },
-  total: { alignItems: 'center' },
-  tv: { fontSize: 16, fontWeight: '900' },
-  tl: { fontSize: 10, color: 'rgba(255,255,255,0.7)', fontWeight: '600' },
-  childBar: { backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#e2e8f0', flexGrow: 0 },
-  childBarContent: { paddingHorizontal: 12, paddingVertical: 10, gap: 8 },
-  childChip: { paddingHorizontal: 16, paddingVertical: 7, borderRadius: 20, backgroundColor: '#f1f5f9' },
-  childChipActive: { backgroundColor: '#dc2626' },
-  childChipText: { fontSize: 12, fontWeight: '700', color: '#6b7280' },
-  childChipTextActive: { color: '#fff' },
-  card: { backgroundColor: '#fff', borderRadius: 14, padding: 14, marginBottom: 8, shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 6, elevation: 1 },
-  cardTop: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
-  feeHead: { fontSize: 14, fontWeight: '800', color: '#1e293b', flex: 1 },
-  badge: { borderRadius: 20, paddingHorizontal: 10, paddingVertical: 3 },
-  badgeText: { fontSize: 11, fontWeight: '700', textTransform: 'capitalize' },
-  cardBottom: { flexDirection: 'row', gap: 12 },
-  amount: { fontSize: 12, color: '#6b7280', fontWeight: '600' },
-  paidText: { fontSize: 12, color: '#059669', fontWeight: '600' },
-  balanceText: { fontSize: 12, fontWeight: '800' },
-  due: { fontSize: 11, color: '#6b7280', marginTop: 6 },
-  retryBtn: { backgroundColor: '#dc2626', paddingHorizontal: 24, paddingVertical: 10, borderRadius: 10, marginTop: 8 },
-  retryText: { color: '#fff', fontWeight: '700' },
+const styles = StyleSheet.create({
+  page: {
+    flex: 1,
+  },
+  banner: {
+    padding: spacing.xl,
+    paddingTop: Platform.OS === 'ios' ? 24 : spacing.xl,
+    borderBottomLeftRadius: radius['2xl'],
+    borderBottomRightRadius: radius['2xl'],
+    ...shadows.md,
+  },
+  title: {
+    color: '#fff',
+    fontSize: typography.size.lg,
+    fontWeight: typography.weight.extrabold,
+  },
+  sub: {
+    color: 'rgba(255,255,255,0.85)',
+    fontSize: typography.size.xs,
+    marginTop: 2,
+    marginBottom: spacing.base,
+  },
+  totalsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  totalBox: {
+    alignItems: 'center',
+  },
+  tv: {
+    fontSize: typography.size.lg,
+    fontWeight: typography.weight.extrabold,
+  },
+  tl: {
+    fontSize: typography.size['2xs'],
+    color: 'rgba(255,255,255,0.85)',
+    fontWeight: typography.weight.semibold,
+    marginTop: 2,
+  },
+  childBar: {
+    flexGrow: 0,
+    borderBottomWidth: 1,
+  },
+  childBarContent: {
+    paddingHorizontal: spacing.base,
+    paddingVertical: spacing.sm,
+    gap: spacing.sm,
+  },
+  feeHead: {
+    fontSize: typography.size.base,
+    fontWeight: typography.weight.bold,
+    flex: 1,
+  },
+  cardBottom: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    padding: spacing.md,
+    borderRadius: radius.md,
+  },
+  amtLbl: {
+    fontSize: typography.size['2xs'],
+    fontWeight: typography.weight.semibold,
+    textTransform: 'uppercase',
+  },
+  amtVal: {
+    fontSize: typography.size.sm,
+    fontWeight: typography.weight.bold,
+    marginTop: 2,
+  },
+  due: {
+    fontSize: typography.size['2xs'],
+    marginTop: 2,
+  },
 });

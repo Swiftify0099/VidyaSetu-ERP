@@ -84,6 +84,15 @@ import BehaviourLogScreen from '../screens/behaviour/BehaviourLogScreen';
 // ── Announcements (standalone) ────────────────────────────────────
 import AnnouncementsScreen from '../screens/communication/AnnouncementsScreen';
 
+// ── Inventory Module ──────────────────────────────────────────────
+import InventoryScreen from '../screens/inventory/InventoryScreen';
+
+// ── QR Center & Digital ID ────────────────────────────────────────
+import QRScanScreen from '../screens/qr/QRScanScreen';
+
+// ── Academics & Subject Allocations ───────────────────────────────
+import SubjectAssignmentsScreen from '../screens/academics/SubjectAssignmentsScreen';
+
 const Stack = createNativeStackNavigator();
 const Tab   = createBottomTabNavigator();
 
@@ -131,6 +140,8 @@ function useHeaderOpts() {
     headerTintColor: colors.headerText,
     headerTitleStyle: { fontWeight: '700' as const, fontSize: 17, color: colors.headerText },
     headerShadowVisible: false,
+    headerBackTitleVisible: false,
+    animation: 'slide_from_right' as const,
   };
 }
 
@@ -173,6 +184,9 @@ function AdminStack() {
       <Stack.Screen name="BehaviourLog"      component={BehaviourLogScreen}         options={{ title: 'Behaviour Log' }} />
       <Stack.Screen name="Announcements"     component={AnnouncementsScreen}        options={{ title: 'Announcements' }} />
       <Stack.Screen name="Notices"           component={CommunicationScreen}        options={{ title: 'Notices & Announcements' }} />
+      <Stack.Screen name="Inventory"         component={InventoryScreen}            options={{ title: 'Inventory Management' }} />
+      <Stack.Screen name="QRScan"            component={QRScanScreen}               options={{ title: 'QR Center & Digital ID' }} />
+      <Stack.Screen name="SubjectAssignments" component={SubjectAssignmentsScreen} options={{ title: 'Subject Allocations' }} />
     </Stack.Navigator>
   );
 }
@@ -247,6 +261,8 @@ function TeacherStack() {
       <Stack.Screen name="Notices"          component={CommunicationScreen}     options={{ title: 'Notices & Announcements' }} />
       <Stack.Screen name="Behaviour"        component={BehaviourLogScreen}      options={{ title: 'Behaviour Log' }} />
       <Stack.Screen name="BehaviourLog"     component={BehaviourLogScreen}      options={{ title: 'Behaviour Log' }} />
+      <Stack.Screen name="QRScan"           component={QRScanScreen}            options={{ title: 'QR Scanner' }} />
+      <Stack.Screen name="SubjectAssignments" component={SubjectAssignmentsScreen} options={{ title: 'Subject Allocations' }} />
     </Stack.Navigator>
   );
 }
@@ -282,6 +298,7 @@ function StudentStack() {
       <Stack.Screen name="Notices"          component={CommunicationScreen}    options={{ title: 'Notices & Announcements' }} />
       <Stack.Screen name="Profile"          component={ProfileScreen}          options={{ title: 'My Profile' }} />
       <Stack.Screen name="Notifications"    component={NotificationsScreen}    options={{ title: 'Notifications' }} />
+      <Stack.Screen name="QRScan"           component={QRScanScreen}           options={{ title: 'Digital ID Pass' }} />
     </Stack.Navigator>
   );
 }
@@ -317,6 +334,7 @@ function ParentStack() {
       <Stack.Screen name="Notices"          component={CommunicationScreen}    options={{ title: 'Notices & Announcements' }} />
       <Stack.Screen name="Profile"          component={ProfileScreen}          options={{ title: 'My Profile' }} />
       <Stack.Screen name="Notifications"    component={NotificationsScreen}    options={{ title: 'Notifications' }} />
+      <Stack.Screen name="QRScan"           component={QRScanScreen}           options={{ title: 'Student Digital ID' }} />
     </Stack.Navigator>
   );
 }
@@ -374,6 +392,7 @@ function LibrarianStack() {
       <Stack.Screen name="Leave"            component={LeaveManagementScreen}  options={{ title: 'Leave' }} />
       <Stack.Screen name="Communication"    component={CommunicationScreen}    options={{ title: 'Communication' }} />
       <Stack.Screen name="Notices"          component={CommunicationScreen}    options={{ title: 'Notices & Announcements' }} />
+      <Stack.Screen name="QRScan"           component={QRScanScreen}           options={{ title: 'Barcode Scanner' }} />
       <Stack.Screen name="Profile"          component={ProfileScreen}          options={{ title: 'My Profile' }} />
     </Stack.Navigator>
   );
@@ -432,6 +451,8 @@ function OfficeStack() {
       <Stack.Screen name="Admission"        component={AdmissionManagementScreen} options={{ title: 'Admissions' }} />
       <Stack.Screen name="FeeCollection"    component={FeesScreen}              options={{ title: 'Fee Collection' }} />
       <Stack.Screen name="Reports"          component={ReportsScreen}           options={{ title: 'Reports' }} />
+      <Stack.Screen name="Inventory"        component={InventoryScreen}         options={{ title: 'Inventory Management' }} />
+      <Stack.Screen name="QRScan"           component={QRScanScreen}            options={{ title: 'QR Verification' }} />
       <Stack.Screen name="Profile"          component={ProfileScreen}           options={{ title: 'My Profile' }} />
       <Stack.Screen name="Notifications"    component={NotificationsScreen}     options={{ title: 'Notifications' }} />
     </Stack.Navigator>

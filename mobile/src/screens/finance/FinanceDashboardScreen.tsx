@@ -1,23 +1,34 @@
 /**
- * VidyaSetu Mobile — Finance Dashboard Screen (Enhanced)
- * Summary, overdue alerts, recent receipts, quick actions.
- * Accountant, Admin, Principal
+ * VidyaSetu Mobile — Finance Dashboard Screen (Premium Redesign)
+ * ===============================================================
+ * Financial collections overview, overdue accounts monitor, and payment receipt audit logs.
  */
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, FlatList,
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  RefreshControl,
+  FlatList,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/FontAwesome5';
 import { useTheme } from '../../theme/ThemeContext';
 import { financeAPI } from '../../services/api';
 import { spacing, radius, typography, shadows } from '../../theme';
-import { formatCurrency, formatDateLong, today } from '../../utils/formatters';
+import { formatCurrency, formatDateLong } from '../../utils/formatters';
 import { CURRENT_ACADEMIC_YEAR } from '../../config/constants';
-import SectionHeader from '../../components/ui/SectionHeader';
-import PremiumCard from '../../components/ui/PremiumCard';
-import StatCard from '../../components/ui/StatCard';
-import SkeletonLoader from '../../components/ui/SkeletonLoader';
-import Badge from '../../components/ui/Badge';
+import {
+  AppCard,
+  AppBadge,
+  AppButton,
+  AppTabs,
+  AppStatCard,
+  AppSectionHeader,
+  AppEmptyState,
+  AppSkeleton,
+} from '../../components/ui';
 
 interface Receipt {
   id: number;
@@ -48,15 +59,15 @@ interface Summary {
 }
 
 const PAYMENT_MODE_ICONS: Record<string, string> = {
-  cash: '💵',
-  upi: '📱',
-  cheque: '🏦',
-  bank_transfer: '🔄',
-  dd: '📄',
+  cash: 'money-bill-wave',
+  upi: 'mobile-alt',
+  cheque: 'money-check',
+  bank_transfer: 'university',
+  dd: 'file-invoice-dollar',
 };
 
 export default function FinanceDashboardScreen({ navigation }: { navigation: any }) {
-  const { colors } = useTheme();
+  const { colors, roleAccent } = useTheme();
   const [summary, setSummary] = useState<Summary | null>(null);
   const [receipts, setReceipts] = useState<Receipt[]>([]);
   const [overdue, setOverdue] = useState<OverdueStudent[]>([]);
@@ -74,202 +85,290 @@ export default function FinanceDashboardScreen({ navigation }: { navigation: any
       if (summaryRes.status   === 'fulfilled') setSummary(summaryRes.value.data?.data);
       if (receiptsRes.status  === 'fulfilled') setReceipts(receiptsRes.value.data?.data?.items ?? receiptsRes.value.data?.data ?? []);
       if (overdueRes.status   === 'fulfilled') setOverdue(overdueRes.value.data?.data?.items ?? overdueRes.value.data?.data ?? []);
-    } catch { /* ignore */ }
-    finally { setLoading(false); setRefreshing(false); }
+    } catch {
+      /* ignore */
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
   }, []);
 
-  useEffect(() => { load(); }, [load]);
-  const onRefresh = () => { setRefreshing(true); load(); };
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    load();
+  };
 
   const QUICK_ACTIONS = [
-    { icon: 'hand-holding-usd', label: 'Collect Fee',   color: '#059669', action: () => navigation.navigate('FeeCollection') },
-    { icon: 'file-invoice',     label: 'Fee Structure', color: '#6366f1', action: () => {} },
-    { icon: 'chart-line',       label: 'Reports',       color: '#f59e0b', action: () => navigation.navigate('Reports') },
-    { icon: 'exclamation-circle', label: 'Overdue',     color: '#dc2626', action: () => setTab('overdue') },
+    { icon: 'hand-holding-usd', label: 'Collect Fee', color: '#059669', action: () => navigation.navigate('FeeCollection') },
+    { icon: 'user-graduate',   label: 'Students',     color: '#4f46e5', action: () => navigation.navigate('Students') },
+    { icon: 'chart-pie',       label: 'Reports',      color: '#f59e0b', action: () => navigation.navigate('Reports') },
+    { icon: 'exclamation-circle', label: 'Overdue Dues', color: '#dc2626', action: () => setTab('overdue') },
   ];
 
   return (
-    <View style={[s.root, { backgroundColor: colors.background }]}>
+    <View style={[styles.root, { backgroundColor: colors.background }]}>
       <ScrollView
         showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} colors={[colors.primary]} />}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={colors.primary}
+            colors={[colors.primary]}
+          />
+        }
       >
-        {/* Summary Stats */}
+        {/* Key Collections Metrics */}
         {loading ? (
           <View style={{ padding: spacing.base }}>
-            <SkeletonLoader variant="stat" count={4} />
+            <AppSkeleton variant="stat" count={4} />
           </View>
         ) : summary ? (
-          <View style={[s.statsWrap, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
-            <View style={s.statsGrid}>
-              {[
-                { label: "Today's Collection", value: formatCurrency(summary.today_collected),  icon: 'sun',            color: colors.success },
-                { label: 'Total Collected',     value: formatCurrency(summary.total_collected), icon: 'rupee-sign',     color: colors.primary },
-                { label: 'Total Due',           value: formatCurrency(summary.total_due),       icon: 'money-bill-alt', color: colors.warning },
-                { label: 'Collection Rate',     value: `${(summary.collection_rate ?? 0).toFixed(1)}%`, icon: 'chart-pie', color: colors.info },
-              ].map((stat, i) => (
-                <View key={i} style={s.statCard}>
-                  <View style={[s.statIcon, { backgroundColor: `${stat.color}18` }]}>
-                    <Icon name={stat.icon} size={16} color={stat.color} solid />
-                  </View>
-                  <Text style={[s.statValue, { color: stat.color }]}>{stat.value}</Text>
-                  <Text style={[s.statLabel, { color: colors.textSecondary }]}>{stat.label}</Text>
-                </View>
-              ))}
+          <View style={[styles.statsSection, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
+            <View style={styles.statsGrid}>
+              <AppStatCard
+                label="Today's Collection"
+                value={formatCurrency(summary.today_collected)}
+                icon="sun"
+                color={colors.success}
+                style={{ width: '48%' }}
+              />
+              <AppStatCard
+                label="Total Collected"
+                value={formatCurrency(summary.total_collected)}
+                icon="rupee-sign"
+                color={colors.primary}
+                style={{ width: '48%' }}
+              />
+              <AppStatCard
+                label="Outstanding Dues"
+                value={formatCurrency(summary.total_due)}
+                icon="money-bill-alt"
+                color={colors.warning}
+                style={{ width: '48%' }}
+              />
+              <AppStatCard
+                label="Collection Rate"
+                value={`${(summary.collection_rate ?? 0).toFixed(1)}%`}
+                icon="chart-pie"
+                color={colors.info}
+                style={{ width: '48%' }}
+              />
             </View>
+
             {summary.overdue_count > 0 && (
               <TouchableOpacity
-                style={[s.overdueAlert, { backgroundColor: colors.dangerBg }]}
+                style={[styles.overdueAlert, { backgroundColor: colors.dangerBg, borderColor: colors.dangerBorder }]}
                 onPress={() => setTab('overdue')}
+                activeOpacity={0.8}
               >
                 <Icon name="exclamation-triangle" size={14} color={colors.danger} solid />
-                <Text style={[s.overdueAlertText, { color: colors.danger }]}>
-                  {summary.overdue_count} students with overdue payments!
+                <Text style={[styles.overdueAlertText, { color: colors.danger }]}>
+                  {summary.overdue_count} students with overdue fee payments!
                 </Text>
-                <Icon name="chevron-right" size={12} color={colors.danger} solid />
+                <Icon name="chevron-right" size={12} color={colors.danger} />
               </TouchableOpacity>
             )}
           </View>
         ) : null}
 
         {/* Quick Actions */}
-        <View style={{ paddingHorizontal: spacing.base, marginTop: spacing.lg }}>
-          <SectionHeader title="Quick Actions" icon="bolt" />
-          <View style={s.actionsRow}>
+        <View style={{ paddingHorizontal: spacing.base, marginTop: spacing.md }}>
+          <AppSectionHeader title="Accountant Actions" icon="bolt" />
+          <View style={styles.actionsRow}>
             {QUICK_ACTIONS.map((item, i) => (
               <TouchableOpacity
                 key={i}
-                style={[s.actionCard, { backgroundColor: colors.surface, ...shadows.sm }]}
+                style={[
+                  styles.actionBtn,
+                  { backgroundColor: colors.surface, ...shadows.sm, borderColor: colors.border },
+                ]}
                 onPress={item.action}
                 activeOpacity={0.75}
               >
-                <View style={[s.actionIcon, { backgroundColor: `${item.color}18` }]}>
+                <View style={[styles.actionIconWrap, { backgroundColor: `${item.color}18` }]}>
                   <Icon name={item.icon} size={18} color={item.color} solid />
                 </View>
-                <Text style={[s.actionLabel, { color: colors.text }]}>{item.label}</Text>
+                <Text style={[styles.actionLabel, { color: colors.text }]}>{item.label}</Text>
               </TouchableOpacity>
             ))}
           </View>
         </View>
 
-        {/* Tabs */}
-        <View style={{ marginTop: spacing.lg }}>
-          <View style={[s.tabs, { borderBottomColor: colors.border }]}>
-            {(['receipts', 'overdue'] as const).map(t => (
-              <TouchableOpacity
-                key={t}
-                style={[s.tab, tab === t && { borderBottomColor: colors.primary, borderBottomWidth: 2.5 }]}
-                onPress={() => setTab(t)}
-              >
-                <Text style={[s.tabText, { color: tab === t ? colors.primary : colors.textSecondary }]}>
-                  {t === 'receipts' ? 'Recent Receipts' : `Overdue (${overdue.length})`}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
+        {/* Activity Tabs */}
+        <View style={{ paddingHorizontal: spacing.base, marginTop: spacing.lg }}>
+          <AppTabs
+            tabs={[
+              { key: 'receipts', label: 'Recent Receipts', count: receipts.length },
+              { key: 'overdue', label: 'Overdue Dues', count: overdue.length },
+            ]}
+            activeTab={tab}
+            onChangeTab={k => setTab(k as any)}
+            variant="segmented"
+          />
+        </View>
 
-          <View style={{ paddingHorizontal: spacing.base, paddingTop: spacing.md }}>
-            {tab === 'receipts' ? (
-              receipts.length === 0 ? (
-                <PremiumCard variant="flat" style={s.emptyCard}>
-                  <Text style={s.emptyIcon}>🧾</Text>
-                  <Text style={[s.emptyText, { color: colors.textSecondary }]}>No receipts today</Text>
-                </PremiumCard>
-              ) : (
-                receipts.map(r => (
-                  <PremiumCard key={r.id} variant="bordered" padding={12} style={{ marginBottom: 8 }}>
-                    <View style={s.receiptRow}>
-                      <View style={[s.receiptIcon, { backgroundColor: colors.successBg }]}>
-                        <Text style={{ fontSize: 20 }}>{PAYMENT_MODE_ICONS[r.payment_mode] ?? '💰'}</Text>
-                      </View>
-                      <View style={{ flex: 1 }}>
-                        <Text style={[s.receiptName, { color: colors.text }]}>{r.student_name}</Text>
-                        <Text style={[s.receiptSub, { color: colors.textSecondary }]}>
-                          GR: {r.gr_number} • {r.payment_mode.replace('_', ' ').toUpperCase()}
-                        </Text>
-                        <Text style={[s.receiptDate, { color: colors.textTertiary }]}>
-                          {formatDateLong(r.created_at)}
-                          {r.receipt_number ? ` • #${r.receipt_number}` : ''}
-                        </Text>
-                      </View>
-                      <Text style={[s.receiptAmount, { color: colors.success }]}>
-                        {formatCurrency(r.amount)}
+        {/* Tab Content List */}
+        <View style={{ padding: spacing.base, paddingBottom: spacing['3xl'] }}>
+          {tab === 'receipts' ? (
+            receipts.length === 0 ? (
+              <AppEmptyState
+                icon="receipt"
+                title="No Receipts Issued"
+                description="No recent fee payment receipts recorded for this session."
+                style={{ paddingVertical: spacing.xl }}
+              />
+            ) : (
+              receipts.map(r => (
+                <AppCard key={r.id} variant="bordered" padding={12} style={{ marginBottom: spacing.xs }}>
+                  <View style={styles.receiptRow}>
+                    <View style={[styles.receiptIconWrap, { backgroundColor: colors.successBg }]}>
+                      <Icon
+                        name={PAYMENT_MODE_ICONS[r.payment_mode] ?? 'receipt'}
+                        size={15}
+                        color={colors.success}
+                        solid
+                      />
+                    </View>
+
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.rName, { color: colors.text }]}>{r.student_name}</Text>
+                      <Text style={[styles.rSub, { color: colors.textSecondary }]}>
+                        GR: {r.gr_number} • {formatDateLong(r.created_at)}
                       </Text>
                     </View>
-                  </PremiumCard>
-                ))
-              )
-            ) : (
-              overdue.length === 0 ? (
-                <PremiumCard variant="flat" style={s.emptyCard}>
-                  <Text style={s.emptyIcon}>✅</Text>
-                  <Text style={[s.emptyText, { color: colors.textSecondary }]}>No overdue payments</Text>
-                </PremiumCard>
-              ) : (
-                overdue.map(o => (
-                  <PremiumCard key={o.student_id} variant="bordered" padding={12} style={{ marginBottom: 8, borderLeftWidth: 4, borderLeftColor: colors.danger }}>
-                    <View style={s.overdueRow}>
-                      <View style={{ flex: 1 }}>
-                        <Text style={[s.receiptName, { color: colors.text }]}>{o.full_name}</Text>
-                        <Text style={[s.receiptSub, { color: colors.textSecondary }]}>
-                          GR: {o.gr_number} • Std {o.standard}-{o.division}
-                        </Text>
-                        <Text style={[s.receiptDate, { color: colors.danger }]}>
-                          Due since: {formatDateLong(o.due_since)}
-                        </Text>
-                      </View>
-                      <View style={{ alignItems: 'flex-end', gap: 4 }}>
-                        <Text style={[s.overdueAmount, { color: colors.danger }]}>
-                          {formatCurrency(o.overdue_amount)}
-                        </Text>
-                        <Badge label="Overdue" variant="danger" size="sm" rounded />
-                      </View>
-                    </View>
-                  </PremiumCard>
-                ))
-              )
-            )}
-          </View>
-        </View>
 
-        <View style={{ height: spacing['3xl'] }} />
+                    <View style={{ alignItems: 'flex-end' }}>
+                      <Text style={[styles.rAmt, { color: colors.success }]}>
+                        {formatCurrency(r.amount)}
+                      </Text>
+                      <AppBadge
+                        label={r.payment_mode.toUpperCase()}
+                        variant="neutral"
+                        size="sm"
+                        rounded
+                      />
+                    </View>
+                  </View>
+                </AppCard>
+              ))
+            )
+          ) : overdue.length === 0 ? (
+            <AppEmptyState
+              icon="check-circle"
+              title="No Overdue Accounts"
+              description="All students have cleared required term fee dues."
+              style={{ paddingVertical: spacing.xl }}
+            />
+          ) : (
+            overdue.map(o => (
+              <AppCard key={o.student_id} variant="bordered" padding={12} style={{ marginBottom: spacing.xs }}>
+                <View style={styles.receiptRow}>
+                  <View style={[styles.receiptIconWrap, { backgroundColor: colors.dangerBg }]}>
+                    <Icon name="exclamation" size={15} color={colors.danger} solid />
+                  </View>
+
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.rName, { color: colors.text }]}>{o.full_name}</Text>
+                    <Text style={[styles.rSub, { color: colors.textSecondary }]}>
+                      Std {o.standard}-{o.division} • GR: {o.gr_number}
+                    </Text>
+                  </View>
+
+                  <View style={{ alignItems: 'flex-end' }}>
+                    <Text style={[styles.rAmt, { color: colors.danger }]}>
+                      {formatCurrency(o.overdue_amount)}
+                    </Text>
+                    <AppBadge label="Overdue" variant="danger" size="sm" rounded />
+                  </View>
+                </View>
+              </AppCard>
+            ))
+          )}
+        </View>
       </ScrollView>
     </View>
   );
 }
 
-const s = StyleSheet.create({
-  root: { flex: 1 },
-  statsWrap: { borderBottomWidth: 1 },
-  statsGrid: { flexDirection: 'row', flexWrap: 'wrap', padding: spacing.sm, gap: 8 },
-  statCard: {
-    width: '47%', alignItems: 'center', gap: 4, padding: 12,
-    backgroundColor: '#f9fafb', borderRadius: radius.xl,
+const styles = StyleSheet.create({
+  root: {
+    flex: 1,
   },
-  statIcon: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
-  statValue: { fontSize: typography.size.lg, fontWeight: typography.weight.extrabold },
-  statLabel: { fontSize: typography.size.xs, textAlign: 'center' },
+  statsSection: {
+    padding: spacing.base,
+    borderBottomWidth: 1,
+    gap: spacing.md,
+  },
+  statsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.md,
+  },
   overdueAlert: {
-    flexDirection: 'row', alignItems: 'center', gap: 8,
-    margin: spacing.sm, borderRadius: radius.md, padding: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    padding: spacing.sm + 2,
+    borderRadius: radius.md,
+    borderWidth: 1,
   },
-  overdueAlertText: { flex: 1, fontSize: typography.size.sm, fontWeight: typography.weight.semibold },
-  actionsRow: { flexDirection: 'row', gap: 8 },
-  actionCard: { flex: 1, borderRadius: radius.xl, padding: 12, alignItems: 'center', gap: 6 },
-  actionIcon: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
-  actionLabel: { fontSize: typography.size.xs, fontWeight: typography.weight.semibold, textAlign: 'center' },
-  tabs: { flexDirection: 'row', borderBottomWidth: 1, marginHorizontal: 0 },
-  tab: { flex: 1, padding: 12, alignItems: 'center' },
-  tabText: { fontSize: typography.size.sm, fontWeight: typography.weight.semibold },
-  receiptRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  receiptIcon: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
-  receiptName: { fontSize: typography.size.base, fontWeight: typography.weight.bold },
-  receiptSub: { fontSize: typography.size.xs, marginTop: 1 },
-  receiptDate: { fontSize: typography.size.xs, marginTop: 1 },
-  receiptAmount: { fontSize: typography.size.lg, fontWeight: typography.weight.extrabold },
-  overdueRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
-  overdueAmount: { fontSize: typography.size.lg, fontWeight: typography.weight.extrabold },
-  emptyCard: { alignItems: 'center', padding: spacing.xl },
-  emptyIcon: { fontSize: 40, marginBottom: 8 },
-  emptyText: { fontSize: typography.size.base },
+  overdueAlertText: {
+    flex: 1,
+    fontSize: typography.size.xs,
+    fontWeight: typography.weight.bold,
+  },
+  actionsRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+  },
+  actionBtn: {
+    flex: 1,
+    padding: spacing.md,
+    borderRadius: radius.lg,
+    alignItems: 'center',
+    gap: spacing.xs,
+    borderWidth: 1,
+  },
+  actionIconWrap: {
+    width: 38,
+    height: 38,
+    borderRadius: radius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  actionLabel: {
+    fontSize: typography.size['2xs'],
+    fontWeight: typography.weight.bold,
+    textAlign: 'center',
+  },
+  receiptRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+  },
+  receiptIconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: radius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  rName: {
+    fontSize: typography.size.sm,
+    fontWeight: typography.weight.bold,
+  },
+  rSub: {
+    fontSize: typography.size['2xs'],
+    marginTop: 2,
+  },
+  rAmt: {
+    fontSize: typography.size.sm,
+    fontWeight: typography.weight.extrabold,
+    marginBottom: 2,
+  },
 });

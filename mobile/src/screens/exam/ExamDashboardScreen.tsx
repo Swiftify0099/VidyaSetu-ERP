@@ -1,23 +1,31 @@
 /**
- * VidyaSetu Mobile — Exam Dashboard Screen
- * Shows exam schedules, stats, and quick actions.
- * Accessible to: admin, principal, teacher, class_teacher, exam_coordinator
+ * VidyaSetu Mobile — Exam Dashboard Screen (Premium Redesign)
+ * ==========================================================
+ * Assessment command center: schedules, marks entry shortcuts, results and report cards.
  */
 import React, { useEffect, useState, useCallback } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  RefreshControl, ActivityIndicator, Alert,
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  RefreshControl,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/FontAwesome5';
 import { useTheme } from '../../theme/ThemeContext';
 import { examAPI } from '../../services/api';
 import { spacing, radius, typography, shadows } from '../../theme';
-import { formatDateLong, formatStatus, statusColor } from '../../utils/formatters';
+import { formatDateLong, formatStatus } from '../../utils/formatters';
 import { CURRENT_ACADEMIC_YEAR } from '../../config/constants';
-import SectionHeader from '../../components/ui/SectionHeader';
-import PremiumCard from '../../components/ui/PremiumCard';
-import Badge from '../../components/ui/Badge';
-import SkeletonLoader from '../../components/ui/SkeletonLoader';
+import {
+  AppCard,
+  AppBadge,
+  AppStatCard,
+  AppSectionHeader,
+  AppEmptyState,
+  AppSkeleton,
+} from '../../components/ui';
 
 interface ExamSchedule {
   id: number;
@@ -33,7 +41,7 @@ interface ExamSchedule {
 }
 
 export default function ExamDashboardScreen({ navigation }: { navigation: any }) {
-  const { colors } = useTheme();
+  const { colors, roleAccent } = useTheme();
   const [schedules, setSchedules] = useState<ExamSchedule[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -58,8 +66,14 @@ export default function ExamDashboardScreen({ navigation }: { navigation: any })
     }
   }, []);
 
-  useEffect(() => { fetchData(); }, [fetchData]);
-  const onRefresh = () => { setRefreshing(true); fetchData(); };
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    fetchData();
+  };
 
   const QUICK_ACTIONS = [
     { icon: 'calendar-plus', label: 'Schedule Exam',  color: '#6366f1', action: () => navigation.navigate('ExamSchedule') },
@@ -68,157 +82,206 @@ export default function ExamDashboardScreen({ navigation }: { navigation: any })
     { icon: 'file-alt',      label: 'Report Cards',   color: '#3b82f6', action: () => navigation.navigate('ReportCard') },
   ];
 
-  function badgeVariant(status: string) {
-    if (status === 'completed') return 'success';
-    if (status === 'ongoing')   return 'warning';
-    if (status === 'scheduled') return 'primary';
-    return 'default';
-  }
-
   return (
-    <View style={[s.root, { backgroundColor: colors.background }]}>
+    <View style={[styles.root, { backgroundColor: colors.background }]}>
       <ScrollView
         showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} colors={[colors.primary]} />}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={colors.primary}
+            colors={[colors.primary]}
+          />
+        }
       >
-        {/* Stats */}
-        <View style={[s.statsBar, { backgroundColor: colors.primary }]}>
-          {[
-            { label: 'Total',     value: stats.total,     color: '#fff' },
-            { label: 'Upcoming',  value: stats.upcoming,  color: '#fde68a' },
-            { label: 'Ongoing',   value: stats.ongoing,   color: '#6ee7b7' },
-            { label: 'Completed', value: stats.completed, color: '#a5b4fc' },
-          ].map((item, i) => (
-            <View key={i} style={s.statItem}>
-              <Text style={[s.statValue, { color: item.color }]}>{item.value}</Text>
-              <Text style={s.statLabel}>{item.label}</Text>
-            </View>
-          ))}
+        {/* Metric Stats Section */}
+        <View style={[styles.statsSection, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
+          <View style={styles.statsGrid}>
+            <AppStatCard
+              label="Total Assessments"
+              value={stats.total}
+              icon="calendar-alt"
+              color={colors.primary}
+              style={{ width: '48%' }}
+            />
+            <AppStatCard
+              label="Upcoming Exams"
+              value={stats.upcoming}
+              icon="clock"
+              color={colors.warning}
+              style={{ width: '48%' }}
+            />
+            <AppStatCard
+              label="Ongoing Today"
+              value={stats.ongoing}
+              icon="stopwatch"
+              color={colors.info}
+              style={{ width: '48%' }}
+            />
+            <AppStatCard
+              label="Completed"
+              value={stats.completed}
+              icon="check-circle"
+              color={colors.success}
+              style={{ width: '48%' }}
+            />
+          </View>
         </View>
 
         {/* Quick Actions */}
-        <View style={[s.section, { marginTop: spacing.lg }]}>
-          <SectionHeader title="Quick Actions" icon="bolt" />
-          <View style={s.actionsGrid}>
+        <View style={{ paddingHorizontal: spacing.base, marginTop: spacing.md }}>
+          <AppSectionHeader title="Assessment Actions" icon="bolt" />
+          <View style={styles.actionsGrid}>
             {QUICK_ACTIONS.map((item, i) => (
               <TouchableOpacity
                 key={i}
-                style={[s.actionBtn, { backgroundColor: colors.surface, ...shadows.sm }]}
+                style={[
+                  styles.actionBtn,
+                  { backgroundColor: colors.surface, ...shadows.sm, borderColor: colors.border },
+                ]}
                 onPress={item.action}
                 activeOpacity={0.75}
               >
-                <View style={[s.actionIcon, { backgroundColor: `${item.color}18` }]}>
+                <View style={[styles.actionIcon, { backgroundColor: `${item.color}18` }]}>
                   <Icon name={item.icon} size={20} color={item.color} solid />
                 </View>
-                <Text style={[s.actionLabel, { color: colors.text }]}>{item.label}</Text>
+                <Text style={[styles.actionLabel, { color: colors.text }]}>{item.label}</Text>
               </TouchableOpacity>
             ))}
           </View>
         </View>
 
-        {/* Exam List */}
-        <View style={s.section}>
-          <SectionHeader
-            title="Exam Schedules"
+        {/* Exam Schedules List */}
+        <View style={styles.section}>
+          <AppSectionHeader
+            title="Scheduled Examinations"
             icon="calendar-alt"
             onViewAll={() => navigation.navigate('ExamSchedule')}
           />
           {loading ? (
-            <SkeletonLoader variant="list" count={4} />
+            <AppSkeleton variant="list" count={4} />
           ) : schedules.length === 0 ? (
-            <PremiumCard variant="flat" style={s.emptyCard}>
-              <Text style={s.emptyIcon}>📋</Text>
-              <Text style={[s.emptyText, { color: colors.textSecondary }]}>No exam schedules found</Text>
-              <TouchableOpacity
-                style={[s.emptyBtn, { backgroundColor: colors.primaryBg }]}
-                onPress={() => navigation.navigate('ExamSchedule')}
-              >
-                <Text style={[s.emptyBtnText, { color: colors.primary }]}>Schedule an Exam</Text>
-              </TouchableOpacity>
-            </PremiumCard>
+            <AppEmptyState
+              icon="clipboard-list"
+              title="No Exam Schedules"
+              description="No assessment tests or term exams scheduled yet."
+              actionLabel="Schedule Exam"
+              onAction={() => navigation.navigate('ExamSchedule')}
+              style={{ paddingVertical: spacing.xl }}
+            />
           ) : (
-            schedules.slice(0, 8).map((exam) => (
-              <PremiumCard key={exam.id} variant="bordered" style={s.examCard} padding={12}>
+            schedules.slice(0, 8).map(exam => {
+              const isCompleted = exam.status === 'completed';
+              return (
                 <TouchableOpacity
-                  onPress={() => navigation.navigate('ExamMarks', { examId: exam.id, exam })}
-                  activeOpacity={0.85}
+                  key={exam.id}
+                  activeOpacity={0.8}
+                  onPress={() =>
+                    navigation.navigate('ExamMarks', {
+                      examId: exam.id,
+                      exam,
+                    })
+                  }
+                  style={{ marginBottom: spacing.sm }}
                 >
-                  <View style={s.examRow}>
-                    <View style={[s.examIconWrap, { backgroundColor: colors.primaryBg }]}>
-                      <Icon name="file-alt" size={16} color={colors.primary} solid />
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <View style={s.examTitleRow}>
-                        <Text style={[s.examSubject, { color: colors.text }]} numberOfLines={1}>
+                  <AppCard variant="bordered" padding={12}>
+                    <View style={styles.examRow}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={[styles.subjectName, { color: colors.text }]}>
                           {exam.subject_name}
                         </Text>
-                        <Badge
-                          label={formatStatus(exam.status)}
-                          variant={badgeVariant(exam.status) as any}
+                        <Text style={[styles.examMeta, { color: colors.textSecondary }]}>
+                          {exam.exam_type_name} • Std {exam.standard}-{exam.division}
+                        </Text>
+                        <Text style={[styles.examDate, { color: colors.textTertiary }]}>
+                          {formatDateLong(exam.exam_date)}
+                        </Text>
+                      </View>
+
+                      <View style={{ alignItems: 'flex-end', gap: 6 }}>
+                        <AppBadge
+                          label={isCompleted ? 'Completed' : 'Scheduled'}
+                          variant={isCompleted ? 'success' : 'primary'}
                           size="sm"
                           rounded
                         />
-                      </View>
-                      <Text style={[s.examType, { color: colors.textSecondary }]}>
-                        {exam.exam_type_name} • Std {exam.standard}-{exam.division}
-                      </Text>
-                      <View style={s.examMeta}>
-                        <Icon name="calendar" size={10} color={colors.textTertiary} solid />
-                        <Text style={[s.examDate, { color: colors.textTertiary }]}>
-                          {formatDateLong(exam.exam_date)}
-                        </Text>
-                        <Icon name="clock" size={10} color={colors.textTertiary} solid />
-                        <Text style={[s.examDate, { color: colors.textTertiary }]}>
-                          {exam.start_time} – {exam.end_time}
-                        </Text>
-                        <Text style={[s.examMarks, { color: colors.textTertiary }]}>
+                        <Text style={[styles.maxMarks, { color: colors.textTertiary }]}>
                           Max: {exam.total_marks}
                         </Text>
                       </View>
                     </View>
-                    <Icon name="chevron-right" size={12} color={colors.textTertiary} solid />
-                  </View>
+                  </AppCard>
                 </TouchableOpacity>
-              </PremiumCard>
-            ))
+              );
+            })
           )}
         </View>
-
-        <View style={{ height: spacing['3xl'] }} />
       </ScrollView>
     </View>
   );
 }
 
-const s = StyleSheet.create({
-  root: { flex: 1 },
-  statsBar: {
-    flexDirection: 'row', padding: spacing.base,
-    justifyContent: 'space-around',
+const styles = StyleSheet.create({
+  root: {
+    flex: 1,
   },
-  statItem: { alignItems: 'center' },
-  statValue: { fontSize: typography.size.xl, fontWeight: typography.weight.extrabold },
-  statLabel: { fontSize: typography.size.xs, color: 'rgba(255,255,255,0.75)', marginTop: 2, fontWeight: typography.weight.medium },
-  section: { paddingHorizontal: spacing.base, marginTop: spacing.lg },
-  actionsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  statsSection: {
+    padding: spacing.base,
+    borderBottomWidth: 1,
+  },
+  statsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.md,
+  },
+  actionsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.md,
+  },
   actionBtn: {
-    width: '47%', borderRadius: radius.xl, padding: spacing.md,
-    alignItems: 'center', gap: 6,
+    width: '48%',
+    padding: spacing.md,
+    borderRadius: radius.lg,
+    alignItems: 'center',
+    gap: spacing.xs,
+    borderWidth: 1,
   },
-  actionIcon: { width: 48, height: 48, borderRadius: radius.lg, alignItems: 'center', justifyContent: 'center' },
-  actionLabel: { fontSize: typography.size.xs, fontWeight: typography.weight.semibold, textAlign: 'center' },
-  examCard: { marginBottom: spacing.sm },
-  examRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
-  examIconWrap: { width: 40, height: 40, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
-  examTitleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 2 },
-  examSubject: { fontSize: typography.size.base, fontWeight: typography.weight.bold, flex: 1, marginRight: 8 },
-  examType: { fontSize: typography.size.sm, marginBottom: 4 },
-  examMeta: { flexDirection: 'row', alignItems: 'center', gap: 5, flexWrap: 'wrap' },
-  examDate: { fontSize: typography.size.xs },
-  examMarks: { fontSize: typography.size.xs, marginLeft: 4 },
-  emptyCard: { alignItems: 'center', padding: spacing.xl },
-  emptyIcon: { fontSize: 40, marginBottom: 8 },
-  emptyText: { fontSize: typography.size.base, marginBottom: spacing.md },
-  emptyBtn: { paddingHorizontal: spacing.lg, paddingVertical: spacing.sm, borderRadius: radius.full },
-  emptyBtnText: { fontSize: typography.size.sm, fontWeight: typography.weight.semibold },
+  actionIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: radius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  actionLabel: {
+    fontSize: typography.size.xs,
+    fontWeight: typography.weight.bold,
+  },
+  section: {
+    padding: spacing.base,
+    paddingBottom: spacing['3xl'],
+  },
+  examRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  subjectName: {
+    fontSize: typography.size.base,
+    fontWeight: typography.weight.bold,
+  },
+  examMeta: {
+    fontSize: typography.size.xs,
+    marginTop: 2,
+  },
+  examDate: {
+    fontSize: typography.size['2xs'],
+    marginTop: 2,
+  },
+  maxMarks: {
+    fontSize: typography.size['2xs'],
+    fontWeight: typography.weight.semibold,
+  },
 });

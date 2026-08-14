@@ -1,25 +1,37 @@
 /**
- * VidyaSetu Mobile — Report Card Screen
- * =======================================
- * Shows subject-wise marks, grades, and overall performance.
- * Accessible to: Admin, Teacher, Student, Parent
- * Uses: GET /exam/report-card/{studentId} or /exam/my-results (for students)
- *       GET /student-portal/results (for student portal)
+ * VidyaSetu Mobile — Report Card Screen (Premium Redesign)
+ * ==========================================================
+ * Holistic student assessment report card with exam tabs, overall percentage,
+ * letter grade pills, and subject-wise score table.
  */
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  ActivityIndicator, RefreshControl, Platform,
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  RefreshControl,
+  Platform,
 } from 'react-native';
+import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/FontAwesome5';
 import { useTheme } from '../../theme/ThemeContext';
 import { examAPI, studentPortalAPI } from '../../services/api';
 import { useAuthStore } from '../../store/authStore';
 import { getGrade, GRADES, CURRENT_ACADEMIC_YEAR } from '../../config/constants';
-import { shadows } from '../../theme';
-import PremiumCard from '../../components/ui/PremiumCard';
-import SectionHeader from '../../components/ui/SectionHeader';
-import SkeletonLoader from '../../components/ui/SkeletonLoader';
+import { spacing, radius, typography, shadows } from '../../theme';
+import { formatPercentage } from '../../utils/formatters';
+import {
+  AppCard,
+  AppBadge,
+  AppTabs,
+  AppProgress,
+  AppEmptyState,
+  AppSkeleton,
+  AppErrorState,
+  AppSectionHeader,
+  AppStatCard,
+} from '../../components/ui';
 
 interface SubjectResult {
   subject_name?: string;
@@ -51,20 +63,30 @@ function resolveRole(user: any): string {
   return (user.role ?? '').toLowerCase();
 }
 
-export default function ReportCardScreen({ navigation, route }: { navigation: any; route: any }) {
+export default function ReportCardScreen({
+  navigation,
+  route,
+}: {
+  navigation: any;
+  route: any;
+}) {
   const { studentId } = route?.params ?? {};
   const { user } = useAuthStore();
   const role = resolveRole(user);
-  const { colors } = useTheme();
+  const { colors, roleAccent } = useTheme();
 
   const isStudent = role === 'student';
 
   const [examGroups, setExamGroups] = useState<ExamGroup[]>([]);
-  const [selectedExam, setSelectedExam] = useState(0);
+  const [selectedExamKey, setSelectedExamKey] = useState('0');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [studentInfo, setStudentInfo] = useState<{ name?: string; standard?: string; division?: string } | null>(null);
+  const [error, setError] = useState<any>(null);
+  const [studentInfo, setStudentInfo] = useState<{
+    name?: string;
+    standard?: string;
+    division?: string;
+  } | null>(null);
 
   const load = useCallback(async () => {
     setError(null);
@@ -73,23 +95,30 @@ export default function ReportCardScreen({ navigation, route }: { navigation: an
       let meta: any = {};
 
       if (isStudent) {
-        // Student portal: GET /student-portal/results
         const res = await studentPortalAPI.getMyResults({ academic_year: CURRENT_ACADEMIC_YEAR });
         const data = res.data?.data;
-        results = Array.isArray(data?.results) ? data.results
-          : Array.isArray(data?.items) ? data.items
-          : Array.isArray(data) ? data : [];
+        results = Array.isArray(data?.results)
+          ? data.results
+          : Array.isArray(data?.items)
+          ? data.items
+          : Array.isArray(data)
+          ? data
+          : [];
         meta = { name: user?.full_name };
       } else {
-        // Admin/Teacher: GET /exam/report-card/{studentId}
         const id = studentId ?? user?.id;
         if (!id) throw new Error('No student ID provided');
         const res = await examAPI.getReportCard(id, { academic_year: CURRENT_ACADEMIC_YEAR });
         const data = res.data?.data;
-        results = Array.isArray(data?.results) ? data.results
-          : Array.isArray(data?.marks) ? data.marks
-          : Array.isArray(data?.items) ? data.items
-          : Array.isArray(data) ? data : [];
+        results = Array.isArray(data?.results)
+          ? data.results
+          : Array.isArray(data?.marks)
+          ? data.marks
+          : Array.isArray(data?.items)
+          ? data.items
+          : Array.isArray(data)
+          ? data
+          : [];
         meta = data?.student ?? {};
       }
 
@@ -98,14 +127,22 @@ export default function ReportCardScreen({ navigation, route }: { navigation: an
       // Group by exam type
       const groups: Record<string, ExamGroup> = {};
       for (const r of results) {
-        const examType = r.exam_type_name ?? r.exam_type ?? 'Exam';
+        const examType = r.exam_type_name ?? r.exam_type ?? 'Term Exam';
         if (!groups[examType]) {
-          groups[examType] = { exam_type: examType, subjects: [], total_obtained: 0, total_marks: 0, percentage: 0 };
+          groups[examType] = {
+            exam_type: examType,
+            subjects: [],
+            total_obtained: 0,
+            total_marks: 0,
+            percentage: 0,
+          };
         }
-        const pct = r.percentage ?? (r.total_marks > 0 ? Math.round((r.marks_obtained / r.total_marks) * 100) : 0);
+        const pct =
+          r.percentage ??
+          (r.total_marks > 0 ? Math.round((r.marks_obtained / r.total_marks) * 100) : 0);
         groups[examType].subjects.push({ ...r, percentage: pct });
         groups[examType].total_obtained += r.marks_obtained;
-        groups[examType].total_marks    += r.total_marks;
+        groups[examType].total_marks += r.total_marks;
       }
       const groupArr = Object.values(groups).map(g => ({
         ...g,
@@ -113,160 +150,321 @@ export default function ReportCardScreen({ navigation, route }: { navigation: an
       }));
       setExamGroups(groupArr);
     } catch (e: any) {
-      setError('Could not load results. Please try again.');
+      setError(e);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
   }, [isStudent, studentId, user]);
 
-  useEffect(() => { load(); }, [load]);
-  const onRefresh = () => { setRefreshing(true); load(); };
+  useEffect(() => {
+    load();
+  }, [load]);
 
-  const group = examGroups[selectedExam];
+  const onRefresh = () => {
+    setRefreshing(true);
+    load();
+  };
+
+  const selectedIdx = parseInt(selectedExamKey, 10);
+  const group = examGroups[selectedIdx] ?? examGroups[0];
   const overallPct = group?.percentage ?? 0;
   const overallGrade = getGrade(overallPct);
-  const gradeInfo = GRADES[overallGrade];
+  const gradeInfo = GRADES[overallGrade as keyof typeof GRADES];
 
   if (loading) {
     return (
-      <View style={[s.root, { backgroundColor: colors.background }]}>
-        <SkeletonLoader />
+      <View style={[styles.root, { backgroundColor: colors.background, padding: spacing.base }]}>
+        <AppSkeleton variant="card" count={3} />
       </View>
     );
   }
 
   if (error) {
     return (
-      <View style={[s.root, s.center, { backgroundColor: colors.background }]}>
-        <Text style={{ fontSize: 40 }}>📋</Text>
-        <Text style={[s.errorText, { color: colors.textSecondary }]}>{error}</Text>
-        <TouchableOpacity style={[s.retryBtn, { backgroundColor: colors.primary }]} onPress={load}>
-          <Text style={s.retryText}>Retry</Text>
-        </TouchableOpacity>
+      <View style={[styles.root, { backgroundColor: colors.background }]}>
+        <AppErrorState
+          error={error}
+          title="Report Card Unavailable"
+          onRetry={load}
+          style={{ flex: 1 }}
+        />
       </View>
     );
   }
 
   if (examGroups.length === 0) {
     return (
-      <View style={[s.root, s.center, { backgroundColor: colors.background }]}>
-        <Text style={{ fontSize: 40 }}>📊</Text>
-        <Text style={[s.errorText, { color: colors.textSecondary }]}>No results available yet.</Text>
+      <View style={[styles.root, { backgroundColor: colors.background }]}>
+        <AppEmptyState
+          icon="award"
+          title="No Published Results"
+          description="Assessment scores and term report cards have not been published yet for this session."
+          style={{ flex: 1 }}
+        />
       </View>
     );
   }
 
+  const examTabs = examGroups.map((g, i) => ({
+    key: String(i),
+    label: g.exam_type,
+  }));
+
   return (
-    <View style={[s.root, { backgroundColor: colors.background }]}>
+    <View style={[styles.root, { backgroundColor: colors.background }]}>
+      {/* Exam Term Tabs */}
+      {examTabs.length > 1 && (
+        <View style={[styles.tabsWrap, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
+          <AppTabs
+            tabs={examTabs}
+            activeTab={selectedExamKey}
+            onChangeTab={setSelectedExamKey}
+            variant="segmented"
+          />
+        </View>
+      )}
+
       <ScrollView
         showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
+        contentContainerStyle={styles.scroll}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={colors.primary}
+            colors={[colors.primary]}
+          />
+        }
       >
-        {/* ── Header Card ──────────────────────────────────────── */}
-        <View style={[s.hero, { backgroundColor: colors.primary }]}>
-          <Text style={s.heroTitle}>📋 Report Card</Text>
-          {studentInfo?.name && <Text style={s.heroSub}>{studentInfo.name}</Text>}
-          {studentInfo?.standard && (
-            <Text style={s.heroSub2}>Std {studentInfo.standard}{studentInfo.division ? `-${studentInfo.division}` : ''}</Text>
-          )}
-        </View>
-
-        {/* ── Exam Type Tabs ────────────────────────────────────── */}
-        {examGroups.length > 1 && (
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.tabBar} contentContainerStyle={s.tabContent}>
-            {examGroups.map((g, i) => (
-              <TouchableOpacity
-                key={g.exam_type}
-                style={[s.tab, i === selectedExam && s.tabActive]}
-                onPress={() => setSelectedExam(i)}
-              >
-                <Text style={[s.tabText, i === selectedExam && s.tabTextActive]}>{g.exam_type}</Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        )}
-
-        <View style={s.body}>
-          {/* ── Overall Summary ───────────────────────────────── */}
-          <View style={[s.summaryCard, { borderColor: gradeInfo?.color ?? colors.primary }]}>
-            <View style={s.summaryLeft}>
-              <Text style={[s.grade, { color: gradeInfo?.color ?? colors.primary }]}>{overallGrade}</Text>
-              <Text style={[s.gradeLabel, { color: colors.textSecondary }]}>{gradeInfo?.label ?? ''}</Text>
+        {/* Overall Score Header Banner */}
+        <LinearGradient
+          colors={roleAccent.gradient}
+          style={styles.banner}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+        >
+          <View style={styles.bannerRow}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.bannerSub}>Overall Assessment Score</Text>
+              <Text style={styles.bannerTitle}>{group?.exam_type}</Text>
+              {studentInfo?.name && (
+                <Text style={styles.studentSub}>
+                  {studentInfo.name} {studentInfo.standard ? `• Std ${studentInfo.standard}` : ''}
+                </Text>
+              )}
             </View>
-            <View style={s.summaryRight}>
-              <Text style={[s.pct, { color: gradeInfo?.color ?? colors.primary }]}>{overallPct}%</Text>
-              <Text style={[s.marks, { color: colors.text }]}>
-                {group?.total_obtained} / {group?.total_marks}
-              </Text>
-              {group?.rank && <Text style={[s.rank, { color: colors.textSecondary }]}>Rank: #{group.rank}</Text>}
+
+            <View style={[styles.gradeCircle, { backgroundColor: 'rgba(255,255,255,0.2)' }]}>
+              <Text style={styles.gradeLetter}>{overallGrade}</Text>
+              <Text style={styles.gradeLabel}>Grade</Text>
             </View>
           </View>
 
-          {/* ── Subject-wise Results ─────────────────────────── */}
-          <PremiumCard>
-            <SectionHeader title="Subject Results" />
-            {group?.subjects.map((sub, i) => {
+          <View style={styles.scoreBarWrap}>
+            <View style={styles.scoreMetaRow}>
+              <Text style={styles.scoreMetaText}>
+                Total Marks: {group?.total_obtained} / {group?.total_marks}
+              </Text>
+              <Text style={styles.scoreMetaText}>
+                Percentage: {formatPercentage(overallPct)}
+              </Text>
+            </View>
+            <AppProgress
+              value={overallPct}
+              showPercentage={false}
+              height={6}
+              color="#ffffff"
+            />
+          </View>
+        </LinearGradient>
+
+        <View style={styles.body}>
+          {/* Subject Marks Table Card */}
+          <AppCard variant="bordered" padding={14}>
+            <AppSectionHeader title="Subject Breakdown" icon="book-open" />
+
+            <View style={styles.tableHeader}>
+              <Text style={[styles.colHead, styles.colSubject, { color: colors.textSecondary }]}>Subject</Text>
+              <Text style={[styles.colHead, styles.colMarks, { color: colors.textSecondary }]}>Marks</Text>
+              <Text style={[styles.colHead, styles.colPct, { color: colors.textSecondary }]}>Percent</Text>
+              <Text style={[styles.colHead, styles.colGrade, { color: colors.textSecondary }]}>Grade</Text>
+            </View>
+
+            {group?.subjects.map((sub, idx) => {
+              const subName = sub.subject_name ?? sub.subject ?? `Subject ${idx + 1}`;
               const subPct = sub.percentage ?? 0;
-              const subGrade = getGrade(subPct);
-              const subGradeInfo = GRADES[subGrade];
-              const subName = sub.subject_name ?? sub.subject ?? `Subject ${i + 1}`;
-              const subBalance = (sub.total_marks - sub.marks_obtained);
+              const subGrade = sub.grade ?? getGrade(subPct);
+              const subGradeInfo = GRADES[subGrade as keyof typeof GRADES];
+
               return (
-                <View key={i} style={[s.subjectRow, { borderBottomColor: colors.border }]}>
-                  <View style={s.subjectLeft}>
-                    <Text style={[s.subjectName, { color: colors.text }]}>{subName}</Text>
-                    <Text style={[s.subjectMeta, { color: colors.textSecondary }]}>
-                      {sub.marks_obtained} / {sub.total_marks} marks
-                    </Text>
-                  </View>
-                  <View style={s.subjectRight}>
-                    <Text style={[s.subjectPct, { color: subGradeInfo?.color ?? colors.primary }]}>{subPct}%</Text>
-                    <View style={[s.gradeBadge, { backgroundColor: (subGradeInfo?.color ?? '#6366f1') + '22' }]}>
-                      <Text style={[s.gradeBadgeText, { color: subGradeInfo?.color ?? colors.primary }]}>{subGrade}</Text>
-                    </View>
+                <View
+                  key={idx}
+                  style={[styles.tableRow, { borderBottomColor: colors.divider }]}
+                >
+                  <Text style={[styles.colCell, styles.colSubject, { color: colors.text, fontWeight: '600' }]} numberOfLines={1}>
+                    {subName}
+                  </Text>
+                  <Text style={[styles.colCell, styles.colMarks, { color: colors.text }]}>
+                    {sub.marks_obtained}/{sub.total_marks}
+                  </Text>
+                  <Text style={[styles.colCell, styles.colPct, { color: colors.textSecondary }]}>
+                    {formatPercentage(subPct)}
+                  </Text>
+                  <View style={styles.colGrade}>
+                    <AppBadge
+                      label={subGrade}
+                      variant={subPct >= 35 ? 'success' : 'danger'}
+                      size="sm"
+                      rounded
+                    />
                   </View>
                 </View>
               );
             })}
-          </PremiumCard>
+          </AppCard>
+
+          {/* Performance Assessment Summary */}
+          <View style={styles.statsRow}>
+            <AppStatCard
+              label="Cumulative Score"
+              value={`${group?.total_obtained} / ${group?.total_marks}`}
+              icon="chart-bar"
+              color={colors.primary}
+            />
+            <AppStatCard
+              label="Overall Grade"
+              value={overallGrade}
+              subtitle={gradeInfo?.label ?? 'Satisfactory'}
+              icon="award"
+              color={gradeInfo?.color ?? colors.success}
+            />
+          </View>
         </View>
       </ScrollView>
     </View>
   );
 }
 
-const s = StyleSheet.create({
-  root: { flex: 1 },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
-  errorText: { fontSize: 14, textAlign: 'center', lineHeight: 22, paddingHorizontal: 32 },
-  retryBtn: { paddingHorizontal: 24, paddingVertical: 10, borderRadius: 10, marginTop: 4 },
-  retryText: { color: '#fff', fontWeight: '700' },
-  hero: { padding: 24, paddingTop: Platform.OS === 'ios' ? 60 : 40, alignItems: 'center', gap: 4 },
-  heroTitle: { fontSize: 20, fontWeight: '900', color: '#fff' },
-  heroSub: { fontSize: 14, color: 'rgba(255,255,255,0.85)', fontWeight: '700' },
-  heroSub2: { fontSize: 12, color: 'rgba(255,255,255,0.65)' },
-  tabBar: { backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#e2e8f0', flexGrow: 0 },
-  tabContent: { paddingHorizontal: 12, paddingVertical: 10, gap: 8 },
-  tab: { paddingHorizontal: 16, paddingVertical: 7, borderRadius: 20, backgroundColor: '#f1f5f9' },
-  tabActive: { backgroundColor: '#4f46e5' },
-  tabText: { fontSize: 12, fontWeight: '700', color: '#6b7280' },
-  tabTextActive: { color: '#fff' },
-  body: { padding: 16, gap: 12 },
-  summaryCard: { backgroundColor: '#fff', borderRadius: 20, padding: 20, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderWidth: 2.5, ...shadows.md },
-  summaryLeft: { alignItems: 'center' },
-  grade: { fontSize: 44, fontWeight: '900' },
-  gradeLabel: { fontSize: 13, fontWeight: '600', marginTop: 2 },
-  summaryRight: { alignItems: 'flex-end' },
-  pct: { fontSize: 32, fontWeight: '900' },
-  marks: { fontSize: 14, fontWeight: '700', marginTop: 2 },
-  rank: { fontSize: 12, marginTop: 4 },
-  subjectRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth },
-  subjectLeft: { flex: 1 },
-  subjectName: { fontSize: 14, fontWeight: '700' },
-  subjectMeta: { fontSize: 11, marginTop: 3 },
-  subjectRight: { alignItems: 'flex-end', gap: 4 },
-  subjectPct: { fontSize: 16, fontWeight: '900' },
-  gradeBadge: { borderRadius: 20, paddingHorizontal: 10, paddingVertical: 3 },
-  gradeBadgeText: { fontSize: 11, fontWeight: '800' },
+const styles = StyleSheet.create({
+  root: {
+    flex: 1,
+  },
+  tabsWrap: {
+    paddingHorizontal: spacing.base,
+    paddingVertical: spacing.sm,
+    borderBottomWidth: 1,
+  },
+  scroll: {
+    paddingBottom: spacing['3xl'],
+  },
+  banner: {
+    padding: spacing.xl,
+    paddingTop: Platform.OS === 'ios' ? 24 : spacing.xl,
+    borderBottomLeftRadius: radius['2xl'],
+    borderBottomRightRadius: radius['2xl'],
+    ...shadows.md,
+  },
+  bannerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  bannerSub: {
+    color: 'rgba(255,255,255,0.85)',
+    fontSize: typography.size.xs,
+    textTransform: 'uppercase',
+    fontWeight: typography.weight.bold,
+  },
+  bannerTitle: {
+    color: '#ffffff',
+    fontSize: typography.size.xl,
+    fontWeight: typography.weight.extrabold,
+    marginTop: 2,
+  },
+  studentSub: {
+    color: 'rgba(255,255,255,0.9)',
+    fontSize: typography.size.xs,
+    marginTop: 4,
+  },
+  gradeCircle: {
+    width: 64,
+    height: 64,
+    borderRadius: radius.full,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.4)',
+  },
+  gradeLetter: {
+    color: '#ffffff',
+    fontSize: typography.size.xl,
+    fontWeight: typography.weight.black,
+  },
+  gradeLabel: {
+    color: 'rgba(255,255,255,0.8)',
+    fontSize: typography.size['2xs'],
+    fontWeight: typography.weight.bold,
+    marginTop: -2,
+  },
+  scoreBarWrap: {
+    marginTop: spacing.lg,
+  },
+  scoreMetaRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: spacing.xs,
+  },
+  scoreMetaText: {
+    color: '#ffffff',
+    fontSize: typography.size.xs,
+    fontWeight: typography.weight.semibold,
+  },
+  body: {
+    padding: spacing.base,
+    gap: spacing.md,
+    marginTop: -spacing.xs,
+  },
+  tableHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
+    marginTop: spacing.xs,
+  },
+  tableRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: spacing.sm + 2,
+    borderBottomWidth: 1,
+  },
+  colHead: {
+    fontSize: typography.size['2xs'],
+    fontWeight: typography.weight.bold,
+    textTransform: 'uppercase',
+  },
+  colCell: {
+    fontSize: typography.size.xs,
+  },
+  colSubject: {
+    flex: 2.2,
+  },
+  colMarks: {
+    flex: 1.2,
+    textAlign: 'center',
+  },
+  colPct: {
+    flex: 1.2,
+    textAlign: 'center',
+  },
+  colGrade: {
+    flex: 1,
+    alignItems: 'flex-end',
+    justifyContent: 'center',
+  },
+  statsRow: {
+    flexDirection: 'row',
+    gap: spacing.md,
+  },
 });

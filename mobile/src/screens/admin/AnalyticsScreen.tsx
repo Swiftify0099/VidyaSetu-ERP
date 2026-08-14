@@ -19,6 +19,7 @@ import {
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import Svg, { Circle, Text as SvgText, Rect, G } from 'react-native-svg';
+import Icon from 'react-native-vector-icons/FontAwesome5';
 import { analyticsAPI } from '../../services/api';
 import { useAuthStore } from '../../store/authStore';
 
@@ -193,7 +194,9 @@ function KpiScrollCard({
 }) {
   return (
     <View style={[styles.kpiCard, { borderTopColor: color }]}>
-      <Text style={styles.kpiIcon}>{icon}</Text>
+      <View style={{ marginBottom: 6 }}>
+        <Icon name={icon} size={18} color={color} solid />
+      </View>
       <Text style={[styles.kpiValue, { color }]}>{value}</Text>
       <Text style={styles.kpiLabel}>{label}</Text>
       {sub && <Text style={styles.kpiSub}>{sub}</Text>}
@@ -211,7 +214,11 @@ function SectionCard({
   return (
     <View style={[styles.sectionCard, accent ? { borderLeftColor: accent, borderLeftWidth: 3 } : {}]}>
       <View style={styles.sectionHeader}>
-        {icon && <Text style={styles.sectionIcon}>{icon}</Text>}
+        {icon && (
+          <View style={{ marginRight: 8 }}>
+            <Icon name={icon} size={14} color={accent || COLORS.primary} solid />
+          </View>
+        )}
         <Text style={styles.sectionTitle}>{title}</Text>
       </View>
       {children}
@@ -312,14 +319,14 @@ export default function AnalyticsScreen({ navigation }: { navigation: any }) {
 
   // Build KPI cards from dashboard data
   const kpiCards = [
-    { icon: '🎓', label: 'Total Students', value: dash?.total_students?.toLocaleString('en-IN') ?? '—', color: COLORS.primary },
-    { icon: '👨‍🏫', label: 'Teaching Staff', value: teachers?.total_teachers?.toString() ?? '—', color: COLORS.info },
-    { icon: '✅', label: 'Attendance', value: dash?.today_attendance_pct ? `${dash.today_attendance_pct}%` : '—', color: pctColor(dash?.today_attendance_pct ?? 0) },
-    { icon: '💰', label: 'Fee Collected', value: dash?.fee_collected ? fmtK(dash.fee_collected) : '—', color: COLORS.success },
-    { icon: '⚠️', label: 'Fee Pending', value: dash?.fee_pending ? fmtK(dash.fee_pending) : '—', color: COLORS.danger },
-    { icon: '📚', label: 'Books Issued', value: dash?.books_issued?.toString() ?? '—', color: COLORS.warning },
-    { icon: '📢', label: 'Active Notices', value: dash?.active_notices?.toString() ?? '—', color: COLORS.purple },
-    ...(dash?.low_stock_alerts ? [{ icon: '📦', label: 'Low Stock', value: dash.low_stock_alerts.toString(), color: COLORS.danger }] : []),
+    { icon: 'user-graduate', label: 'Total Students', value: dash?.total_students?.toLocaleString('en-IN') ?? '—', color: COLORS.primary },
+    { icon: 'chalkboard-teacher', label: 'Teaching Staff', value: teachers?.total_teachers?.toString() ?? '—', color: COLORS.info },
+    { icon: 'clipboard-check', label: 'Attendance', value: dash?.today_attendance_pct ? `${dash.today_attendance_pct}%` : '—', color: pctColor(dash?.today_attendance_pct ?? 0) },
+    { icon: 'rupee-sign', label: 'Fee Collected', value: dash?.fee_collected ? fmtK(dash.fee_collected) : '—', color: COLORS.success },
+    { icon: 'exclamation-triangle', label: 'Fee Pending', value: dash?.fee_pending ? fmtK(dash.fee_pending) : '—', color: COLORS.danger },
+    { icon: 'book', label: 'Books Issued', value: dash?.books_issued?.toString() ?? '—', color: COLORS.warning },
+    { icon: 'bullhorn', label: 'Active Notices', value: dash?.active_notices?.toString() ?? '—', color: COLORS.purple },
+    ...(dash?.low_stock_alerts ? [{ icon: 'boxes', label: 'Low Stock', value: dash.low_stock_alerts.toString(), color: COLORS.danger }] : []),
   ];
 
   return (
@@ -336,8 +343,8 @@ export default function AnalyticsScreen({ navigation }: { navigation: any }) {
       >
         <View style={styles.headerTop}>
           <View>
-            <Text style={styles.headerTitle}>📊 Analytics</Text>
-            <Text style={styles.headerSub}>School Intelligence Dashboard</Text>
+            <Text style={styles.headerTitle}>Institutional Analytics</Text>
+            <Text style={styles.headerSub}>Real-Time Intelligence Dashboard</Text>
           </View>
           <View style={styles.headerRight}>
             <View style={styles.roleBadge}>
@@ -359,7 +366,7 @@ export default function AnalyticsScreen({ navigation }: { navigation: any }) {
 
       {/* ── Fee Overview ─────────────────────────────────────── */}
       {fees && (
-        <SectionCard title="Fee Collection Overview" icon="💳" accent={feeColor(fees.collection_pct)}>
+        <SectionCard title="Fee Collection Overview" icon="credit-card" accent={feeColor(fees.collection_pct)}>
           <View style={styles.feeOverview}>
             <RingChart pct={fees.collection_pct}
               color={feeColor(fees.collection_pct)} size={100}
@@ -395,7 +402,7 @@ export default function AnalyticsScreen({ navigation }: { navigation: any }) {
 
       {/* ── Revenue Bar Chart ─────────────────────────────────── */}
       {dash && dash.monthly_revenue.some(m => m.amount > 0) && (
-        <SectionCard title="Monthly Revenue" icon="📈">
+        <SectionCard title="Monthly Revenue" icon="chart-line">
           <MiniBarChart
             data={dash.monthly_revenue
               .filter(m => m.amount > 0)
@@ -407,14 +414,14 @@ export default function AnalyticsScreen({ navigation }: { navigation: any }) {
 
       {/* ── Attendance ───────────────────────────────────────── */}
       {attendance && (
-        <SectionCard title="Attendance Summary" icon="📅" accent={pctColor(attendance.overall_pct)}>
+        <SectionCard title="Attendance Summary" icon="calendar-alt" accent={pctColor(attendance.overall_pct)}>
           <View style={styles.attRow}>
             <RingChart pct={attendance.overall_pct}
               color={pctColor(attendance.overall_pct)} size={90}
               label="Overall" sub="School Average"/>
             <View style={{ flex: 1, marginLeft: 16 }}>
               <View style={styles.attStat}>
-                <Text style={styles.attStatLabel}>⚠️ Defaulters (&lt;75%)</Text>
+                <Text style={styles.attStatLabel}>Defaulters (&lt;75%)</Text>
                 <Text style={[styles.attStatValue, { color: COLORS.danger }]}>{attendance.defaulters_count}</Text>
               </View>
               <TouchableOpacity style={styles.drillBtn}
@@ -442,7 +449,7 @@ export default function AnalyticsScreen({ navigation }: { navigation: any }) {
 
       {/* ── Academic Performance ──────────────────────────────── */}
       {academic && (
-        <SectionCard title="Academic Performance" icon="📖"
+        <SectionCard title="Academic Performance" icon="award"
           accent={academic.status === 'no_data' ? COLORS.textMuted : pctColor(academic.pass_pct)}>
           {academic.status === 'no_data' ? (
             <Text style={styles.noDataText}>No examination data found for this academic year.</Text>
@@ -473,7 +480,7 @@ export default function AnalyticsScreen({ navigation }: { navigation: any }) {
               </View>
               {academic.weak_subjects.length > 0 && (
                 <View style={styles.weakSubjBox}>
-                  <Text style={styles.weakSubjTitle}>⚠️ Subjects Needing Attention</Text>
+                  <Text style={styles.weakSubjTitle}>Subjects Needing Attention</Text>
                   {academic.weak_subjects.slice(0, 3).map(ws => (
                     <ProgressRow key={ws.subject} label={ws.subject} pct={ws.avg_pct}
                       barColor={COLORS.danger}/>
@@ -487,7 +494,7 @@ export default function AnalyticsScreen({ navigation }: { navigation: any }) {
 
       {/* ── Teachers ──────────────────────────────────────────── */}
       {teachers && (
-        <SectionCard title="Teaching Staff" icon="👨‍🏫">
+        <SectionCard title="Teaching Staff" icon="chalkboard-teacher">
           <View style={styles.teacherRow}>
             <View style={styles.teacherStat}>
               <Text style={[styles.teacherNum, { color: COLORS.primary }]}>{teachers.total_teachers}</Text>
@@ -513,7 +520,7 @@ export default function AnalyticsScreen({ navigation }: { navigation: any }) {
 
       {/* ── Risk Indicators ───────────────────────────────────── */}
       {risk && (risk.attendance_risk + risk.fee_risk + risk.academic_risk > 0) && (
-        <SectionCard title="Students At Risk" icon="🚨" accent={COLORS.danger}>
+        <SectionCard title="Students At Risk" icon="exclamation-triangle" accent={COLORS.danger}>
           <View style={styles.riskRow}>
             <View style={[styles.riskBox, { borderColor: COLORS.warning }]}>
               <Text style={[styles.riskNum, { color: COLORS.warning }]}>{risk.attendance_risk}</Text>
@@ -559,7 +566,7 @@ export default function AnalyticsScreen({ navigation }: { navigation: any }) {
 
       {/* ── Insights ─────────────────────────────────────────── */}
       {insights.length > 0 && (
-        <SectionCard title="🧠 School Intelligence Insights" icon="">
+        <SectionCard title="School Intelligence Insights" icon="lightbulb">
           <Text style={styles.insightsMeta}>Based on your actual ERP data</Text>
           {insights.map((ins, i) => <InsightRow key={i} ins={ins}/>)}
         </SectionCard>
@@ -568,7 +575,7 @@ export default function AnalyticsScreen({ navigation }: { navigation: any }) {
       {/* ── No Data Fallback ──────────────────────────────────── */}
       {!dash && !attendance && !fees && (
         <View style={styles.emptyState}>
-          <Text style={styles.emptyIcon}>📊</Text>
+          <Icon name="chart-bar" size={44} color={COLORS.textMuted} />
           <Text style={styles.emptyTitle}>No Analytics Data</Text>
           <Text style={styles.emptySub}>Start recording attendance, fees, and exams in the ERP to see analytics here.</Text>
         </View>
