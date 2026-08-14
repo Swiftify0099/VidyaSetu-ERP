@@ -1,9 +1,13 @@
+packages:
+  - '.'
+
 allowBuilds:
   '@firebase/util': true
   esbuild: true
   protobufjs: true
   workerd: true
   sharp: true
+
 minimumReleaseAgeExclude:
   - miniflare@5.20260811.1-alpha
   - wrangler@4.123.0

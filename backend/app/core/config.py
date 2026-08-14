@@ -105,8 +105,8 @@ class Settings(BaseSettings):
     # ── Device Security ───────────────────────────────────────
     # Token lifetime for new-device email verification links
     DEVICE_VERIFICATION_TOKEN_EXPIRE_MINUTES: int = 30
-    # Maximum active/trusted devices per user account
-    MAX_TRUSTED_DEVICES: int = 3
+    # Maximum active/trusted devices per user account (Single Device Policy)
+    MAX_TRUSTED_DEVICES: int = 1
     # Enable device security checks (set False only for local dev bypass)
     DEVICE_SECURITY_ENABLED: bool = True
 
