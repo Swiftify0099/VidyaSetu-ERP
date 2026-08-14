@@ -242,6 +242,12 @@ export const profileAPI = {
       new_password,
       confirm_password: new_password,
     }),
+
+  /** POST /auth/profile/photo — upload profile picture */
+  uploadPhoto: (formData: FormData) =>
+    api.post('/auth/profile/photo', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    }),
 };
 
 // ─────────────────────────────────────────────────────────
@@ -751,20 +757,6 @@ export const notificationAPI = {
   markAllRead: () => api.patch('/notifications/read-all'),
   delete: (id: number) => api.delete(`/notifications/${id}`),
   getUnreadCount: () => api.get('/notifications/unread-count'),
-};
-
-// ─────────────────────────────────────────────────────────
-// PROFILE API
-// ─────────────────────────────────────────────────────────
-export const profileAPI = {
-  getMyProfile: () => api.get('/auth/me'),
-  updateProfile: (data: object) => api.patch('/auth/profile', data),
-  uploadPhoto: (formData: FormData) =>
-    api.post('/auth/profile/photo', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    }),
-  changePassword: (old_password: string, new_password: string) =>
-    api.post('/auth/change-password', { old_password, new_password }),
 };
 
 // ─────────────────────────────────────────────────────────

@@ -1,10 +1,6 @@
-/**
- * VidyaSetu Mobile — Auth Store (Zustand)
- * Manages login state, tokens, and user info globally.
- */
 import { create } from 'zustand';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { api, STORAGE_KEYS } from '../services/api';
+import { api, authAPI, STORAGE_KEYS } from '../services/api';
 import mobileFcmService from '../services/fcmService';
 import { buildMobileDeviceContext } from '../services/deviceService';
 
