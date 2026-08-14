@@ -69,7 +69,7 @@ export default function AttendancePage() {
         records,
       });
 
-      toast.success(`✅ Attendance saved for ${count} students.`);
+      toast.success(`Attendance saved for ${count} students.`);
     } catch {
       toast.error('Failed to save attendance.');
     } finally {
@@ -155,8 +155,8 @@ export default function AttendancePage() {
           {/* Bulk Actions */}
           <div className={styles.bulkActions}>
             <span className={styles.bulkLabel}>Mark All:</span>
-            <button className={styles.bulkBtn} onClick={() => markAll('present')}>✅ All Present</button>
-            <button className={`${styles.bulkBtn} ${styles.bulkBtnDanger}`} onClick={() => markAll('absent')}>❌ All Absent</button>
+            <button className={styles.bulkBtn} onClick={() => markAll('present')}><CheckCircle size={14} className="inline mr-1" /> All Present</button>
+            <button className={`${styles.bulkBtn} ${styles.bulkBtnDanger}`} onClick={() => markAll('absent')}><XCircle size={14} className="inline mr-1" /> All Absent</button>
           </div>
 
           {/* Student Grid */}

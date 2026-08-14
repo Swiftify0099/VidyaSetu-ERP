@@ -1,0 +1,226 @@
+/* MobileBlock.module.css — shown only on phone-sized viewports */
+
+/* Full-screen overlay — sits above everything else */
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-background);
+  padding: var(--space-6);
+  overflow: hidden;
+  animation: fadeIn 0.4s ease;
+}
+
+/* Decorative blurred blob */
+.blob {
+  position: absolute;
+  width: 380px;
+  height: 380px;
+  border-radius: 50%;
+  background: var(--gradient-primary);
+  opacity: 0.07;
+  filter: blur(80px);
+  top: -80px;
+  left: 50%;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+/* Glass-morphic card */
+.card {
+  position: relative;
+  z-index: 1;
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-2xl);
+  box-shadow: var(--shadow-xl);
+  padding: var(--space-8) var(--space-6);
+  max-width: 360px;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-5);
+  text-align: center;
+  animation: slideUp 0.5s var(--transition-spring);
+}
+
+/* App icon */
+.iconWrap {
+  width: 72px;
+  height: 72px;
+  border-radius: var(--radius-2xl);
+  background: var(--gradient-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 12px 32px color-mix(in srgb, var(--color-primary) 35%, transparent),
+              inset 0 1px 1px rgba(255, 255, 255, 0.25);
+  animation: logoPulse 3s ease-in-out infinite;
+}
+
+/* Headings */
+.title {
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text-primary);
+  letter-spacing: -0.01em;
+  line-height: var(--line-height-tight);
+  margin: 0;
+}
+
+/* ── Device row ───────────────────────────────────────────── */
+.deviceRow {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: var(--space-4);
+  width: 100%;
+  padding: var(--space-4) var(--space-3);
+  background: var(--color-surface-3);
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--color-border);
+}
+
+.deviceItem {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.deviceLabel {
+  font-size: 10px;
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-muted);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.divider {
+  color: var(--color-text-disabled);
+  font-size: var(--font-size-sm);
+  margin-bottom: var(--space-5);
+}
+
+/* Phone icon — desaturated / crossed */
+.phoneIcon,
+.tabletIcon,
+.desktopIcon {
+  position: relative;
+  color: var(--color-text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.phoneIcon svg { width: 32px; height: 32px; opacity: 0.5; }
+.tabletIcon svg { width: 40px; height: 40px; }
+.desktopIcon svg { width: 40px; height: 36px; }
+
+/* Red ✕ badge */
+.crossBadge {
+  position: absolute;
+  top: -5px;
+  right: -6px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--color-danger);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.18);
+}
+.crossBadge svg { width: 8px; height: 8px; }
+
+/* Green ✓ badge */
+.checkBadge {
+  position: absolute;
+  top: -5px;
+  right: -6px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--color-success);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.18);
+}
+.checkBadge svg { width: 8px; height: 8px; }
+
+/* ── Message text ─────────────────────────────────────────── */
+.message {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  line-height: var(--line-height-relaxed);
+  margin: 0;
+}
+
+.message strong {
+  color: var(--color-text-primary);
+  font-weight: var(--font-weight-semibold);
+}
+
+/* ── CTA Button ───────────────────────────────────────────── */
+.downloadBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-6);
+  border-radius: var(--radius-full);
+  background: var(--gradient-primary);
+  color: var(--color-primary-contrast);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  text-decoration: none;
+  letter-spacing: 0.01em;
+  box-shadow: var(--shadow-primary);
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast), opacity var(--transition-fast);
+  width: 100%;
+  justify-content: center;
+}
+
+.downloadBtn:hover,
+.downloadBtn:focus-visible {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px color-mix(in srgb, var(--color-primary) 45%, transparent);
+  opacity: 0.93;
+}
+
+.downloadBtn:active {
+  transform: translateY(0);
+}
+
+/* ── Footer note ──────────────────────────────────────────── */
+.footer {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-disabled);
+  margin: 0;
+  letter-spacing: 0.02em;
+}
+
+/* ── Keyframes ────────────────────────────────────────────── */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(24px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes logoPulse {
+  0%, 100% { transform: scale(1); box-shadow: 0 12px 32px color-mix(in srgb, var(--color-primary) 35%, transparent); }
+  50%       { transform: scale(1.05); box-shadow: 0 16px 44px color-mix(in srgb, var(--color-primary) 50%, transparent); }
+}

@@ -18,9 +18,11 @@ declare global {
   }
 }
 
-// VAPID key from Firebase Console → Project Settings → Cloud Messaging → Web Push certificates
-// If this is not set, FCM token generation will be skipped.
 const VAPID_KEY = import.meta.env.VITE_FIREBASE_VAPID_KEY as string | undefined;
+
+function getVapidKey(): string | undefined {
+  return (import.meta.env.VITE_FIREBASE_VAPID_KEY as string | undefined) || VAPID_KEY;
+}
 
 export interface AppNotification {
   id: number;
@@ -173,7 +175,8 @@ const notificationService = {
         return null;
       }
 
-      if (!VAPID_KEY) {
+      const activeVapidKey = getVapidKey();
+      if (!activeVapidKey) {
         console.error('[FCM] VITE_FIREBASE_VAPID_KEY is not set in .env. Cannot generate FCM token.');
         console.info('[FCM] Get it from: Firebase Console → Project Settings → Cloud Messaging → Web Push certificates');
         return null;
@@ -191,7 +194,7 @@ const notificationService = {
       await navigator.serviceWorker.register('/firebase-messaging-sw.js');
       const swReg = await navigator.serviceWorker.ready;
 
-      const token = await getToken(messaging, { vapidKey: VAPID_KEY, serviceWorkerRegistration: swReg });
+      const token = await getToken(messaging, { vapidKey: activeVapidKey, serviceWorkerRegistration: swReg });
 
       if (token) {
         console.log('[FCM] ✅ Token generated:', token.substring(0, 25) + '...');
@@ -241,26 +244,26 @@ const notificationService = {
   },
 
   /**
-   * Category → emoji map
+   * Category icon indicator label
    */
   getCategoryIcon(category: string): string {
     const map: Record<string, string> = {
-      attendance: '📋',
-      exam: '🎓',
-      fee: '💰',
-      leave: '🏖️',
-      library: '📚',
-      security: '🔐',
-      system: '⚙️',
-      homework: '📝',
-      certificate: '📄',
-      behaviour: '⚠️',
-      transport: '🚌',
-      notice: '📢',
-      birthday: '🎂',
-      admission: '📋',
+      attendance: 'Attendance',
+      exam: 'Exam',
+      fee: 'Fee',
+      leave: 'Leave',
+      library: 'Library',
+      security: 'Security',
+      system: 'System',
+      homework: 'Homework',
+      certificate: 'Certificate',
+      behaviour: 'Behaviour',
+      transport: 'Transport',
+      notice: 'Notice',
+      birthday: 'Birthday',
+      admission: 'Admission',
     };
-    return map[category] ?? '🔔';
+    return map[category] ?? 'Notification';
   },
 
   /**

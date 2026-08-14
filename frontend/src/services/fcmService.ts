@@ -24,6 +24,10 @@ const FCM_PERMISSION_DENIED_KEY = 'vidyasetu_fcm_denied';
 // ── Env vars ─────────────────────────────────────────────────
 const VAPID_KEY = import.meta.env.VITE_FIREBASE_VAPID_KEY as string | undefined;
 
+function getVapidKey(): string | undefined {
+  return (import.meta.env.VITE_FIREBASE_VAPID_KEY as string | undefined) || VAPID_KEY;
+}
+
 // ── Types ─────────────────────────────────────────────────────
 
 export interface FCMDeviceInfo {
@@ -71,24 +75,30 @@ export interface NotificationSendResult {
 export interface NotificationLogRecord {
   id: number;
   uuid?: string;
+  sender_id?: number;
+  user_id?: number;
+  recipient_id?: number;
+  recipient_role?: string;
+  recipient_count?: number;
   title: string;
   body: string;
+  category?: string;
+  priority?: string;
   /** Timestamp when the notification was sent */
-  sent_at: string;
+  sent_at?: string;
   /** 'broadcast' | 'role' | 'class' | 'user' | 'users' | 'topic' */
   send_mode?: string;
   /** Alias used by AdminFCMPanel for the target audience type */
   target_type?: string;
   target_role?: string;
   target_class?: string;
-  /** User ID when targeting a single user */
-  user_id?: number;
   target_user_id?: number;
   total_sent?: number;
   success_count?: number;
   failure_count?: number;
   sent_by?: number;
   sent_by_name?: string;
+  sent_via?: string;
   /** 'sent' | 'failed' | 'partial' */
   status?: string;
   /** Alias used by AdminFCMPanel */
@@ -207,7 +217,8 @@ const fcmService = {
       }
 
       // Step 3 — Validate VAPID key
-      if (!VAPID_KEY) {
+      const activeVapidKey = getVapidKey();
+      if (!activeVapidKey) {
         console.error(
           '[FCM] VITE_FIREBASE_VAPID_KEY is missing from .env\n' +
           '→ Get it from Firebase Console → Project Settings → Cloud Messaging → Web Push certificates'
@@ -244,7 +255,7 @@ const fcmService = {
 
       // Step 6 — Get the FCM registration token
       const token = await getToken(messaging, {
-        vapidKey: VAPID_KEY,
+        vapidKey: activeVapidKey,
         serviceWorkerRegistration: swRegistration,
       });
 
@@ -447,9 +458,10 @@ const fcmService = {
     // On next app startup, the token is fetched fresh from Firebase.
     // If it differs from the cached one, we re-register automatically.
     const cachedToken = this.getCachedToken();
-    if (!cachedToken) return;
+    const activeVapidKey = getVapidKey();
+    if (!activeVapidKey) return;
 
-    getToken(messaging, { vapidKey: VAPID_KEY }).then((freshToken: string) => {
+    getToken(messaging, { vapidKey: activeVapidKey }).then((freshToken: string) => {
       if (freshToken && freshToken !== cachedToken) {
         console.log('[FCM] 🔄 Token rotated — re-registering with backend.');
         this.cacheToken(freshToken);

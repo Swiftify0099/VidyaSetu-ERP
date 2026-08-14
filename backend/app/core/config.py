@@ -102,6 +102,14 @@ class Settings(BaseSettings):
     SESSION_TIMEOUT_MINUTES: int = 120
     REQUIRE_PASSWORD_CHANGE_DAYS: int = 90
 
+    # ── Device Security ───────────────────────────────────────
+    # Token lifetime for new-device email verification links
+    DEVICE_VERIFICATION_TOKEN_EXPIRE_MINUTES: int = 30
+    # Maximum active/trusted devices per user account
+    MAX_TRUSTED_DEVICES: int = 3
+    # Enable device security checks (set False only for local dev bypass)
+    DEVICE_SECURITY_ENABLED: bool = True
+
     # ── Pagination ────────────────────────────────────────────
     DEFAULT_PAGE_SIZE: int = 20
     MAX_PAGE_SIZE: int = 100

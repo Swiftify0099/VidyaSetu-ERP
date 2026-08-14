@@ -130,10 +130,27 @@ export default function StudentProfilePage() {
           {/* Photo */}
           <div className={styles.photoWrap}>
             <div className={styles.photo}>
-              {photoUrl
-                ? <img src={photoUrl} alt={student.full_name} />
-                : <span>{student.full_name.charAt(0)}</span>
-              }
+              {photoUrl ? (
+                <img
+                  src={photoUrl}
+                  alt={student.full_name}
+                  onError={(e) => {
+                    (e.target as HTMLElement).style.display = 'none';
+                    if (e.currentTarget.parentElement) {
+                      const parts = (student.full_name || '').trim().split(/\s+/).filter(Boolean);
+                      const init = parts.length > 1 ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase() : (parts[0]?.substring(0, 2).toUpperCase() || 'ST');
+                      e.currentTarget.parentElement.innerText = init;
+                    }
+                  }}
+                />
+              ) : (
+                <span>
+                  {(() => {
+                    const parts = (student.full_name || '').trim().split(/\s+/).filter(Boolean);
+                    return parts.length > 1 ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase() : (parts[0]?.substring(0, 2).toUpperCase() || 'ST');
+                  })()}
+                </span>
+              )}
             </div>
             <PermissionGate permission="student.update">
               <button

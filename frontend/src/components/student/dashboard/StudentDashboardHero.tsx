@@ -13,7 +13,14 @@ export const StudentDashboardHero: React.FC<StudentDashboardHeroProps> = ({
 }) => {
   if (!profile) return null;
   const p = profile;
-  const initials = p.full_name.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase();
+  const getInitials = (name?: string): string => {
+    if (!name || typeof name !== 'string') return 'ST';
+    const parts = name.trim().split(/\s+/).filter(Boolean);
+    if (parts.length === 0) return 'ST';
+    if (parts.length === 1) return parts[0].substring(0, 2).toUpperCase();
+    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  };
+  const initials = getInitials(p?.full_name);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-5, 1.25rem)' }}>
@@ -36,7 +43,18 @@ export const StudentDashboardHero: React.FC<StudentDashboardHeroProps> = ({
       {/* ── Welcome Hero Card ──────────────────────────────────── */}
       <div className={styles.hero}>
         <div className={styles.avatar}>
-          {p.photo_path ? <img src={`/storage/${p.photo_path}`} alt={p.full_name} /> : initials}
+          {p.photo_path ? (
+            <img
+              src={`/storage/${p.photo_path}`}
+              alt={p.full_name}
+              onError={(e) => {
+                (e.target as HTMLElement).style.display = 'none';
+                if (e.currentTarget.parentElement) {
+                  e.currentTarget.parentElement.innerText = initials;
+                }
+              }}
+            />
+          ) : initials}
         </div>
         <div className={styles.heroInfo}>
           <h2 className={styles.heroName}>{p.full_name}</h2>

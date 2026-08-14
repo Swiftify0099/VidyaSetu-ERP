@@ -14,7 +14,7 @@ interface DataTableProps<T extends object> {
   data: T[];
   loading?: boolean;
   emptyMessage?: string;
-  emptyIcon?: string;
+  emptyIcon?: string | React.ReactNode;
   onSort?: (key: string, direction: 'asc' | 'desc') => void;
   keyExtractor?: (row: T, index: number) => string | number;
   onRowClick?: (row: T) => void;
@@ -27,7 +27,7 @@ export function DataTable<T extends object>({
   data,
   loading = false,
   emptyMessage = 'No records found.',
-  emptyIcon = '📋',
+  emptyIcon = '📋' as React.ReactNode,
   onSort,
   keyExtractor,
   onRowClick,

@@ -10,6 +10,7 @@ import {
   Users, CalendarDays, ClipboardList, BookOpen,
   Bell, UserCheck, X, Search, Plus,
   Palmtree, LayoutDashboard, CheckCircle2, RefreshCw, Brain, Trophy, Target, Clock, Trash2, Eye,
+  FileSignature, Pencil, BarChart2, Mail, Lightbulb,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../../services/api';
@@ -1092,26 +1093,26 @@ export default function TeacherPortalPage() {
           <div className={styles.cardHeader}><h3 className={styles.cardTitle}><X size={18} color="var(--color-primary)" /> AI Teaching Assistant</h3></div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 'var(--space-4)' }}>
             {[
-              { label: 'Generate Lesson Plan', desc: 'AI creates structured lesson plan from topic', icon: '📋' },
-              { label: 'Create Question Paper', desc: 'Auto-generate MCQ/short answer questions', icon: '📝' },
-              { label: 'Summarize Chapter', desc: 'Get a concise summary of any textbook chapter', icon: '📖' },
-              { label: 'Homework Generator', desc: 'Generate age-appropriate homework tasks', icon: '✏️' },
-              { label: 'Rubric Creator', desc: 'Create grading rubrics for assignments', icon: '📊' },
-              { label: 'Parent Message Draft', desc: 'Draft professional parent communication', icon: '✉️' },
+              { label: 'Generate Lesson Plan', desc: 'AI creates structured lesson plan from topic', icon: <ClipboardList size={28} className="text-indigo-500" /> },
+              { label: 'Create Question Paper', desc: 'Auto-generate MCQ/short answer questions', icon: <FileSignature size={28} className="text-violet-500" /> },
+              { label: 'Summarize Chapter', desc: 'Get a concise summary of any textbook chapter', icon: <BookOpen size={28} className="text-sky-500" /> },
+              { label: 'Homework Generator', desc: 'Generate age-appropriate homework tasks', icon: <Pencil size={28} className="text-emerald-500" /> },
+              { label: 'Rubric Creator', desc: 'Create grading rubrics for assignments', icon: <BarChart2 size={28} className="text-amber-500" /> },
+              { label: 'Parent Message Draft', desc: 'Draft professional parent communication', icon: <Mail size={28} className="text-rose-500" /> },
             ].map(tool => (
               <div key={tool.label} style={{ padding: 'var(--space-5)', background: 'var(--color-surface-2)', borderRadius: 'var(--radius-xl)', border: '1px solid var(--color-border)', cursor: 'pointer', transition: 'all 0.15s ease' }}
                 onClick={() => window.open('/ai-hub', '_blank')}
                 onMouseEnter={e => (e.currentTarget.style.borderColor = 'var(--color-primary)')}
                 onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--color-border)')}
               >
-                <div style={{ fontSize: '2rem', marginBottom: 'var(--space-3)' }}>{tool.icon}</div>
+                <div style={{ marginBottom: 'var(--space-3)' }}>{tool.icon}</div>
                 <div style={{ fontSize: 'var(--font-size-sm)', fontWeight: 700, color: 'var(--color-text-primary)', marginBottom: 'var(--space-1)' }}>{tool.label}</div>
                 <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)' }}>{tool.desc}</div>
               </div>
             ))}
           </div>
           <div style={{ marginTop: 'var(--space-4)', padding: 'var(--space-4)', background: 'var(--color-primary-light)', borderRadius: 'var(--radius-lg)', fontSize: 'var(--font-size-sm)', color: 'var(--color-primary)' }}>
-            💡 These tools use the VidyaSetu AI Hub. Click any tool to open the AI assistant with the relevant prompt pre-loaded.
+            <Lightbulb size={16} className="inline mr-1" /> These tools use the VidyaSetu AI Hub. Click any tool to open the AI assistant with the relevant prompt pre-loaded.
           </div>
         </div>
       )}

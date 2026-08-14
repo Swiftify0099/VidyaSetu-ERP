@@ -5,7 +5,7 @@
  * achievements, and generate behaviour reports.
  */
 import { useState, useEffect, useCallback } from 'react';
-import { ShieldAlert, Star, AlertTriangle, BookOpen, Plus, Search, Filter, RefreshCw, Download } from 'lucide-react';
+import { ShieldAlert, Star, AlertTriangle, BookOpen, Plus, Search, Filter, RefreshCw, Download, FileText, Bell, CheckCircle2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../../services/api';
 import {
@@ -41,9 +41,9 @@ const CATEGORIES = {
 };
 
 const TYPE_CONFIG = {
-  positive: { icon: '⭐', label: 'Positive',  color: '#059669', bg: '#d1fae5' },
-  negative: { icon: '⚠️', label: 'Negative',  color: '#dc2626', bg: '#fee2e2' },
-  neutral:  { icon: '📝', label: 'Neutral',   color: '#6b7280', bg: '#f3f4f6' },
+  positive: { icon: <Star size={13} />, label: 'Positive',  color: '#059669', bg: '#d1fae5' },
+  negative: { icon: <AlertTriangle size={13} />, label: 'Negative',  color: '#dc2626', bg: '#fee2e2' },
+  neutral:  { icon: <FileText size={13} />, label: 'Neutral',   color: '#6b7280', bg: '#f3f4f6' },
 };
 
 const STANDARDS = ['1','2','3','4','5','6','7','8','9','10','11','12'];
@@ -200,15 +200,20 @@ export default function BehaviourLogPage() {
       {/* Stats Row */}
       <div className={styles.statsRow}>
         {[
-          { icon: '⭐', label: 'Positive', value: stats.positive, color: '#059669', bg: '#d1fae5' },
-          { icon: '⚠️', label: 'Negative', value: stats.negative, color: '#dc2626', bg: '#fee2e2' },
-          { icon: '🔔', label: 'Open', value: stats.open, color: '#d97706', bg: '#fef3c7' },
-          { icon: '✅', label: 'Resolved', value: stats.resolved, color: '#6b7280', bg: '#f3f4f6' },
+          { icon: <Star size={20} />, label: 'Positive', value: stats.positive, color: 'var(--color-success)', sub: 'Good behaviour & awards' },
+          { icon: <AlertTriangle size={20} />, label: 'Negative', value: stats.negative, color: 'var(--color-danger)', sub: 'Incidents & warnings' },
+          { icon: <Bell size={20} />, label: 'Open', value: stats.open, color: 'var(--color-warning)', sub: 'Pending follow-up' },
+          { icon: <CheckCircle2 size={20} />, label: 'Resolved', value: stats.resolved, color: 'var(--color-primary)', sub: 'Action completed' },
         ].map(s => (
-          <div key={s.label} className={styles.statCard} style={{ borderTopColor: s.color }}>
-            <span style={{ fontSize: '1.4rem' }}>{s.icon}</span>
-            <span className={styles.statValue} style={{ color: s.color }}>{s.value}</span>
-            <span className={styles.statLabel}>{s.label}</span>
+          <div key={s.label} className={styles.statCard} style={{ '--card-color': s.color } as React.CSSProperties}>
+            <div className={styles.statHeader}>
+              <div className={styles.statIconWrap}>{s.icon}</div>
+            </div>
+            <div className={styles.statBody}>
+              <div className={styles.statValue}>{s.value}</div>
+              <div className={styles.statLabel}>{s.label}</div>
+              <div className={styles.statSub}>{s.sub}</div>
+            </div>
           </div>
         ))}
       </div>

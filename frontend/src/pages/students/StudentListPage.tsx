@@ -64,19 +64,16 @@ export default function StudentListPage() {
 
   const loadStats = useCallback(async () => {
     try {
-      const s = await studentService.getStats();
-      setStats(s);
-    } catch {}
+      const data = await studentService.getStats();
+      setStats(data);
+    } catch {
+      // Silently catch stats failure
+    }
   }, []);
 
   useEffect(() => { loadStudents(); }, [loadStudents]);
   useEffect(() => { loadStats(); }, [loadStats]);
-
-  // Debounced search
-  useEffect(() => {
-    const t = setTimeout(() => { setPage(1); }, 400);
-    return () => clearTimeout(t);
-  }, [search]);
+  useEffect(() => { setPage(1); }, [search, filterStd, filterDiv, filterStatus]);
 
   const handleDelete = async (id: number, name: string) => {
     if (!confirm(`Delete student "${name}"? This action cannot be undone.`)) return;
@@ -96,6 +93,14 @@ export default function StudentListPage() {
   const getPhotoUrl = (path?: string) =>
     path ? `${import.meta.env.VITE_STORAGE_URL}/${path}` : null;
 
+  const getInitials = (name?: string, fallback = 'ST'): string => {
+    if (!name || typeof name !== 'string') return fallback;
+    const parts = name.trim().split(/\s+/).filter(Boolean);
+    if (parts.length === 0) return fallback;
+    if (parts.length === 1) return parts[0].substring(0, 2).toUpperCase();
+    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  };
+
   const statusBadge = (s: string) => {
     const map: Record<string, string> = {
       active: styles.badgeSuccess,
@@ -106,26 +111,35 @@ export default function StudentListPage() {
     return map[s] || styles.badgeMuted;
   };
 
+  const displayStats = stats || {
+    total: total || students.length,
+    active: students.filter(s => s.status === 'active').length,
+    boys: students.filter(s => s.gender === 'male' || s.gender === 'M').length,
+    girls: students.filter(s => s.gender === 'female' || s.gender === 'F').length,
+  };
+
   return (
     <div className={styles.page}>
       {/* ── Stats Row ─────────────────────────────────────── */}
-      {stats && (
-        <div className={styles.statsRow}>
-          {[
-            { label: 'Total Students', value: stats.total, icon: <Users size={18}/>, color: 'var(--color-primary)' },
-            { label: 'Active', value: stats.active, icon: <UserCheck size={18}/>, color: 'var(--color-success)' },
-            { label: 'Boys', value: stats.boys, icon: <GraduationCap size={18}/>, color: 'var(--color-info)' },
-            { label: 'Girls', value: stats.girls, icon: <GraduationCap size={18}/>, color: 'var(--color-secondary)' },
-            { label: 'Left / Transferred', value: stats.left, icon: <UserX size={18}/>, color: 'var(--color-danger)' },
-          ].map(s => (
-            <div key={s.label} className={styles.statCard} style={{ '--c': s.color } as React.CSSProperties}>
-              <div className={styles.statIcon}>{s.icon}</div>
-              <div className={styles.statVal}>{s.value}</div>
-              <div className={styles.statLbl}>{s.label}</div>
+      <div className={styles.statsRow}>
+        {[
+          { label: 'Total Students', value: displayStats.total ?? '—', icon: <Users size={20}/>, color: 'var(--color-primary)', sub: 'Registered students' },
+          { label: 'Active', value: displayStats.active ?? '—', icon: <UserCheck size={20}/>, color: 'var(--color-success)', sub: 'Currently enrolled' },
+          { label: 'Boys', value: displayStats.boys ?? '—', icon: <GraduationCap size={20}/>, color: 'var(--color-info)', sub: 'Male students' },
+          { label: 'Girls', value: displayStats.girls ?? '—', icon: <GraduationCap size={20}/>, color: 'var(--color-secondary)', sub: 'Female students' },
+        ].map(s => (
+          <div key={s.label} className={styles.statCard} style={{ '--card-color': s.color } as React.CSSProperties}>
+            <div className={styles.statHeader}>
+              <div className={styles.statIconWrap}>{s.icon}</div>
             </div>
-          ))}
-        </div>
-      )}
+            <div className={styles.statBody}>
+              <div className={styles.statValue}>{s.value}</div>
+              <div className={styles.statLabel}>{s.label}</div>
+              <div className={styles.statSub}>{s.sub}</div>
+            </div>
+          </div>
+        ))}
+      </div>
 
       {/* ── Toolbar ───────────────────────────────────────── */}
       <div className={styles.toolbar}>
@@ -249,10 +263,20 @@ export default function StudentListPage() {
                 <tr key={student.id} className={styles.row}>
                   <td>
                     <div className={styles.avatar}>
-                      {getPhotoUrl(student.photo_path)
-                        ? <img src={getPhotoUrl(student.photo_path)!} alt={student.full_name} />
-                        : <span>{student.full_name.charAt(0)}</span>
-                      }
+                      {getPhotoUrl(student.photo_path) ? (
+                        <img
+                          src={getPhotoUrl(student.photo_path)!}
+                          alt={student.full_name}
+                          onError={(e) => {
+                            (e.target as HTMLElement).style.display = 'none';
+                            if (e.currentTarget.parentElement) {
+                              e.currentTarget.parentElement.innerText = getInitials(student.full_name);
+                            }
+                          }}
+                        />
+                      ) : (
+                        <span>{getInitials(student.full_name)}</span>
+                      )}
                     </div>
                   </td>
                   <td><span className={styles.grNumber}>{student.gr_number}</span></td>

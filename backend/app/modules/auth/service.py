@@ -112,6 +112,11 @@ class AuthService:
         """
         Authenticate user and return token pair.
         Handles: account lock, failed attempts, session creation.
+        
+        Device Security:
+        - Trusted primary device → immediate session (existing behaviour)
+        - New/unknown device → HTTP 202 + verification_required (no session)
+        - Existing user, first login ever → auto-register as primary, immediate session
         """
         user = cls.find_user_by_username(db, request.username)
 
@@ -184,8 +189,77 @@ class AuthService:
                 detail=f"Invalid username or password. {settings.MAX_LOGIN_ATTEMPTS - user.failed_attempts} attempts remaining.",
             )
 
-        # ── Login Successful ──────────────────────────────────
+        # ── Credentials Valid ───────────────────────────────────
         user.failed_attempts = 0
+
+        # ── Device Security Check ─────────────────────────────
+        # Build device metadata dict from request fields
+        device_meta = {
+            "device_installation_id": request.device_installation_id,
+            "device_type": request.device_type or "web",
+            "platform": request.platform,
+            "manufacturer": request.manufacturer,
+            "model": request.model,
+            "os_version": request.os_version,
+            "app_version": request.app_version,
+            "browser_name": request.browser_name,
+            "browser_version": request.browser_version,
+            "timezone": request.timezone,
+            "language": request.language,
+            "latitude": request.latitude,
+            "longitude": request.longitude,
+            "location_accuracy": request.location_accuracy,
+            "approximate_location": request.approximate_location,
+            "user_agent": client_request.headers.get("User-Agent", "")[:500],
+        }
+
+        device_security_enabled = getattr(settings, "DEVICE_SECURITY_ENABLED", True)
+
+        if device_security_enabled:
+            # Import here to avoid circular imports at module level
+            from app.modules.device_security.service import (
+                DeviceSecurityOrchestrator, get_client_ip
+            )
+            from app.modules.device_security.router import dispatch_verification_email_and_push
+
+            device_result = DeviceSecurityOrchestrator.check_device_on_login(
+                db=db,
+                user_id=user.id,
+                failed_attempts=user.failed_attempts,
+                device_installation_id=request.device_installation_id,
+                device_meta=device_meta,
+                request=client_request,
+            )
+
+            if device_result.requires_verification:
+                # New/untrusted device — do NOT issue a session
+                # Send email + push (async, non-blocking)
+                ip = get_client_ip(client_request)
+                dispatch_verification_email_and_push(
+                    db=db,
+                    user=user,
+                    token=device_result.verification_token,
+                    device=device_result.device,
+                    ip_address=ip,
+                    login_time=datetime.now(timezone.utc),
+                )
+                db.commit()
+
+                # Return HTTP 202 — not a full auth response
+                from fastapi.responses import JSONResponse
+                raise HTTPException(
+                    status_code=status.HTTP_202_ACCEPTED,
+                    detail={
+                        "status": "verification_required",
+                        "requires_verification": True,
+                        "login_attempt_id": device_result.login_attempt_id,
+                        "message": "New device detected. Please check your registered email to approve this login.",
+                    },
+                )
+
+            # Device is trusted — continue to normal session creation
+
+        # ── Login Successful ──────────────────────────────────
         user.is_locked = False
         user.last_login = datetime.now(timezone.utc)
         user.last_login_ip = client_request.client.host if client_request.client else None
@@ -202,11 +276,14 @@ class AuthService:
         refresh_token, refresh_jti, refresh_expires = create_refresh_token(user_id=user.id)
 
         # Save session
+        device_display = None
+        if device_security_enabled and 'device_result' in dir():
+            device_display = device_result.device.display_name if device_result.device else None
         session = UserSession(
             user_id=user.id,
             token_jti=access_jti,
             refresh_token_jti=refresh_jti,
-            device_name=request.device_name,
+            device_name=device_display or request.device_name,
             browser=client_request.headers.get("User-Agent", "")[:255],
             ip_address=client_request.client.host if client_request.client else None,
             logged_in_at=datetime.now(timezone.utc),

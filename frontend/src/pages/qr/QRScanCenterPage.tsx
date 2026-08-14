@@ -8,7 +8,7 @@
  *  - Fee payment verification
  */
 import { useState, useCallback, useEffect } from 'react';
-import { QrCode, Search, Download, Copy, CheckCircle, Book, GraduationCap, CreditCard, CalendarCheck, Printer, User } from 'lucide-react';
+import { QrCode, Search, Download, Copy, CheckCircle, Book, GraduationCap, CreditCard, CalendarCheck, Printer, User, Loader2, XCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../../services/api';
 import { PageHeader, StatusBadge } from '../../components/shared';
@@ -347,14 +347,18 @@ export default function QRScanCenterPage() {
             onClick={verifyScan}
             disabled={scanning || !scanInput.trim()}
           >
-            {scanning ? '⏳ Verifying...' : '🔍 Verify QR Code'}
+            {scanning ? (
+              <><Loader2 size={16} className="animate-spin inline mr-1" /> Verifying...</>
+            ) : (
+              <><Search size={16} className="inline mr-1" /> Verify QR Code</>
+            )}
           </button>
 
           {/* Scan Result */}
           {scanResult && (
             <div className={`${styles.scanResult} ${scanResult.found ? styles.scanSuccess : styles.scanError}`}>
               <div className={styles.scanResultIcon}>
-                {scanResult.found ? '✅' : '❌'}
+                {scanResult.found ? <CheckCircle size={24} className="text-emerald-500" /> : <XCircle size={24} className="text-rose-500" />}
               </div>
               <div className={styles.scanResultBody}>
                 <p className={styles.scanResultMsg}>{scanResult.message}</p>

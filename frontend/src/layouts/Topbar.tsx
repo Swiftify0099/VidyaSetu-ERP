@@ -1,4 +1,4 @@
-import { Bell, Search, Sun, Moon, Globe, ChevronDown, User, Settings, LogOut, Key, Menu, CheckCheck, ExternalLink } from 'lucide-react';
+import { Bell, Search, Sun, Moon, Globe, ChevronDown, User, Settings, LogOut, Key, Menu, CheckCheck, ExternalLink, GraduationCap, UserCheck, BookOpen, Receipt, ClipboardList } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -10,6 +10,7 @@ import notificationService, { AppNotification } from '../services/notificationSe
 import communicationService from '../services/communicationService';
 import { useNotifications } from '../hooks/useNotifications';
 import { handleNotificationClick } from '../utils/notificationUtils';
+import { NotificationCategoryIcon } from '../components/shared/NotificationCategoryIcon';
 import styles from './Topbar.module.css';
 
 // Module-level flag: only log FCM tokens once per browser session
@@ -28,9 +29,12 @@ interface SearchResults {
   results: Record<string, SearchResult[]>;
 }
 
-const TYPE_ICONS: Record<string, string> = {
-  student: '🎓', teacher: '👨‍🏫', book: '📚',
-  receipt: '🧾', default: '🔍',
+const TYPE_ICONS: Record<string, React.ReactNode> = {
+  student: <GraduationCap size={15} />,
+  teacher: <UserCheck size={15} />,
+  book: <BookOpen size={15} />,
+  receipt: <Receipt size={15} />,
+  default: <Search size={15} />,
 };
 
 export default function Topbar({
@@ -219,7 +223,7 @@ export default function Topbar({
                   items.length > 0 ? (
                     <div key={category}>
                       <div className={styles.searchCategory}>
-                        {TYPE_ICONS[category] ?? '📋'} {category.charAt(0).toUpperCase() + category.slice(1)}
+                        {TYPE_ICONS[category] ?? <ClipboardList size={15} />} {category.charAt(0).toUpperCase() + category.slice(1)}
                       </div>
                       {items.map(item => (
                         <button
@@ -228,7 +232,7 @@ export default function Topbar({
                           onClick={() => handleResultClick(item.url)}
                         >
                           <span className={styles.resultIcon}>
-                            {TYPE_ICONS[item.type] ?? '🔍'}
+                            {TYPE_ICONS[item.type] ?? <Search size={15} />}
                           </span>
                           <span className={styles.resultText}>
                             <span className={styles.resultLabel}>{item.label}</span>
@@ -360,7 +364,7 @@ export default function Topbar({
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div className={styles.notifMeta}>
                           <span className={`${styles.notifBadge} ${styles.notifBadgeNotice}`}>
-                            {notificationService.getCategoryIcon(n.category)} {n.category}
+                            <NotificationCategoryIcon category={n.category} size={12} className="inline mr-1" /> {n.category}
                           </span>
                           <span>{notificationService.formatRelativeTime(n.created_at)}</span>
                         </div>

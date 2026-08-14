@@ -9,11 +9,11 @@ import { Platform } from 'react-native';
 
 // ── Keys ─────────────────────────────────────────────────
 export const STORAGE_KEYS = {
-  ACCESS_TOKEN:  'vs_access_token',
+  ACCESS_TOKEN: 'vs_access_token',
   REFRESH_TOKEN: 'vs_refresh_token',
-  USER:          'vs_user',
-  LANGUAGE:      'vs_language',
-  THEME:         'vs_theme',
+  USER: 'vs_user',
+  LANGUAGE: 'vs_language',
+  THEME: 'vs_theme',
 };
 
 // ── Base URLs ────────────────────────────────────────────
@@ -27,7 +27,7 @@ let LOCAL_BASE_URL = Platform.OS === 'android' ? EMULATOR_HOST_URL : LOCAL_HOST_
 // Priority 2: Render cloud backend (production — always available)
 const RENDER_BASE_URL = 'https://vidyasetu-erp.onrender.com/api/v1';
 // Production URL (used in release builds)
-const PROD_BASE_URL   = RENDER_BASE_URL;
+const PROD_BASE_URL = RENDER_BASE_URL;
 
 /**
  * Start with local backend in DEV mode.
@@ -38,7 +38,7 @@ const INITIAL_BASE_URL = __DEV__ ? LOCAL_BASE_URL : PROD_BASE_URL;
 
 // Track which backend is currently active
 let activeBaseURL = INITIAL_BASE_URL;
-let usingFallback  = false;
+let usingFallback = false;
 let fallbackCheckInProgress = false;
 
 /** Silently probe local backend; returns true if reachable */

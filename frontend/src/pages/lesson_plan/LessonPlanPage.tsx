@@ -11,6 +11,7 @@ import { DataTable } from '../../components/shared/DataTable';
 import { StatusBadge } from '../../components/shared/StatusBadge';
 import { Modal } from '../../components/shared/Modal';
 import { EmptyState } from '../../components/shared/EmptyState';
+import { BookOpen, FileText, CheckCircle2, AlertTriangle } from 'lucide-react';
 import type { TableColumn } from '../../types';
 import styles from './LessonPlanPage.module.css';
 
@@ -31,6 +32,11 @@ const CUR_YEAR = '2025-2026';
 
 const TABS = ['Lesson Plans', 'Teaching Diary'] as const;
 type Tab = typeof TABS[number];
+
+const TAB_ICONS: Record<Tab, React.ReactNode> = {
+  'Lesson Plans': <BookOpen size={15} />,
+  'Teaching Diary': <FileText size={15} />,
+};
 
 export default function LessonPlanPage() {
   const [tab, setTab] = useState<Tab>('Lesson Plans');
@@ -159,8 +165,8 @@ export default function LessonPlanPage() {
     { key: 'topic_covered', header: 'Topic Covered' },
     { key: 'students_present', header: 'Attendance', align: 'center', render: (v) => <span>{v != null ? String(v) : '—'}</span> },
     { key: 'class_participation', header: 'Participation', render: (v) => v ? <StatusBadge status={String(v)} variant={v === 'excellent' ? 'success' : v === 'good' ? 'info' : v === 'average' ? 'warning' : 'danger'} size="sm" /> : <span>—</span> },
-    { key: 'homework_given', header: 'HW', align: 'center', render: (v) => v ? '✅' : '—' },
-    { key: 'remedial_needed', header: 'Remedial', align: 'center', render: (v) => v ? '⚠️' : '—' },
+    { key: 'homework_given', header: 'HW', align: 'center', render: (v) => v ? <CheckCircle2 size={14} className="text-emerald-500 inline" /> : '—' },
+    { key: 'remedial_needed', header: 'Remedial', align: 'center', render: (v) => v ? <AlertTriangle size={14} className="text-amber-500 inline" /> : '—' },
   ];
 
   const fieldClass = styles.inp;
@@ -169,7 +175,7 @@ export default function LessonPlanPage() {
   return (
     <div className={styles.page}>
       <PageHeader
-        icon="📖"
+        icon={<BookOpen size={24} />}
         title="Lesson Plans & Teaching Diary"
         subtitle="Create monthly lesson plans and maintain daily teaching records"
         breadcrumbs={[{ label: 'Dashboard', href: '/dashboard' }, { label: 'Lesson Plans' }]}
@@ -183,14 +189,14 @@ export default function LessonPlanPage() {
 
       <div className={styles.tabs}>
         {TABS.map(t => (
-          <button key={t} className={`${styles.tab} ${tab === t ? styles.activeTab : ''}`} onClick={() => setTab(t)}>{t}</button>
+          <button key={t} className={`${styles.tab} ${tab === t ? styles.activeTab : ''}`} onClick={() => setTab(t)}>{TAB_ICONS[t]} {t}</button>
         ))}
       </div>
 
       {tab === 'Lesson Plans' && (
         <div className={styles.tableCard}>
           {plans.length === 0 && !loading
-            ? <EmptyState icon="📖" title="No lesson plans yet" description="Create your first monthly lesson plan" size="lg" action={<button className={styles.primaryBtn} onClick={() => setShowPlanModal(true)}>+ Create Plan</button>} />
+            ? <EmptyState icon={<BookOpen size={44} />} title="No lesson plans yet" description="Create your first monthly lesson plan" size="lg" action={<button className={styles.primaryBtn} onClick={() => setShowPlanModal(true)}>+ Create Plan</button>} />
             : <DataTable columns={planCols} data={plans} loading={loading} keyExtractor={(r) => r.id} emptyMessage="No plans found" />
           }
         </div>
@@ -199,7 +205,7 @@ export default function LessonPlanPage() {
       {tab === 'Teaching Diary' && (
         <div className={styles.tableCard}>
           {diary.length === 0 && !loading
-            ? <EmptyState icon="📓" title="No diary entries yet" description="Record what you taught today" size="lg" action={<button className={styles.primaryBtn} onClick={() => setShowDiaryModal(true)}>+ Add Entry</button>} />
+            ? <EmptyState icon={<FileText size={44} />} title="No diary entries yet" description="Record what you taught today" size="lg" action={<button className={styles.primaryBtn} onClick={() => setShowDiaryModal(true)}>+ Add Entry</button>} />
             : <DataTable columns={diaryCols} data={diary} loading={loading} keyExtractor={(r) => r.id} emptyMessage="No diary entries" />
           }
         </div>

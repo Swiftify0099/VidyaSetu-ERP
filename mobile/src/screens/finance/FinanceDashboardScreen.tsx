@@ -63,6 +63,7 @@ const PAYMENT_MODE_ICONS: Record<string, string> = {
   upi: 'mobile-alt',
   cheque: 'money-check',
   bank_transfer: 'university',
+  online: 'exchange-alt',
   dd: 'file-invoice-dollar',
 };
 

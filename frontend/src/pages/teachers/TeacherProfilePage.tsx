@@ -291,10 +291,25 @@ export default function TeacherProfilePage() {
             <div className={styles.avatarWrapper}>
               <div className={styles.avatarImageContainer}>
                 {photoUrl ? (
-                  <img src={photoUrl} alt={teacher.full_name} className={styles.avatarImg}/>
+                  <img
+                    src={photoUrl}
+                    alt={teacher.full_name}
+                    className={styles.avatarImg}
+                    onError={(e) => {
+                      (e.target as HTMLElement).style.display = 'none';
+                      if (e.currentTarget.parentElement) {
+                        const parts = (teacher.full_name || '').trim().split(/\s+/).filter(Boolean);
+                        const init = parts.length > 1 ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase() : (parts[0]?.substring(0, 2).toUpperCase() || 'TR');
+                        e.currentTarget.parentElement.innerText = init;
+                      }
+                    }}
+                  />
                 ) : (
                   <div className={styles.avatarFallback}>
-                    {teacher.full_name.charAt(0)}
+                    {(() => {
+                      const parts = (teacher.full_name || '').trim().split(/\s+/).filter(Boolean);
+                      return parts.length > 1 ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase() : (parts[0]?.substring(0, 2).toUpperCase() || 'TR');
+                    })()}
                   </div>
                 )}
                 <span className={`${styles.onlineDot} ${teacher.status === 'active' ? styles.online : styles.offline}`} />
@@ -728,7 +743,7 @@ export default function TeacherProfilePage() {
               {teacher.subjects ? (
                 <div className={styles.chipCloud}>
                   {teacher.subjects.split(',').map((sub, i) => (
-                    <span key={i} className={styles.subjectTag}>📚 {sub.trim()}</span>
+                    <span key={i} className={styles.subjectTag}><BookOpen size={13} className="inline mr-1" /> {sub.trim()}</span>
                   ))}
                 </div>
               ) : (
@@ -742,7 +757,7 @@ export default function TeacherProfilePage() {
               {teacher.classes_assigned ? (
                 <div className={styles.chipCloud}>
                   {teacher.classes_assigned.split(',').map((cls, i) => (
-                    <span key={i} className={styles.classTag}>🏫 Class {cls.trim()}</span>
+                    <span key={i} className={styles.classTag}><Building2 size={13} className="inline mr-1" /> Class {cls.trim()}</span>
                   ))}
                 </div>
               ) : (

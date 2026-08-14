@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { X, ExternalLink, Flame, Check } from 'lucide-react';
 import notificationService from '../../services/notificationService';
 import { handleNotificationClick } from '../../utils/notificationUtils';
+import { NotificationCategoryIcon } from '../shared/NotificationCategoryIcon';
 import styles from './FCMNotificationToast.module.css';
 
 export interface FCMToastData {
@@ -160,7 +161,7 @@ const SingleToastItem: React.FC<{
       {/* Main Content Group */}
       <div className={styles.toastContent}>
         <div className={styles.categoryIconWrap} title={category}>
-          {categoryIcon}
+          <NotificationCategoryIcon category={category} size={18} />
         </div>
         <div className={styles.textGroup}>
           <div className={styles.toastTitle}>{toast.title}</div>

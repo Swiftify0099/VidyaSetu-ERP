@@ -52,6 +52,8 @@ const TYPE_CONFIG: Record<string, { label: string; icon: string; color: string }
   exam:      { label: 'Exam Update',    icon: 'file-alt',             color: '#f59e0b' },
   fee:       { label: 'Fee Reminder',   icon: 'rupee-sign',           color: '#ef4444' },
   urgent:    { label: 'Urgent Alert',   icon: 'exclamation-triangle', color: '#dc2626' },
+  holiday:   { label: 'Holiday',        icon: 'calendar-check',       color: '#059669' },
+  emergency: { label: 'Emergency',      icon: 'exclamation-circle',   color: '#dc2626' },
 };
 
 const TYPE_OPTIONS = Object.entries(TYPE_CONFIG).map(([k, v]) => ({

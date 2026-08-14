@@ -4,6 +4,7 @@
  */
 import React, { useState } from 'react';
 import { toast } from 'react-hot-toast';
+import { FileText, FileSpreadsheet } from 'lucide-react';
 import styles from './ExportButton.module.css';
 
 interface ExportButtonProps {
@@ -15,7 +16,10 @@ interface ExportButtonProps {
   variant?: 'primary' | 'secondary' | 'ghost';
 }
 
-const FORMAT_ICONS = { pdf: '📄', excel: '📊' };
+const FORMAT_ICONS = {
+  pdf: <FileText size={16} />,
+  excel: <FileSpreadsheet size={16} />,
+};
 const FORMAT_LABELS = { pdf: 'PDF', excel: 'Excel' };
 
 export function ExportButton({

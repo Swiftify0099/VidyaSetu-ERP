@@ -11,20 +11,39 @@
 
 /* Dashboard */
 .dashContent { display: flex; flex-direction: column; gap: var(--space-5); }
-.kpiGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: var(--space-4); }
-.kpiCard {
-  background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-xl);
-  padding: var(--space-5); display: flex; flex-direction: column; gap: var(--space-2);
-  position: relative; overflow: hidden; transition: all var(--transition-base);
+.kpiGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--space-4); }
+
+@media (min-width: 1280px) {
+  .kpiGrid { grid-template-columns: repeat(4, 1fr); }
 }
-.kpiCard::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; background: var(--kc); }
+
+.kpiCard {
+  background: var(--card-bg);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--card-border);
+  border-radius: 16px;
+  padding: 16px 20px; display: flex; flex-direction: column; gap: 6px;
+  position: relative; overflow: visible; transition: all 0.3s ease;
+  box-shadow: var(--card-shadow);
+}
 .kpiClickable { cursor: pointer; }
-.kpiClickable:hover { transform: translateY(-3px); box-shadow: var(--shadow-xl); border-color: var(--kc); }
-.kpiIcon { display: flex; }
-.kpiVal { font-size: clamp(1.25rem, 2.5vw, 1.75rem); font-weight: var(--font-weight-bold); color: var(--color-text-primary); }
-.kpiLabel { font-size: var(--font-size-sm); font-weight: var(--font-weight-semibold); color: var(--color-text-primary); }
-.kpiSub { font-size: var(--font-size-xs); color: var(--color-text-muted); }
-.kpiArrow { position: absolute; bottom: var(--space-4); right: var(--space-4); color: var(--color-text-muted); transition: all var(--transition-fast); }
+.kpiClickable:hover {
+  transform: translateY(-2px);
+  background: var(--card-bg-hover);
+  border-color: var(--card-border-hover);
+  box-shadow: var(--card-shadow-hover);
+}
+.kpiIcon {
+  width: 42px; height: 42px; border-radius: 12px;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--kc, var(--color-primary)) 40%, white), var(--kc, var(--color-primary)));
+  color: white; display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 6px 14px color-mix(in srgb, var(--kc, var(--color-primary)) 40%, transparent); flex-shrink: 0;
+}
+.kpiVal { font-size: 1.75rem; font-weight: 800; color: var(--color-text-primary); line-height: 1.1; letter-spacing: -0.02em; }
+.kpiLabel { font-size: 0.875rem; font-weight: 600; color: var(--color-text-primary); }
+.kpiSub { font-size: 0.75rem; color: var(--color-text-muted); }
+.kpiArrow { position: absolute; bottom: 16px; right: 16px; color: var(--color-text-muted); transition: all var(--transition-fast); }
 .kpiClickable:hover .kpiArrow { color: var(--kc); transform: translateX(3px); }
 
 /* Toolbar */

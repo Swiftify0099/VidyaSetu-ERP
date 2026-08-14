@@ -23,29 +23,30 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useNotificationContext } from '../../contexts/NotificationContext';
 import notificationService, { AppNotification } from '../../services/notificationService';
 import { scheduleDelayedSystemNotification } from '../../utils/notificationUtils';
+import { NotificationCategoryIcon } from '../../components/shared/NotificationCategoryIcon';
 import styles from './NotificationCenterPage.module.css';
 
 // ── Category config ────────────────────────────────────────
 
 const CATEGORIES = [
-  { key: 'all',         label: 'All',        emoji: '🔔' },
-  { key: 'exam',        label: 'Exam',       emoji: '🎓' },
-  { key: 'attendance',  label: 'Attendance', emoji: '📋' },
-  { key: 'fee',         label: 'Finance',    emoji: '💰' },
-  { key: 'leave',       label: 'Leave',      emoji: '🏖️' },
-  { key: 'library',     label: 'Library',    emoji: '📚' },
-  { key: 'homework',    label: 'Homework',   emoji: '📝' },
-  { key: 'notice',      label: 'Notices',    emoji: '📢' },
-  { key: 'security',    label: 'Security',   emoji: '🔐' },
-  { key: 'system',      label: 'System',     emoji: '⚙️' },
+  { key: 'all',         label: 'All' },
+  { key: 'exam',        label: 'Exam' },
+  { key: 'attendance',  label: 'Attendance' },
+  { key: 'fee',         label: 'Finance' },
+  { key: 'leave',       label: 'Leave' },
+  { key: 'library',     label: 'Library' },
+  { key: 'homework',    label: 'Homework' },
+  { key: 'notice',      label: 'Notices' },
+  { key: 'security',    label: 'Security' },
+  { key: 'system',      label: 'System' },
 ];
 
 const PRIORITIES = [
-  { key: '',         label: 'All Priority' },
-  { key: 'critical', label: '🚨 Critical' },
-  { key: 'high',     label: '🔴 High' },
-  { key: 'medium',   label: '🟡 Medium' },
-  { key: 'low',      label: '⚪ Low' },
+  { key: '',         label: 'All Priority', icon: <Bell size={14} /> },
+  { key: 'critical', label: 'Critical',     icon: <Flame size={14} className="text-rose-500" /> },
+  { key: 'high',     label: 'High',         icon: <AlertTriangle size={14} className="text-amber-500" /> },
+  { key: 'medium',   label: 'Medium',       icon: <ShieldAlert size={14} className="text-blue-500" /> },
+  { key: 'low',      label: 'Low',          icon: <CheckCircle2 size={14} className="text-slate-400" /> },
 ];
 
 export default function NotificationCenterPage() {
@@ -99,7 +100,7 @@ export default function NotificationCenterPage() {
     setCountdown(5);
     scheduleDelayedSystemNotification(
       5,
-      '🚨 VidyaSetu Outside-App Push Alert',
+      'VidyaSetu Outside-App Push Alert',
       'Success! Background OS Push notification delivered successfully while outside the app.',
       '/notifications'
     );
@@ -118,28 +119,28 @@ export default function NotificationCenterPage() {
   const handleTestNotification = (preset: 'exam' | 'fee' | 'critical' | 'system') => {
     const presets = {
       exam: {
-        title: '🎓 Mid-Term Exam Schedule Released',
+        title: 'Mid-Term Exam Schedule Released',
         body: 'Mathematics & Science exam timetables for Class X are now available in the portal.',
         category: 'exam',
         priority: 'high',
         actionUrl: '/timetable',
       },
       fee: {
-        title: '💰 Fee Receipt Confirmed',
+        title: 'Fee Receipt Confirmed',
         body: 'Payment of ₹15,000 for Term II fees has been successfully received & acknowledged.',
         category: 'fee',
         priority: 'medium',
         actionUrl: '/finance/fees',
       },
       critical: {
-        title: '🚨 Emergency Weather Advisory',
+        title: 'Emergency Weather Advisory',
         body: 'School will remain closed tomorrow due to severe heavy rainfall warning by IMD.',
         category: 'security',
         priority: 'critical',
         actionUrl: '/notice-board',
       },
       system: {
-        title: '⚙️ Scheduled System Maintenance',
+        title: 'Scheduled System Maintenance',
         body: 'VidyaSetu ERP servers will undergo routine maintenance tonight from 11:00 PM to 1:00 AM.',
         category: 'system',
         priority: 'low',
@@ -235,7 +236,9 @@ export default function NotificationCenterPage() {
       {/* ── Page Header ──────────────────────────────────────── */}
       <div className={styles.header}>
         <div className={styles.headerLeft}>
-          <div className={styles.headerIcon}>🔔</div>
+          <div className={styles.headerIcon}>
+            <Bell size={22} color="#ffffff" />
+          </div>
           <div>
             <h1 className={styles.headerTitle}>
               Notification Center
@@ -284,28 +287,36 @@ export default function NotificationCenterPage() {
       {/* ── Stats Bar ─────────────────────────────────────────── */}
       <div className={styles.statsBar}>
         <div className={styles.statCard}>
-          <div className={`${styles.statIconWrap} ${styles.blue}`}>🔔</div>
+          <div className={`${styles.statIconWrap} ${styles.blue}`}>
+            <Bell size={20} />
+          </div>
           <div>
             <div className={styles.statValue}>{total}</div>
             <div className={styles.statLabel}>Total</div>
           </div>
         </div>
         <div className={styles.statCard}>
-          <div className={`${styles.statIconWrap} ${styles.red}`}>🔴</div>
+          <div className={`${styles.statIconWrap} ${styles.red}`}>
+            <Flame size={20} />
+          </div>
           <div>
             <div className={styles.statValue}>{unreadCount}</div>
             <div className={styles.statLabel}>Unread</div>
           </div>
         </div>
         <div className={styles.statCard}>
-          <div className={`${styles.statIconWrap} ${styles.green}`}>✅</div>
+          <div className={`${styles.statIconWrap} ${styles.green}`}>
+            <CheckCircle2 size={20} />
+          </div>
           <div>
             <div className={styles.statValue}>{total - unreadCount}</div>
             <div className={styles.statLabel}>Read</div>
           </div>
         </div>
         <div className={styles.statCard}>
-          <div className={`${styles.statIconWrap} ${styles.amber}`}>🚨</div>
+          <div className={`${styles.statIconWrap} ${styles.amber}`}>
+            <ShieldAlert size={20} />
+          </div>
           <div>
             <div className={styles.statValue}>
               {notifications.filter(n => n.priority === 'critical' || n.priority === 'high').length}
@@ -375,14 +386,14 @@ export default function NotificationCenterPage() {
                 <div className={styles.stepNum}>Step 1</div>
                 <div className={styles.stepTitle}>Browser Site Permission</div>
                 <div className={styles.stepDesc}>
-                  Click the padlock 🔒 icon next to your URL bar → Ensure Notifications permission is set to <strong>Allow</strong>.
+                  Click the padlock icon next to your URL bar → Ensure Notifications permission is set to <strong>Allow</strong>.
                 </div>
               </div>
               <div className={styles.guideStepCard}>
                 <div className={styles.stepNum}>Step 2</div>
                 <div className={styles.stepTitle}>Windows / OS Notifications</div>
                 <div className={styles.stepDesc}>
-                  In Windows Settings ⚙️ → System → Notifications → Ensure Google Chrome / Edge is toggled <strong>ON</strong>.
+                  In Windows Settings → System → Notifications → Ensure Google Chrome / Edge is toggled <strong>ON</strong>.
                 </div>
               </div>
               <div className={styles.guideStepCard}>
@@ -455,7 +466,7 @@ export default function NotificationCenterPage() {
                 onClick={() => setCategory(cat.key)}
                 id={`notif-cat-${cat.key}`}
               >
-                <span>{cat.emoji}</span>
+                <NotificationCategoryIcon category={cat.key} size={15} />
                 {cat.label}
                 {catBreakdown[cat.key] ? (
                   <span className={styles.filterBadge}>{catBreakdown[cat.key]}</span>
@@ -473,6 +484,7 @@ export default function NotificationCenterPage() {
                 onClick={() => setPriority(p.key)}
                 id={`notif-pri-${p.key || 'all'}`}
               >
+                {p.icon}
                 {p.label}
               </button>
             ))}
@@ -516,7 +528,7 @@ export default function NotificationCenterPage() {
           ) : notifications.length === 0 ? (
             <div className={styles.empty}>
               <div className={styles.emptyIcon}>
-                {category !== 'all' ? notificationService.getCategoryIcon(category) : '🔔'}
+                <NotificationCategoryIcon category={category} size={28} />
               </div>
               <div className={styles.emptyTitle}>No notifications found</div>
               <div className={styles.emptyBody}>
@@ -545,7 +557,7 @@ export default function NotificationCenterPage() {
                 {!notif.is_read && <div className={styles.unreadDot} />}
 
                 <div className={styles.notifIconWrap}>
-                  {notificationService.getCategoryIcon(notif.category)}
+                  <NotificationCategoryIcon category={notif.category} size={18} />
                 </div>
 
                 <div className={styles.notifBody}>

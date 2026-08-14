@@ -5,6 +5,25 @@
  */
 import React, { useState, useEffect } from 'react';
 import { toast } from 'react-hot-toast';
+import {
+  GraduationCap,
+  UserCheck,
+  DollarSign,
+  BookOpen,
+  FileText,
+  CalendarCheck,
+  Calendar,
+  Building2,
+  Package,
+  Megaphone,
+  BarChart2,
+  Briefcase,
+  Settings,
+  ClipboardList,
+  Save,
+  PlusCircle,
+  Key,
+} from 'lucide-react';
 import api from '../../services/api';
 import { PageHeader } from '../../components/shared/PageHeader';
 import { StatusBadge } from '../../components/shared/StatusBadge';
@@ -33,11 +52,21 @@ interface Permission {
 }
 
 const ACTIONS = ['read', 'create', 'update', 'delete', 'approve', 'export', 'import', 'manage'];
-const MODULE_ICONS: Record<string, string> = {
-  student: '🎓', teacher: '👨‍🏫', finance: '💰', library: '📚',
-  exam: '📝', attendance: '📅', timetable: '🗓️', office: '🏢',
-  inventory: '📦', communication: '📢', analytics: '📊',
-  leave: '🏖️', lesson_plan: '📖', admin: '⚙️',
+const MODULE_ICONS: Record<string, React.ReactNode> = {
+  student: <GraduationCap size={16} />,
+  teacher: <UserCheck size={16} />,
+  finance: <DollarSign size={16} />,
+  library: <BookOpen size={16} />,
+  exam: <FileText size={16} />,
+  attendance: <CalendarCheck size={16} />,
+  timetable: <Calendar size={16} />,
+  office: <Building2 size={16} />,
+  inventory: <Package size={16} />,
+  communication: <Megaphone size={16} />,
+  analytics: <BarChart2 size={16} />,
+  leave: <Briefcase size={16} />,
+  lesson_plan: <BookOpen size={16} />,
+  admin: <Settings size={16} />,
 };
 
 export default function RoleManagementPage() {
@@ -252,7 +281,7 @@ export default function RoleManagementPage() {
                <>
                  <button className={styles.cancelBtn} onClick={() => setShowPermModal(false)}>Cancel</button>
                  <button className={styles.saveBtn} onClick={savePermissions} disabled={savingPerms}>
-                   {savingPerms ? 'Saving...' : '💾 Save Permissions'}
+                   {savingPerms ? 'Saving...' : <><Save size={14} className="inline mr-1" /> Save Permissions</>}
                  </button>
                </>
              }>
@@ -260,7 +289,7 @@ export default function RoleManagementPage() {
           {Object.entries(moduleGroups).map(([module, perms]) => (
             <div key={module} className={styles.permModule}>
               <div className={styles.permModuleHeader}>
-                <span className={styles.permModuleIcon}>{MODULE_ICONS[module] ?? '📋'}</span>
+                <span className={styles.permModuleIcon}>{MODULE_ICONS[module] ?? <ClipboardList size={16} />}</span>
                 <span className={styles.permModuleName}>{module.replace(/_/g, ' ').toUpperCase()}</span>
               </div>
               <div className={styles.permActions}>

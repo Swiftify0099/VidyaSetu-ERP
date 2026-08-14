@@ -31,10 +31,25 @@ async def login(
 ):
     """
     Login with mobile / employee ID / GR number / username.
-    Returns JWT access token + refresh token.
+    Returns JWT access token + refresh token on success.
+    Returns HTTP 202 with verification_required=true for new devices.
     """
-    token_data = AuthService.login(db, body, request)
-    return APIResponse.ok(data=token_data.model_dump(), message="Login successful.")
+    from fastapi.responses import JSONResponse
+    try:
+        token_data = AuthService.login(db, body, request)
+        return APIResponse.ok(data=token_data.model_dump(), message="Login successful.")
+    except HTTPException as exc:
+        if exc.status_code == status.HTTP_202_ACCEPTED:
+            # New device detected — return 202 with verification details
+            return JSONResponse(
+                status_code=202,
+                content={
+                    "success": True,
+                    "message": "Verification required.",
+                    "data": exc.detail,
+                },
+            )
+        raise
 
 
 @router.post("/refresh", response_model=APIResponse)

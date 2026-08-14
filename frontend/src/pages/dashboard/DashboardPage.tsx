@@ -13,7 +13,7 @@ import {
   GraduationCap, Users, BookOpen, DollarSign,
   AlertCircle, CheckCircle2, Clock, Package, Library,
   RefreshCw, Activity, BarChart3, Bell, ArrowRight,
-  Shield, Zap, FileText, TrendingUp, TrendingDown, Send, Copy
+  Shield, Zap, FileText, TrendingUp, TrendingDown, Send, Copy, ChevronDown
 } from 'lucide-react';
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip,
@@ -69,26 +69,33 @@ function StatCard({ label, value, icon, color, trend, sub, loading, onClick }: S
     <div
       className={styles.statCard}
       style={{ '--card-color': color } as React.CSSProperties}
-      onClick={onClick}
-      role={onClick ? 'button' : undefined}
-      tabIndex={onClick ? 0 : undefined}
     >
       <div className={styles.statHeader}>
         <div className={styles.statIconWrap}>{icon}</div>
-        {trend && (
-          <span className={`${styles.trend} ${trend.up ? styles.trendUp : styles.trendDown}`}>
-            {trend.up ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
-            {trend.value}%
-          </span>
-        )}
       </div>
-      {loading ? (
-        <div className={styles.statValueLoading}>—</div>
-      ) : (
-        <div className={styles.statValue}>{value}</div>
-      )}
-      <div className={styles.statLabel}>{label}</div>
-      {sub && <div className={styles.statSub}>{sub}</div>}
+      
+      <div 
+        className={styles.statBody} 
+        onClick={onClick} 
+        role={onClick ? 'button' : undefined} 
+        tabIndex={onClick ? 0 : undefined}
+      >
+        {loading ? (
+          <div className={styles.statValueLoading}>—</div>
+        ) : (
+          <div className={styles.statValue}>
+            {value}
+            {trend && (
+              <span className={`${styles.trend} ${trend.up ? styles.trendUp : styles.trendDown}`}>
+                {trend.up ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
+                {trend.value}%
+              </span>
+            )}
+          </div>
+        )}
+        <div className={styles.statLabel}>{label}</div>
+        {sub && <div className={styles.statSub}>{sub}</div>}
+      </div>
     </div>
   );
 }

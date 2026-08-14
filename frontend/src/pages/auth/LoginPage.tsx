@@ -40,7 +40,18 @@ export default function LoginPage() {
       await login(data);
       toast.success(t('auth.login') + ' ' + t('common.success') + '!');
     } catch (err: any) {
-      const message = err?.response?.data?.message || t('auth.invalid_credentials');
+      // FastAPI HTTPException errors come as { detail: "..." }
+      // APIResponse errors come as { message: "..." }
+      // Axios timeout errors have no response
+      let message: string;
+      if (err?.code === 'ECONNABORTED' || err?.message?.includes('timeout')) {
+        message = 'Server is waking up, please wait a moment and try again.';
+      } else {
+        message =
+          err?.response?.data?.detail ||
+          err?.response?.data?.message ||
+          t('auth.invalid_credentials');
+      }
       toast.error(message);
     } finally {
       setIsSubmitting(false);

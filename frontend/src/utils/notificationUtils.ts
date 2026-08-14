@@ -208,8 +208,8 @@ export async function showNotification(
 
   // Format rich title for Windows Notification Tray / OS notification shade
   let titlePrefix = '';
-  if (priority === 'critical') titlePrefix = '🚨 [CRITICAL] ';
-  else if (priority === 'high') titlePrefix = '🔴 [HIGH] ';
+  if (priority === 'critical') titlePrefix = '[CRITICAL] ';
+  else if (priority === 'high') titlePrefix = '[HIGH] ';
   else if (category) titlePrefix = `[${category.toUpperCase()}] `;
 
   const resolveUrl = (path?: string) => {
@@ -308,7 +308,7 @@ export async function showNotification(
  */
 export function scheduleDelayedSystemNotification(
   delaySeconds: number,
-  title: string = '🔔 VidyaSetu Outside-App Push Test',
+  title: string = 'VidyaSetu Outside-App Push Test',
   body: string = 'Success! Background OS Push notifications are working outside of VidyaSetu ERP.',
   actionUrl: string = '/notifications'
 ): void {

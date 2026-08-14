@@ -21,6 +21,15 @@ export const TeacherDashboardHero: React.FC<TeacherDashboardHeroProps> = ({
         : teacher.classes_assigned)
     : [];
 
+  const getInitials = (name?: string): string => {
+    if (!name || typeof name !== 'string') return 'TR';
+    const parts = name.trim().split(/\s+/).filter(Boolean);
+    if (parts.length === 0) return 'TR';
+    if (parts.length === 1) return parts[0].substring(0, 2).toUpperCase();
+    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  };
+  const initials = getInitials(teacher?.full_name);
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-5, 1.25rem)' }}>
       {/* ── Page Header ────────────────────────────────────────── */}
@@ -45,9 +54,18 @@ export const TeacherDashboardHero: React.FC<TeacherDashboardHeroProps> = ({
       <div className={styles.hero}>
         <div className={styles.avatar}>
           {teacher?.photo_path ? (
-            <img src={`/storage/${teacher.photo_path}`} alt={teacher.full_name} />
+            <img
+              src={`/storage/${teacher.photo_path}`}
+              alt={teacher.full_name}
+              onError={(e) => {
+                (e.target as HTMLElement).style.display = 'none';
+                if (e.currentTarget.parentElement) {
+                  e.currentTarget.parentElement.innerText = initials;
+                }
+              }}
+            />
           ) : (
-            <span>{teacher?.full_name?.[0] || 'T'}</span>
+            <span>{initials}</span>
           )}
         </div>
         <div className={styles.heroInfo}>

@@ -31,11 +31,19 @@ export default defineConfig(({ mode }) => {
           target: backendTarget,
           changeOrigin: true,
           secure: false,
+          ws: false,
+          rewrite: (path) => path,
+          configure: (proxy) => {
+            proxy.on('error', (err) => {
+              console.error('[proxy error]', err.message);
+            });
+          },
         },
         '/storage': {
           target: backendTarget,
           changeOrigin: true,
           secure: false,
+          rewrite: (path) => path,
         },
       },
     },
@@ -49,10 +57,10 @@ export default defineConfig(({ mode }) => {
       rollupOptions: {
         output: {
           manualChunks: {
-            react:   ['react', 'react-dom', 'react-router-dom'],
-            charts:  ['recharts'],
-            utils:   ['axios', 'zustand', 'date-fns'],
-            tiptap:  ['@tiptap/react', '@tiptap/starter-kit'],
+            react: ['react', 'react-dom', 'react-router-dom'],
+            charts: ['recharts'],
+            utils: ['axios', 'zustand', 'date-fns'],
+            tiptap: ['@tiptap/react', '@tiptap/starter-kit'],
           },
         },
       },

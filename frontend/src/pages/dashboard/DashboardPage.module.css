@@ -96,60 +96,161 @@
 /* Stats Cards Grid */
 .statsGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: var(--space-4);
 }
 
-.statCard {
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-xl);
-  padding: var(--space-5);
-  transition: all var(--transition-base);
-  cursor: default;
-  position: relative;
-  overflow: hidden;
-  box-shadow: var(--shadow-card);
+@media (min-width: 1280px) {
+  .statsGrid {
+    grid-template-columns: repeat(4, 1fr);
+  }
 }
 
-.statCard::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 3px;
-  background: var(--card-color, var(--color-primary));
-  border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+.statCard {
+  background: var(--card-bg);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--card-border);
+  border-radius: 16px;
+  padding: 16px 20px;
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: visible;
+  box-shadow: var(--card-shadow);
 }
 
 .statCard:hover {
-  transform: translateY(-3px);
-  box-shadow: var(--shadow-card-hover);
-  border-color: var(--color-border-strong);
-}
-
-.statCard[role="button"] {
-  cursor: pointer;
+  transform: translateY(-2px);
+  background: var(--card-bg-hover);
+  border-color: var(--card-border-hover);
+  box-shadow: var(--card-shadow-hover);
 }
 
 .statHeader {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
-  margin-bottom: var(--space-4);
+  margin-bottom: 12px;
 }
 
 .statIconWrap {
-  width: 44px;
-  height: 44px;
-  border-radius: var(--radius-lg);
-  background: color-mix(in srgb, var(--card-color, var(--color-primary)) 12%, transparent);
-  color: var(--card-color, var(--color-primary));
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--card-color) 40%, var(--card-icon-bg-mix, white)), var(--card-color));
+  color: white;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1);
+  box-shadow: 0 6px 14px color-mix(in srgb, var(--card-color) 40%, transparent);
+}
+
+/* Menu Dropdown Styles */
+.statMenuWrap {
+  position: relative;
+}
+
+.statMenuBtn {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  box-shadow: 2px 2px 5px rgba(0,0,0,0.03), -2px -2px 5px rgba(255,255,255,0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.statMenuBtn:hover {
+  background: rgba(255, 255, 255, 0.8);
+  color: var(--color-text-primary);
+}
+
+.statDropdown {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 8px;
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  border-radius: 12px;
+  padding: 8px;
+  min-width: 150px;
+  box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  z-index: 10;
+  animation: slideDown 0.2s ease-out;
+}
+
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.statDropdown button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border: none;
+  background: transparent;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.2s;
+}
+
+.statDropdown button:hover {
+  background: rgba(0, 0, 0, 0.04);
+  color: var(--color-text-primary);
+}
+
+.statBody {
+  display: flex;
+  flex-direction: column;
+  cursor: pointer;
+}
+
+.statValue {
+  font-size: 1.75rem;
+  font-weight: 800;
+  color: var(--color-text-primary);
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  margin-bottom: 4px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.statValueLoading {
+  font-size: 1.75rem;
+  font-weight: 800;
+  color: var(--color-text-muted);
+  line-height: 1.1;
+  margin-bottom: 4px;
+}
+
+.statLabel {
+  font-size: 0.875rem;
+  color: var(--color-text-primary);
+  font-weight: 600;
+  margin-bottom: 2px;
+  line-height: 1.25;
+}
+
+.statSub {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
 }
 
 .trend {
@@ -172,35 +273,6 @@
   color: var(--color-danger-dark);
   background: var(--color-danger-light);
   border: 1px solid var(--color-danger-border);
-}
-
-.statValue {
-  font-size: 1.85rem;
-  font-weight: var(--font-weight-extrabold);
-  color: var(--color-text-primary);
-  line-height: 1.1;
-  letter-spacing: -0.025em;
-  margin-bottom: var(--space-1);
-}
-
-.statValueLoading {
-  font-size: 1.85rem;
-  font-weight: var(--font-weight-bold);
-  color: var(--color-text-muted);
-  line-height: 1.1;
-  margin-bottom: var(--space-1);
-}
-
-.statLabel {
-  font-size: var(--font-size-xs);
-  color: var(--color-text-secondary);
-  font-weight: var(--font-weight-semibold);
-}
-
-.statSub {
-  font-size: 0.72rem;
-  color: var(--color-text-muted);
-  margin-top: var(--space-1);
 }
 
 /* Middle Section Grid */
