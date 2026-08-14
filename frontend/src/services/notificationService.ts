@@ -5,6 +5,7 @@
  * Separate from communicationService (which handles outgoing SMS/email/push logs).
  */
 import api from './api';
+import fcmService from './fcmService';
 import {
   showNotification,
   requestNotificationPermission,
@@ -137,96 +138,21 @@ const notificationService = {
    * Register/refresh FCM device token for push notifications
    */
   async registerFcmToken(fcmToken: string): Promise<void> {
-    await api.post('/communication/notifications/fcm-token', null, {
-      params: { fcm_token: fcmToken },
-    });
+    await fcmService.registerToken(fcmToken);
   },
 
   /**
-   * Get cached FCM token from localStorage
+   * Get cached FCM token
    */
   getCachedFcmToken(): string | null {
-    if (typeof localStorage === 'undefined') return null;
-    return localStorage.getItem('vidyasetu_fcm_token');
+    return fcmService.getCachedToken();
   },
 
   /**
-   * Initialize FCM for the browser:
-   * 1. Checks messaging support
-   * 2. Requests notification permission
-   * 3. Registers service worker and waits for active state
-   * 4. Gets FCM token via Firebase Messaging SDK
-   * 5. Sets up foreground push message listener (onMessage)
-   * 6. Registers token with the backend
+   * Initialize FCM for the browser (delegates to unified fcmService):
    */
   async initFcmToken(): Promise<string | null> {
-    try {
-      const { isSupported } = await import('firebase/messaging');
-      const supported = await isSupported();
-      if (!supported) {
-        console.warn('[FCM] Firebase Messaging not supported in this browser.');
-        return null;
-      }
-
-      // Check browser notification permission
-      const permission = await requestNotificationPermission();
-      if (permission !== 'granted') {
-        console.warn('[FCM] Notification permission not granted. FCM token generation deferred.');
-        return null;
-      }
-
-      const activeVapidKey = getVapidKey();
-      if (!activeVapidKey) {
-        console.error('[FCM] VITE_FIREBASE_VAPID_KEY is not set in .env. Cannot generate FCM token.');
-        console.info('[FCM] Get it from: Firebase Console → Project Settings → Cloud Messaging → Web Push certificates');
-        return null;
-      }
-
-      const { getMessaging, getToken, onMessage } = await import('firebase/messaging');
-      const { app: firebaseApp } = await import('../config/firebase');
-      if (!firebaseApp) {
-        console.warn('[FCM] Firebase client configuration is not available.');
-        return null;
-      }
-      const messaging = getMessaging(firebaseApp);
-
-      // Register Service Worker and wait for active ready state
-      await navigator.serviceWorker.register('/firebase-messaging-sw.js');
-      const swReg = await navigator.serviceWorker.ready;
-
-      const token = await getToken(messaging, { vapidKey: activeVapidKey, serviceWorkerRegistration: swReg });
-
-      if (token) {
-        console.log('[FCM] ✅ Token generated:', token.substring(0, 25) + '...');
-        if (typeof localStorage !== 'undefined') {
-          localStorage.setItem('vidyasetu_fcm_token', token);
-        }
-        await api.post('/communication/notifications/fcm-token', null, { params: { fcm_token: token } });
-        console.log('[FCM] ✅ Token registered with backend successfully.');
-
-        // Setup Foreground Push Message Listener (handles messages when app tab is OPEN & ACTIVE)
-        if (!window._fcmForegroundListenerAttached) {
-          window._fcmForegroundListenerAttached = true;
-          onMessage(messaging, (payload) => {
-            console.log('[FCM] 🔔 Foreground message received:', payload);
-            
-            // Trigger native desktop notification with audio sound, deduplication, and click handler
-            showNotification(payload as NotificationPayload);
-
-            // Dispatch custom event for UI components (Topbar bell, Inbox list, etc.)
-            window.dispatchEvent(new CustomEvent('fcm-message-received', { detail: payload }));
-          });
-        }
-
-        return token;
-      } else {
-        console.warn('[FCM] No token returned. Check VAPID key and service worker registration.');
-        return null;
-      }
-    } catch (err) {
-      console.error('[FCM] Error initializing FCM token:', err);
-      return null;
-    }
+    return fcmService.init();
   },
 
   /**

@@ -117,13 +117,25 @@ async def notification_analytics(current_user: AuthUser, db: DBSession):
 
 @router.post("/notifications/fcm-token", response_model=APIResponse,
              summary="Register or refresh FCM token for current user")
+@router.post("/notifications/fcm-token/", response_model=APIResponse, include_in_schema=False)
+@router.put("/notifications/fcm-token", response_model=APIResponse, include_in_schema=False)
+@router.put("/notifications/fcm-token/", response_model=APIResponse, include_in_schema=False)
+@router.post("/fcm-tokens", response_model=APIResponse, include_in_schema=False)
 async def register_fcm_token(
     current_user: AuthUser,
     db: DBSession,
-    fcm_token: str = Query(..., description="Firebase Cloud Messaging device token"),
+    body: Optional[dict] = None,
+    fcm_token: Optional[str] = Query(default=None, description="Firebase Cloud Messaging device token"),
 ):
     """Stores FCM token on User record. Call from mobile/web app on launch."""
-    NotificationService.register_fcm_token(db, current_user.user_id, fcm_token)
+    token = None
+    if body and isinstance(body, dict):
+        token = body.get("fcm_token")
+    if not token and fcm_token:
+        token = fcm_token
+    if not token:
+        return APIResponse.error(message="fcm_token parameter is required.", status_code=400)
+    NotificationService.register_fcm_token(db, current_user.user_id, token)
     return APIResponse.ok(message="FCM token registered.")
 
 

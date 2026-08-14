@@ -37,53 +37,7 @@ from app.modules.device_security.service import (
     DeviceService, VerificationService, LoginEventService, DeviceSecurityOrchestrator
 )
 
-# ── Test Database Setup ───────────────────────────────────────
 
-SQLALCHEMY_DATABASE_URL = "sqlite:///./test_device_security.db"
-
-engine = create_engine(
-    SQLALCHEMY_DATABASE_URL,
-    connect_args={"check_same_thread": False},
-)
-TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-
-
-@pytest.fixture(scope="session", autouse=True)
-def create_tables():
-    """Create all tables once for the test session."""
-    # Import all models to register them
-    import app.modules.auth.models
-    import app.modules.device_security.models
-    import app.shared.audit
-    Base.metadata.create_all(bind=engine)
-    yield
-    Base.metadata.drop_all(bind=engine)
-
-
-@pytest.fixture
-def db() -> Generator[Session, None, None]:
-    """Fresh database transaction for each test (rolled back after)."""
-    connection = engine.connect()
-    transaction = connection.begin()
-    session = TestingSessionLocal(bind=connection)
-    try:
-        yield session
-    finally:
-        session.close()
-        transaction.rollback()
-        connection.close()
-
-
-@pytest.fixture
-def client(db: Session) -> TestClient:
-    """Test client with database override."""
-    def override_get_db():
-        yield db
-
-    app.dependency_overrides[get_db] = override_get_db
-    with TestClient(app, raise_server_exceptions=False) as c:
-        yield c
-    app.dependency_overrides.clear()
 
 
 # ── Test Fixtures ─────────────────────────────────────────────

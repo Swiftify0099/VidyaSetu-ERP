@@ -6,10 +6,11 @@ Shared fixtures for all tests:
   - FastAPI TestClient with override DB
   - Pre-seeded admin user
 """
+from typing import Generator
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import sessionmaker, Session
 from sqlalchemy.pool import StaticPool
 
 from app.main import app
@@ -27,15 +28,6 @@ engine = create_engine(
     poolclass=StaticPool,
 )
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-
-
-# ── Override DB dependency ────────────────────────────────────
-def override_get_db():
-    db = TestingSessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -63,31 +55,45 @@ def create_tables():
     Base.metadata.drop_all(bind=engine)
 
 
-@pytest.fixture(scope="function")
-def db():
-    """Fresh DB session per test function."""
-    db = TestingSessionLocal()
+@pytest.fixture
+def db() -> Generator[Session, None, None]:
+    """Fresh DB session per test function with clean rollback."""
+    connection = engine.connect()
+    transaction = connection.begin()
+    session = TestingSessionLocal(bind=connection)
     try:
-        yield db
+        yield session
     finally:
-        db.rollback()
-        db.close()
+        session.close()
+        transaction.rollback()
+        connection.close()
 
 
-@pytest.fixture(scope="session")
-def client():
+@pytest.fixture(autouse=True)
+def override_get_db_dep(db: Session):
+    """Ensure get_db is automatically overridden for all tests."""
+    def _override():
+        yield db
+
+    app.dependency_overrides[get_db] = _override
+    yield
+    app.dependency_overrides.pop(get_db, None)
+
+
+@pytest.fixture
+def client(db: Session) -> TestClient:
     """FastAPI TestClient with DB override."""
-    app.dependency_overrides[get_db] = override_get_db
-    with TestClient(app) as c:
+    def _override():
+        yield db
+
+    app.dependency_overrides[get_db] = _override
+    with TestClient(app, raise_server_exceptions=False) as c:
         yield c
-    app.dependency_overrides.clear()
 
 
 @pytest.fixture(scope="session")
 def admin_token():
-    """
-    Seed admin user and return valid JWT access token.
-    """
+    """Seed admin user and return valid JWT access token."""
     db = TestingSessionLocal()
     try:
         role = db.query(Role).filter_by(code="super_admin").first()
