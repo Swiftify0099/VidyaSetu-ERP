@@ -30,9 +30,6 @@ class AcademicYearCreateRequest(BaseModel):
     end_date: date
 
 
-
-
-
 # ── System Settings ───────────────────────────────────────────
 @router.get("/settings", response_model=APIResponse)
 async def get_all_settings(

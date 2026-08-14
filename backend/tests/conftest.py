@@ -15,7 +15,8 @@ from sqlalchemy.pool import StaticPool
 from app.main import app
 from app.database.base import Base
 from app.database.session import get_db
-from app.core.security import hash_password
+from app.core.security import hash_password, create_access_token
+from app.modules.auth.models import User, Role, UserRole
 
 # ── In-Memory SQLite (fast, no external DB needed) ────────────
 SQLITE_URL = "sqlite:///:memory:"
@@ -40,6 +41,23 @@ def override_get_db():
 @pytest.fixture(scope="session", autouse=True)
 def create_tables():
     """Create all tables before the test session."""
+    import app.modules.auth.models
+    import app.modules.device_security.models
+    import app.modules.leave.models
+    import app.modules.lesson_plan.models
+    import app.modules.student.models
+    import app.modules.teacher.models
+    import app.modules.timetable.models
+    import app.modules.inventory.models
+    import app.modules.library.models
+    import app.modules.finance.models
+    import app.modules.exam.models
+    import app.modules.attendance.models
+    import app.modules.communication.models
+    import app.modules.transport.models
+    import app.modules.video.models
+    import app.modules.settings.models
+    import app.shared.audit
     Base.metadata.create_all(bind=engine)
     yield
     Base.metadata.drop_all(bind=engine)
@@ -66,26 +84,46 @@ def client():
 
 
 @pytest.fixture(scope="session")
-def admin_token(client: TestClient):
+def admin_token():
     """
-    Login as admin and return JWT token.
-    Seeds admin user if not already present.
+    Seed admin user and return valid JWT access token.
     """
-    # Attempt login
-    resp = client.post("/api/v1/auth/login", json={
-        "username": "admin",
-        "password": "admin123",
-    })
-    if resp.status_code == 200:
-        return resp.json()["data"]["access_token"]
+    db = TestingSessionLocal()
+    try:
+        role = db.query(Role).filter_by(code="super_admin").first()
+        if not role:
+            role = Role(name="Super Administrator", code="super_admin", is_system=True)
+            db.add(role)
+            db.flush()
 
-    # If user doesn't exist, create via seeder (best-effort)
-    return None
+        user = db.query(User).filter_by(username="admin").first()
+        if not user:
+            user = User(
+                username="admin",
+                full_name="System Administrator",
+                email="admin@school.example.com",
+                password_hash=hash_password("admin123"),
+                is_active=True,
+                is_locked=False,
+            )
+            db.add(user)
+            db.flush()
+            user_role = UserRole(user_id=user.id, role_id=role.id, is_active=True)
+            db.add(user_role)
+            db.commit()
+
+        token, _, _ = create_access_token(
+            user_id=user.id,
+            role_codes=["super_admin"],
+            permissions=["*"],
+            full_name=user.full_name,
+        )
+        return token
+    finally:
+        db.close()
 
 
 @pytest.fixture
 def auth_headers(admin_token):
     """HTTP headers with JWT Bearer token."""
-    if not admin_token:
-        pytest.skip("Admin user not available in test environment")
     return {"Authorization": f"Bearer {admin_token}"}

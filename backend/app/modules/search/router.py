@@ -1,23 +1,16 @@
 """
-VidyaSetu ERP — Global Search + Health Check Router
-====================================================
+VidyaSetu ERP — Global Search Router
+====================================
 - /api/v1/search?q=...  — cross-module search
-- /api/health            — system health check
 """
-from datetime import datetime
 from typing import Optional
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import select, or_, text
-from sqlalchemy.orm import Session
+from sqlalchemy import select, or_
 
 from app.core.dependencies import AuthUser, DBSession, require_permission
-from app.database.session import engine
 from app.shared.responses import APIResponse
 
-router = APIRouter(tags=["Search & Health"])
-
-
-
+router = APIRouter(tags=["Search"])
 
 
 # ── Global Search ─────────────────────────────────────────────
