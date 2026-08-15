@@ -27,11 +27,24 @@ export default defineConfig(function (_a) {
                     target: backendTarget,
                     changeOrigin: true,
                     secure: false,
+                    ws: false,
+                    rewrite: function (path) { return path; },
+                    configure: function (proxy) {
+                        proxy.on('error', function (err) {
+                            console.error('[proxy error]', err.message);
+                        });
+                    },
                 },
                 '/storage': {
                     target: backendTarget,
                     changeOrigin: true,
                     secure: false,
+                    rewrite: function (path) { return path; },
+                },
+                '/socket.io': {
+                    target: backendTarget,
+                    changeOrigin: true,
+                    ws: true,
                 },
             },
         },

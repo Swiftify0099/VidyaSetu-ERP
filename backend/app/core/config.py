@@ -103,6 +103,11 @@ class Settings(BaseSettings):
     DEVICE_VERIFICATION_TOKEN_EXPIRE_MINUTES: int = 30
     # Maximum active/trusted devices per user account
     MAX_TRUSTED_DEVICES: int = 3
+    # 1 Primary + Maximum 2 Temporary devices
+    MAX_PRIMARY_DEVICES: int = 1
+    MAX_TEMPORARY_DEVICES: int = 2
+    # Dynamic expiration duration for temporary devices (in hours)
+    TEMPORARY_DEVICE_DURATION_HOURS: int = 24
     # Enable device security checks (set False only for local dev bypass)
     DEVICE_SECURITY_ENABLED: bool = True
 

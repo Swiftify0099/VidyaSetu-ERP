@@ -55,9 +55,10 @@ shortuuid==1.0.13
 email-validator==2.2.0
 phonenumbers==8.13.48
 
-# ── Background Jobs (Future Ready) ───────────────────────────
+# ── Background Jobs & WebSockets ─────────────────────────────
 celery==5.4.0
 redis==5.1.1
+python-socketio[asyncio_client]>=5.11.0
 
 # ── Testing ───────────────────────────────────────────────────
 pytest==8.3.3

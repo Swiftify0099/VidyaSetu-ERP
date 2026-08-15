@@ -63,11 +63,14 @@ class DeviceResponse(BaseModel):
     user_agent: Optional[str] = None
     is_primary: bool
     is_trusted: bool
+    is_temporary: bool = False
     status: str
     first_seen_at: Optional[datetime] = None
     last_seen_at: Optional[datetime] = None
     trusted_at: Optional[datetime] = None
+    temporary_expires_at: Optional[datetime] = None
     display_name: str
+
 
 
 class DeviceListResponse(BaseModel):

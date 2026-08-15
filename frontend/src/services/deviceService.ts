@@ -150,10 +150,14 @@ export interface DeviceRecord {
   user_agent?: string;
   is_primary: boolean;
   is_trusted: boolean;
+  is_temporary?: boolean;
   status: string;
   first_seen_at?: string;
   last_seen_at?: string;
   trusted_at?: string;
+  temporary_started_at?: string;
+  temporary_expires_at?: string;
+  revoke_reason?: string;
   display_name: string;
 }
 

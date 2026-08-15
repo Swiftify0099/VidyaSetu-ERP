@@ -1,9 +1,11 @@
 import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import toast from 'react-hot-toast';
 import authService, { type LoginCredentials, type AuthUser } from '../services/authService';
 import { getPortalPath } from '../utils/rolePortals';
 import notificationService from '../services/notificationService';
 import fcmService from '../services/fcmService';
+import socketService from '../services/socketService';
 
 interface AuthContextType {
   user: AuthUser | null;
@@ -55,6 +57,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     initAuth();
   }, []);
 
+  // ── Real-time Device Session Listeners ────────────────────────
+  useEffect(() => {
+    if (!user) return;
+
+    const unsubRevoked = socketService.onDeviceRevoked(() => {
+      toast.error('This device has been revoked. Logging you out...');
+      authService.clearStorage();
+      setUser(null);
+      navigate('/login', { replace: true });
+    });
+
+    const unsubExpired = socketService.onDeviceExpired(() => {
+      toast.error('Your temporary device session has expired. Please log in again.');
+      authService.clearStorage();
+      setUser(null);
+      navigate('/login', { replace: true });
+    });
+
+    return () => {
+      unsubRevoked();
+      unsubExpired();
+    };
+  }, [user, navigate]);
+
   // ── Login ──────────────────────────────────────────────────
   const login = useCallback(async (credentials: LoginCredentials) => {
     const response = await authService.login(credentials);
@@ -69,7 +95,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if ('user' in response) {
       setUser(response.user);
       // Initialize FCM after login — request permission + register token with backend
-      // Runs in background; never blocks the login flow.
       void fcmService.init();
       const roleCode = response.user.roles?.[0]?.code;
       navigate(getPortalPath(roleCode ?? ''), { replace: true });
@@ -78,7 +103,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // ── Logout ─────────────────────────────────────────────────────
   const logout = useCallback(async () => {
-    // Unregister FCM token BEFORE clearing storage (needs auth token)
     void fcmService.unregisterCurrentToken();
     try { await authService.logout(); } finally {
       setUser(null);

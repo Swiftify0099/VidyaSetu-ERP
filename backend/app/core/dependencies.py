@@ -59,10 +59,12 @@ async def get_current_user(
     credentials: Annotated[
         Optional[HTTPAuthorizationCredentials], Depends(security_scheme)
     ] = None,
+    db: DBSession = None,
 ) -> CurrentUser:
     """
     Extract and validate JWT from Authorization header.
-    Raises 401 if token is missing or invalid.
+    Validates token signature, session active state, device status, and temporary expiry.
+    Raises 401 if token is missing, invalid, revoked, or expired.
     """
     if credentials is None:
         raise HTTPException(
@@ -80,6 +82,44 @@ async def get_current_user(
             detail="Invalid or expired token. Please login again.",
             headers={"WWW-Authenticate": "Bearer"},
         )
+
+    # ── Authoritative Backend Device & Session Expiration Check ──
+    if db is not None and payload.get("jti"):
+        from datetime import datetime, timezone
+        from sqlalchemy import select
+        from app.modules.auth.models import UserSession
+        from app.modules.device_security.models import DeviceStatus, UserDevice
+
+        session = db.scalar(
+            select(UserSession).where(
+                UserSession.token_jti == payload["jti"],
+                UserSession.is_active == True,
+                UserSession.is_deleted == False,
+            )
+        )
+        if session and session.device_id:
+            device = db.get(UserDevice, session.device_id)
+            if device:
+                if device.status == DeviceStatus.REVOKED or device.is_deleted:
+                    raise HTTPException(
+                        status_code=status.HTTP_401_UNAUTHORIZED,
+                        detail="Your device has been revoked. Please login again.",
+                        headers={"WWW-Authenticate": "Bearer"},
+                    )
+                if (
+                    getattr(device, "is_temporary", False)
+                    and device.temporary_expires_at
+                    and device.temporary_expires_at <= datetime.now(timezone.utc)
+                ):
+                    device.status = DeviceStatus.REVOKED
+                    device.revoke_reason = "EXPIRED"
+                    session.is_active = False
+                    db.commit()
+                    raise HTTPException(
+                        status_code=status.HTTP_401_UNAUTHORIZED,
+                        detail="Your temporary device session has expired. Please login again.",
+                        headers={"WWW-Authenticate": "Bearer"},
+                    )
 
     return CurrentUser(
         user_id=int(payload["sub"]),

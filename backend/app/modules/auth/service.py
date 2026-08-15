@@ -277,13 +277,16 @@ class AuthService:
 
         # Save session
         device_display = None
-        if device_security_enabled and 'device_result' in dir():
-            device_display = device_result.device.display_name if device_result.device else None
+        device_id = None
+        if device_security_enabled and 'device_result' in dir() and device_result.device:
+            device_display = device_result.device.display_name
+            device_id = device_result.device.id
         session = UserSession(
             user_id=user.id,
             token_jti=access_jti,
             refresh_token_jti=refresh_jti,
             device_name=device_display or request.device_name,
+            device_id=device_id,
             browser=client_request.headers.get("User-Agent", "")[:255],
             ip_address=client_request.client.host if client_request.client else None,
             logged_in_at=datetime.now(timezone.utc),

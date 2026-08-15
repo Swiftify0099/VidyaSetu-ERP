@@ -21,11 +21,12 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from slowapi import Limiter
 from slowapi.util import get_remote_address
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update as sa_update
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.core.dependencies import AuthUser, DBSession, get_current_user
+from app.core.security import create_access_token, create_refresh_token
 from app.modules.auth.models import User, UserSession
 from app.modules.auth.schemas import TokenResponse, UserMeResponse
 from app.modules.auth.service import AuthService
@@ -64,6 +65,11 @@ from app.modules.device_security.service import (
 from app.modules.fcm.service import FCMPushService
 from app.shared.email import send_email_async
 from app.shared.responses import APIResponse
+from app.shared.socket_manager import (
+    emit_device_revoked,
+    emit_login_approved,
+    emit_login_rejected,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -116,7 +122,7 @@ def _send_verification_email_async(
 
     send_email_async(
         to_email=user.email,
-        subject=f"VidyaSetu ERP — New Login Verification Required",
+        subject="VidyaSetu ERP — New Login Verification Required",
         html_content=html,
         text_content=plain,
     )
@@ -149,21 +155,23 @@ def _build_device_response(device: UserDevice) -> DeviceResponse:
         user_agent=device.user_agent[:100] if device.user_agent else None,
         is_primary=device.is_primary,
         is_trusted=device.is_trusted,
+        is_temporary=getattr(device, 'is_temporary', False) or False,
         status=device.status,
         first_seen_at=device.first_seen_at,
         last_seen_at=device.last_seen_at,
         trusted_at=device.trusted_at,
+        temporary_expires_at=getattr(device, 'temporary_expires_at', None),
         display_name=device.display_name,
     )
 
 
 # ═══════════════════════════════════════════════════════════════
-# DEVICE VERIFICATION — Approve
+# DEVICE VERIFICATION — Approve ('Yes, This Is Me')
 # ═══════════════════════════════════════════════════════════════
 
 @router.post(
     "/login/verify",
-    summary="Verify new device login (Yes, This Is Me)",
+    summary="Verify new device login ('Yes, This Is Me')",
     status_code=status.HTTP_200_OK,
 )
 async def verify_device_login(
@@ -172,15 +180,15 @@ async def verify_device_login(
     db: DBSession,
 ):
     """
-    Process 'Yes, This Is Me' verification.
-    
-    - Validates token (hash check, expiry, rate limit)
-    - Trusts the device
-    - Enforces max-3 device limit (may evict oldest non-primary)
-    - Creates full JWT session
-    - Returns access_token + refresh_token
-    
-    Rate limited: 10 requests/minute per IP.
+    Process 'I'M IN — I WANT TO LOGIN' approval.
+
+    Flow:
+    1. Validate approval token (hash, expiry, single-use).
+    2. Mark device as TEMPORARY with configured expiry (or PRIMARY if first).
+    3. Enforce max-2 temporary devices (evict oldest if needed).
+    4. Create a JWT session linked to the device.
+    5. Emit LOGIN_APPROVED via Socket.IO with full auth payload to the waiting device.
+    6. Return tokens to the approving client (email callback page).
     """
     success, error_reason, vr, device = DeviceSecurityOrchestrator.complete_verification(
         db, body.token, request
@@ -193,18 +201,63 @@ async def verify_device_login(
             detail=error_reason or "Verification failed.",
         )
 
-    # Load the user (for token creation)
+    # Load user
     user = AuthService.find_user_by_username(db, _get_username_by_id(db, vr.user_id))
     if not user or not user.is_active:
         db.commit()
         raise HTTPException(status_code=401, detail="Account not found or deactivated.")
 
-    # Build session tokens
+    # ── Temporary device lifecycle ─────────────────────────────
+    if device and not device.is_primary:
+        # Invalidate sessions for any evicted devices
+        evicted = DeviceService.enforce_temporary_device_limit(
+            db, vr.user_id, device.id
+        )
+        if evicted:
+            LoginEventService.record(
+                db,
+                event_type=LoginEventType.TEMPORARY_DEVICE_REVOKED,
+                user_id=vr.user_id,
+                device_id=evicted.id,
+                login_attempt_id=vr.login_attempt_id,
+                ip_address=get_client_ip(request),
+                failure_reason="MAX_TEMPORARY_DEVICE_LIMIT: new temporary device added",
+                status="SUCCESS",
+            )
+            db.execute(
+                sa_update(UserSession)
+                .where(
+                    UserSession.device_id == evicted.id,
+                    UserSession.is_active == True,
+                    UserSession.is_deleted == False,
+                )
+                .values(is_active=False)
+            )
+
+        LoginEventService.record(
+            db,
+            event_type=LoginEventType.TEMPORARY_DEVICE_REGISTERED,
+            user_id=vr.user_id,
+            device_id=device.id,
+            login_attempt_id=vr.login_attempt_id,
+            ip_address=get_client_ip(request),
+            status="SUCCESS",
+        )
+        LoginEventService.record(
+            db,
+            event_type=LoginEventType.TEMPORARY_LOGIN_APPROVED,
+            user_id=vr.user_id,
+            device_id=device.id,
+            login_attempt_id=vr.login_attempt_id,
+            ip_address=get_client_ip(request),
+            status="SUCCESS",
+        )
+
+    # ── Build session tokens ───────────────────────────────────
     permissions = AuthService._build_user_permissions(user)
     role_codes = [ur.role.code for ur in user.user_roles if ur.is_active and not ur.is_deleted]
 
-    from app.core.security import create_access_token, create_refresh_token
-    access_token, access_jti, access_expires = create_access_token(
+    access_token, access_jti, _ = create_access_token(
         user_id=user.id,
         role_codes=role_codes,
         permissions=permissions,
@@ -212,7 +265,6 @@ async def verify_device_login(
     )
     refresh_token, refresh_jti, refresh_expires = create_refresh_token(user_id=user.id)
 
-    # Save session
     ip = get_client_ip(request)
     ua = request.headers.get("User-Agent", "")[:255]
     session = UserSession(
@@ -220,6 +272,7 @@ async def verify_device_login(
         token_jti=access_jti,
         refresh_token_jti=refresh_jti,
         device_name=device.display_name if device else None,
+        device_id=device.id if device else None,
         browser=ua,
         ip_address=ip,
         logged_in_at=datetime.now(timezone.utc),
@@ -228,14 +281,37 @@ async def verify_device_login(
     )
     db.add(session)
 
-    # Update user last login
     user.last_login = datetime.now(timezone.utc)
     user.last_login_ip = ip
     user.failed_attempts = 0
 
     db.commit()
 
-    # Send confirmation email (async, non-blocking)
+    user_response = AuthService._build_user_response(user, permissions)
+    temporary_expires_at = None
+    if device and getattr(device, 'is_temporary', False) and device.temporary_expires_at:
+        temporary_expires_at = device.temporary_expires_at.isoformat()
+
+    auth_payload = {
+        "status": "success",
+        "requires_verification": False,
+        "access_token": access_token,
+        "refresh_token": refresh_token,
+        "token_type": "bearer",
+        "expires_in": settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        "is_temporary_device": bool(device and getattr(device, 'is_temporary', False)),
+        "temporary_expires_at": temporary_expires_at,
+        "user": user_response.model_dump(),
+    }
+
+    # ── Socket.IO: notify the waiting device ──────────────────
+    if vr.login_attempt_id:
+        try:
+            await emit_login_approved(vr.login_attempt_id, auth_payload)
+        except Exception as exc:
+            logger.warning("[DeviceSecurity] Socket.IO emit failed (non-critical): %s", exc)
+
+    # ── Confirmation email ─────────────────────────────────────
     if user.email:
         html, plain = build_verification_success_email(
             user_name=user.full_name,
@@ -245,29 +321,19 @@ async def verify_device_login(
         )
         send_email_async(
             to_email=user.email,
-            subject="VidyaSetu ERP — New Device Login Approved",
+            subject="VidyaSetu ERP – Device Login Approved",
             html_content=html,
             text_content=plain,
         )
 
-    user_response = AuthService._build_user_response(user, permissions)
-
     return APIResponse.ok(
-        data={
-            "status": "success",
-            "requires_verification": False,
-            "access_token": access_token,
-            "refresh_token": refresh_token,
-            "token_type": "bearer",
-            "expires_in": settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
-            "user": user_response.model_dump(),
-        },
+        data=auth_payload,
         message="Device verified and login approved.",
     )
 
 
 # ═══════════════════════════════════════════════════════════════
-# DEVICE VERIFICATION — Reject
+# DEVICE VERIFICATION — Reject ('No, This Wasn't Me')
 # ═══════════════════════════════════════════════════════════════
 
 @router.post(
@@ -286,6 +352,7 @@ async def reject_device_login(
     - Marks verification rejected
     - Revokes pending device record
     - Records SUSPICIOUS_LOGIN event
+    - Emits LOGIN_REJECTED via Socket.IO
     - Sends suspicious activity email
     """
     success, error_reason, vr = DeviceSecurityOrchestrator.reject_verification(
@@ -297,6 +364,13 @@ async def reject_device_login(
         raise HTTPException(status_code=400, detail=error_reason or "Rejection failed.")
 
     db.commit()
+
+    # Socket.IO notification to the waiting device
+    if vr and vr.login_attempt_id:
+        try:
+            await emit_login_rejected(vr.login_attempt_id)
+        except Exception as exc:
+            logger.warning("[DeviceSecurity] Socket.IO emit_login_rejected failed: %s", exc)
 
     # Notify user (async)
     if vr:
@@ -333,7 +407,6 @@ async def get_login_attempt_status(
     """
     Frontend polls this to check if email verification is complete.
     Returns status: PENDING | VERIFIED | REJECTED | EXPIRED.
-    Does not expose sensitive details.
     """
     vr = VerificationService.find_by_attempt_id(db, login_attempt_id)
 
@@ -397,7 +470,7 @@ async def revoke_device(
     if not device or device.is_deleted:
         raise HTTPException(status_code=404, detail="Device not found.")
 
-    # Ownership check — CRITICAL security enforcement
+    # Ownership check
     if device.user_id != current_user.user_id and not current_user.is_super_admin():
         raise HTTPException(status_code=403, detail="You can only revoke your own devices.")
 
@@ -405,6 +478,17 @@ async def revoke_device(
         raise HTTPException(status_code=400, detail="Device is already revoked.")
 
     DeviceService.revoke_device(db, device, revoked_by=current_user.user_id)
+
+    # Invalidate all active sessions for this device
+    db.execute(
+        sa_update(UserSession)
+        .where(
+            UserSession.device_id == device.id,
+            UserSession.is_active == True,
+            UserSession.is_deleted == False,
+        )
+        .values(is_active=False)
+    )
 
     ip = get_client_ip(request)
     LoginEventService.record(
@@ -417,6 +501,13 @@ async def revoke_device(
     )
 
     db.commit()
+
+    # Emit Socket.IO notification to the revoked device
+    try:
+        await emit_device_revoked(device.id)
+    except Exception as exc:
+        logger.warning("[DeviceSecurity] Socket.IO emit_device_revoked failed: %s", exc)
+
     return APIResponse.ok(message="Device revoked successfully.")
 
 
@@ -432,12 +523,6 @@ async def make_device_primary(
 ):
     """
     Change which device is the primary device.
-    
-    Security: Backend enforces:
-    - Ownership check
-    - Device must be trusted/active to become primary
-    - Exactly one primary device after the operation
-    - Atomic swap (FOR UPDATE locking)
     """
     device = db.get(UserDevice, device_id)
 
@@ -536,7 +621,6 @@ async def admin_security_events(
     """
     Admin-only security event dashboard.
     Restricted to super_admin and admin roles via RBAC.
-    Regular school staff cannot access this endpoint.
     """
     if not current_user.is_super_admin() and not current_user.has_permission("admin.security"):
         raise HTTPException(status_code=403, detail="Admin access required.")
@@ -567,7 +651,6 @@ async def admin_security_events(
         .limit(page_size)
     ).all()
 
-    # Today's stats
     from datetime import date
     today = date.today()
 
@@ -594,7 +677,6 @@ async def admin_security_events(
 
     items = []
     for e in events:
-        # Get user name safely (don't crash if user is gone)
         user_name = None
         if e.user_id:
             u = db.get(User, e.user_id)

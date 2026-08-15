@@ -3,18 +3,21 @@
  * ==================================
  * Users can view and manage their trusted devices.
  * - See all registered devices with device info, last seen, trust status
+ * - View TEMPORARY device countdown timers
  * - Revoke individual devices
  * - Change which device is the primary
+ * - Real-time Socket.IO synchronization on revocation/expiry
  * - View recent security events
  */
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Monitor, Smartphone, Globe, Shield, ShieldCheck, ShieldX,
-  Star, StarOff, Trash2, RefreshCw, ChevronLeft, Clock, AlertTriangle
+  Star, Trash2, RefreshCw, ChevronLeft, Clock, AlertTriangle, Timer
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import deviceService, { type DeviceRecord, type SecurityEvent } from '../../services/deviceService';
+import socketService from '../../services/socketService';
 import styles from './MyDevicesPage.module.css';
 
 function DeviceIcon({ deviceType }: { deviceType?: string }) {
@@ -23,7 +26,10 @@ function DeviceIcon({ deviceType }: { deviceType?: string }) {
   return <Globe size={20} />;
 }
 
-function StatusPill({ status }: { status: string }) {
+function StatusPill({ status, isTemporary }: { status: string; isTemporary?: boolean }) {
+  if (status === 'ACTIVE' && isTemporary) {
+    return <span className={`${styles.pill} ${styles.pillTemporary}`}>Temporary</span>;
+  }
   const map: Record<string, { label: string; cls: string }> = {
     ACTIVE:   { label: 'Trusted',  cls: styles.pillActive },
     PENDING:  { label: 'Pending',  cls: styles.pillPending },
@@ -32,6 +38,41 @@ function StatusPill({ status }: { status: string }) {
   };
   const info = map[status] ?? { label: status, cls: styles.pillPending };
   return <span className={`${styles.pill} ${info.cls}`}>{info.label}</span>;
+}
+
+function ExpiryCountdown({ expiresAt }: { expiresAt?: string }) {
+  const [timeLeft, setTimeLeft] = useState('');
+  const [isExpired, setIsExpired] = useState(false);
+
+  useEffect(() => {
+    if (!expiresAt) return;
+    const update = () => {
+      const diff = new Date(expiresAt).getTime() - Date.now();
+      if (diff <= 0) {
+        setTimeLeft('Expired');
+        setIsExpired(true);
+        return;
+      }
+      const h = Math.floor(diff / (1000 * 60 * 60));
+      const m = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+      const s = Math.floor((diff % (1000 * 60)) / 1000);
+      setTimeLeft(
+        `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`
+      );
+    };
+    update();
+    const interval = setInterval(update, 1000);
+    return () => clearInterval(interval);
+  }, [expiresAt]);
+
+  if (!expiresAt) return null;
+
+  return (
+    <div className={`${styles.expiryBadge} ${isExpired ? styles.expiryExpired : ''}`}>
+      <Timer size={12} />
+      <span>{isExpired ? 'Session Expired' : `Expires in ${timeLeft}`}</span>
+    </div>
+  );
 }
 
 function EventTypeLabel({ type }: { type: string }) {
@@ -49,6 +90,12 @@ function EventTypeLabel({ type }: { type: string }) {
     DEVICE_REGISTERED: '📱 Device registered',
     LOGIN_ATTEMPT: '🔑 Login attempt',
     LOGOUT: '👋 Logout',
+    TEMPORARY_LOGIN_REQUESTED: '⏳ Temporary login requested',
+    TEMPORARY_LOGIN_APPROVED: '✅ Temporary login approved',
+    TEMPORARY_DEVICE_REGISTERED: '📱 Temporary device registered',
+    TEMPORARY_DEVICE_REVOKED: '🔒 Temporary device revoked',
+    TEMPORARY_DEVICE_EXPIRED: '⏰ Temporary device expired',
+    TEMPORARY_LOGIN_REJECTED: '🚫 Temporary login rejected',
   };
   return <span>{labels[type] ?? type}</span>;
 }
@@ -102,6 +149,20 @@ export default function MyDevicesPage() {
     if (activeTab === 'events') loadEvents();
   }, [activeTab, loadEvents]);
 
+  // Real-time socket updates for device status
+  useEffect(() => {
+    const unsubRevoked = socketService.onDeviceRevoked(() => {
+      loadDevices();
+    });
+    const unsubExpired = socketService.onDeviceExpired(() => {
+      loadDevices();
+    });
+    return () => {
+      unsubRevoked();
+      unsubExpired();
+    };
+  }, [loadDevices]);
+
   const handleRevoke = async (device: DeviceRecord) => {
     if (device.is_primary) {
       toast.error('Cannot revoke your primary device. First make another device primary.');
@@ -147,7 +208,7 @@ export default function MyDevicesPage() {
           <div className={styles.headerIcon}><Shield size={22} /></div>
           <div>
             <h1 className={styles.pageTitle}>My Devices & Security</h1>
-            <p className={styles.pageSubtitle}>Manage trusted devices and review login activity</p>
+            <p className={styles.pageSubtitle}>Manage primary and temporary devices and review login activity</p>
           </div>
         </div>
         <button className={styles.refreshBtn} onClick={loadDevices} title="Refresh">
@@ -161,13 +222,13 @@ export default function MyDevicesPage() {
           className={`${styles.tab} ${activeTab === 'devices' ? styles.tabActive : ''}`}
           onClick={() => setActiveTab('devices')}
         >
-          <Monitor size={15} /> Trusted Devices ({activeDevices.length}/3)
+          <Monitor size={15} /> Active Devices ({activeDevices.length}/3)
         </button>
         <button
           className={`${styles.tab} ${activeTab === 'events' ? styles.tabActive : ''}`}
           onClick={() => setActiveTab('events')}
         >
-          <Clock size={15} /> Login History
+          <Clock size={15} /> Security Events Log
         </button>
       </div>
 
@@ -181,12 +242,12 @@ export default function MyDevicesPage() {
               {/* Device Limit Info */}
               <div className={styles.limitBanner}>
                 <ShieldCheck size={15} />
-                <span>You can have up to <strong>3 active trusted devices</strong>. Adding a 4th will automatically revoke the oldest non-primary device.</span>
+                <span>You can have <strong>1 Primary Device</strong> and up to <strong>2 Temporary Devices</strong> (up to 3 active devices total). Adding a 3rd temporary device will automatically evict the oldest temporary device.</span>
               </div>
 
               {/* Active Devices */}
               <section className={styles.section}>
-                <h2 className={styles.sectionTitle}>Active Trusted Devices</h2>
+                <h2 className={styles.sectionTitle}>Active Devices</h2>
                 {activeDevices.length === 0 ? (
                   <div className={styles.empty}>No active devices. Log in from a device to register it.</div>
                 ) : (
@@ -202,11 +263,16 @@ export default function MyDevicesPage() {
                           </div>
                           <div className={styles.deviceMeta}>
                             <div className={styles.deviceName}>{device.display_name}</div>
-                            <StatusPill status={device.status} />
+                            <StatusPill status={device.status} isTemporary={device.is_temporary} />
                           </div>
                         </div>
 
                         <div className={styles.deviceDetails}>
+                          {device.is_temporary && device.temporary_expires_at && (
+                            <div style={{ marginBottom: 8 }}>
+                              <ExpiryCountdown expiresAt={device.temporary_expires_at} />
+                            </div>
+                          )}
                           {device.os_version && (
                             <div className={styles.detailRow}>
                               <span className={styles.detailLabel}>OS</span>
@@ -284,9 +350,15 @@ export default function MyDevicesPage() {
                           </div>
                         </div>
                         <div className={styles.deviceDetails}>
+                          {device.revoke_reason && (
+                            <div className={styles.detailRow}>
+                              <span className={styles.detailLabel}>Reason</span>
+                              <span style={{ color: '#f87171' }}>{device.revoke_reason}</span>
+                            </div>
+                          )}
                           <div className={styles.detailRow}>
                             <span className={styles.detailLabel}>Revoked at</span>
-                            <span>{formatDate(device.trusted_at)}</span>
+                            <span>{formatDate(device.trusted_at || device.last_seen_at)}</span>
                           </div>
                         </div>
                       </div>

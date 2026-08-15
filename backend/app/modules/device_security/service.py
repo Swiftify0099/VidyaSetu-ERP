@@ -227,7 +227,7 @@ class DeviceService:
 
     @classmethod
     def trust_device(cls, db: Session, device: UserDevice) -> None:
-        """Mark a device as trusted/active. Does NOT commit."""
+        """Mark a device as trusted/active (permanent). Does NOT commit."""
         now = datetime.now(timezone.utc)
         device.is_trusted = True
         device.status = DeviceStatus.ACTIVE
@@ -235,9 +235,81 @@ class DeviceService:
         device.last_seen_at = now
 
     @classmethod
+    def trust_as_temporary(cls, db: Session, device: UserDevice) -> None:
+        """
+        Mark a verified device as TEMPORARY with a configured expiry.
+        Called instead of trust_device() when the user does not have an
+        existing device (i.e. the verified device is not the first/primary).
+
+        Expiry duration comes from settings.TEMPORARY_DEVICE_DURATION_HOURS.
+        Does NOT commit.
+        """
+        from app.core.config import settings
+        hours = getattr(settings, "TEMPORARY_DEVICE_DURATION_HOURS", 24)
+        now = datetime.now(timezone.utc)
+        device.is_trusted = True
+        device.is_temporary = True
+        device.status = DeviceStatus.ACTIVE
+        device.trusted_at = now
+        device.last_seen_at = now
+        device.temporary_started_at = now
+        device.temporary_expires_at = now + timedelta(hours=hours)
+
+    @classmethod
+    def enforce_temporary_device_limit(
+        cls, db: Session, user_id: int, new_device_id: int
+    ) -> Optional[UserDevice]:
+        """
+        Enforce the maximum-2 temporary device rule.
+
+        If adding a new temporary device would exceed settings.MAX_TEMPORARY_DEVICES:
+          1. Lock all ACTIVE temporary device rows for this user (FOR UPDATE).
+          2. Evict the oldest temporary device (earliest last_seen_at).
+          3. Never evict the primary device.
+          4. Return the evicted device (for logging with reason MAX_TEMPORARY_DEVICE_LIMIT).
+
+        Called AFTER trust_as_temporary(), inside the same transaction.
+        """
+        from app.core.config import settings
+        max_temp = getattr(settings, "MAX_TEMPORARY_DEVICES", 2)
+
+        # Lock all active temporary devices for this user
+        temp_devices = list(db.scalars(
+            select(UserDevice)
+            .where(
+                UserDevice.user_id == user_id,
+                UserDevice.is_temporary == True,
+                UserDevice.is_primary == False,
+                UserDevice.status == DeviceStatus.ACTIVE,
+                UserDevice.is_deleted == False,
+                UserDevice.id != new_device_id,   # Exclude the just-approved device
+            )
+            .order_by(UserDevice.last_seen_at.asc().nullsfirst())
+            .with_for_update(skip_locked=False)  # Block — correctness over speed
+        ).all())
+
+        if len(temp_devices) < max_temp:
+            return None  # Still within the limit
+
+        # Evict the oldest temporary device
+        evict = temp_devices[0]
+        evict.status = DeviceStatus.REVOKED
+        evict.is_trusted = False
+        evict.is_temporary = False
+        evict.revoke_reason = "MAX_TEMPORARY_DEVICE_LIMIT"
+        evict.revoked_at = datetime.now(timezone.utc)
+        logger.info(
+            "[DeviceSecurity] Evicted oldest temporary device id=%s for user_id=%s "
+            "(reason: MAX_TEMPORARY_DEVICE_LIMIT)",
+            evict.id, user_id,
+        )
+        return evict
+
+    @classmethod
     def touch_device(cls, db: Session, device: UserDevice) -> None:
         """Update last_seen_at for an existing device. Does NOT commit."""
         device.last_seen_at = datetime.now(timezone.utc)
+
 
     @classmethod
     def enforce_device_limit(
@@ -943,21 +1015,34 @@ class DeviceSecurityOrchestrator:
             device = db.get(UserDevice, vr.device_id)
 
         if device:
-            DeviceService.trust_device(db, device)
-
-            # Enforce max-3 device limit (with row lock)
-            evicted = DeviceService.enforce_device_limit(db, vr.user_id, device.id)
-            if evicted:
-                LoginEventService.record(
-                    db,
-                    event_type=LoginEventType.DEVICE_REVOKED,
-                    user_id=vr.user_id,
-                    device_id=evicted.id,
-                    login_attempt_id=vr.login_attempt_id,
-                    ip_address=ip,
-                    failure_reason="Auto-evicted: max device limit reached",
-                    status="SUCCESS",
-                )
+            if not device.is_primary:
+                DeviceService.trust_as_temporary(db, device)
+                evicted = DeviceService.enforce_temporary_device_limit(db, vr.user_id, device.id)
+                if evicted:
+                    LoginEventService.record(
+                        db,
+                        event_type=LoginEventType.TEMPORARY_DEVICE_REVOKED,
+                        user_id=vr.user_id,
+                        device_id=evicted.id,
+                        login_attempt_id=vr.login_attempt_id,
+                        ip_address=ip,
+                        failure_reason="Auto-evicted: max temporary device limit reached",
+                        status="SUCCESS",
+                    )
+            else:
+                DeviceService.trust_device(db, device)
+                evicted = DeviceService.enforce_device_limit(db, vr.user_id, device.id)
+                if evicted:
+                    LoginEventService.record(
+                        db,
+                        event_type=LoginEventType.DEVICE_REVOKED,
+                        user_id=vr.user_id,
+                        device_id=evicted.id,
+                        login_attempt_id=vr.login_attempt_id,
+                        ip_address=ip,
+                        failure_reason="Auto-evicted: max device limit reached",
+                        status="SUCCESS",
+                    )
 
         VerificationService.mark_verified(db, vr)
 

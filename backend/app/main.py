@@ -96,7 +96,12 @@ async def lifespan(app: FastAPI):
         with engine.begin() as conn:
             conn.execute(text("ALTER TABLE student_attendance ADD COLUMN IF NOT EXISTS subject_id BIGINT REFERENCES subjects(id);"))
             conn.execute(text("ALTER TABLE class_attendance_sessions ADD COLUMN IF NOT EXISTS subject_id BIGINT REFERENCES subjects(id);"))
-        logger.info("   Database    : All tables & attendance columns verified ✓")
+            conn.execute(text("ALTER TABLE user_devices ADD COLUMN IF NOT EXISTS is_temporary BOOLEAN DEFAULT FALSE;"))
+            conn.execute(text("ALTER TABLE user_devices ADD COLUMN IF NOT EXISTS temporary_started_at TIMESTAMPTZ;"))
+            conn.execute(text("ALTER TABLE user_devices ADD COLUMN IF NOT EXISTS temporary_expires_at TIMESTAMPTZ;"))
+            conn.execute(text("ALTER TABLE user_devices ADD COLUMN IF NOT EXISTS revoke_reason VARCHAR(255);"))
+            conn.execute(text("ALTER TABLE user_sessions ADD COLUMN IF NOT EXISTS device_id BIGINT REFERENCES user_devices(id) ON DELETE SET NULL;"))
+        logger.info("   Database    : All tables & device security columns verified ✓")
     except Exception as err:
         logger.warning(f"   Database Init Warning: {err}")
 
@@ -108,6 +113,15 @@ async def lifespan(app: FastAPI):
         logger.info("   Scheduler   : Notification scheduler started ✓")
     except Exception as e:
         logger.warning(f"   Scheduler   : Could not start notification scheduler: {e}")
+
+    # ── Temporary Device Expiry Scheduler ─────────────────────
+    try:
+        from app.database.session import SessionLocal
+        from app.modules.device_security.expiry_scheduler import run_temporary_device_expiry
+        asyncio.create_task(run_temporary_device_expiry(SessionLocal))
+        logger.info("   Device Expiry: Temporary device expiry scheduler started ✓")
+    except Exception as e:
+        logger.warning(f"   Device Expiry: Could not start expiry scheduler: {e}")
 
     # ── Firebase Admin SDK Initialization ─────────────────────
     try:
@@ -279,11 +293,20 @@ async def health_check():
     }
 
 
+# ── Socket.IO ASGI Integration ────────────────────────────────
+import socketio
+from app.shared.socket_manager import sio
+
+# socket_app wraps FastAPI — routes /socket.io to Socket.IO and everything else to FastAPI
+socket_app = socketio.ASGIApp(sio, other_asgi_app=app, socketio_path="socket.io")
+application = socket_app
+
+
 # ── Entry Point ───────────────────────────────────────────────
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(
-        "app.main:app",
+        "app.main:socket_app",
         host="0.0.0.0",
         port=8000,
         reload=settings.APP_DEBUG,

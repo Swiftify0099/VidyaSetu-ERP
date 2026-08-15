@@ -45,6 +45,11 @@ export default defineConfig(({ mode }) => {
           secure: false,
           rewrite: (path) => path,
         },
+        '/socket.io': {
+          target: backendTarget,
+          changeOrigin: true,
+          ws: true,
+        },
       },
     },
 

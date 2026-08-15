@@ -154,6 +154,12 @@ class UserSession(BaseModel):
     browser: Mapped[str | None] = mapped_column(String(255), nullable=True)
     os: Mapped[str | None] = mapped_column(String(100), nullable=True)
     ip_address: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    # Link to user_devices for temporary-device expiry enforcement.
+    # NULL for sessions created before this column existed (treated as non-temporary).
+    device_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("user_devices.id", ondelete="SET NULL"),
+        nullable=True, index=True
+    )
 
     # Timing
     logged_in_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
