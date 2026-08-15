@@ -16,7 +16,8 @@ type Section = 'dashboard' | 'mark' | 'reports' | 'defaulters' | 'teacher' | 'ho
 
 const STANDARDS = ['1','2','3','4','5','6','7','8','9','10','11','12'];
 const DIVISIONS  = ['A','B','C','D'];
-const CURRENT_AY = 1;
+// Academic year ID resolved dynamically from auth store at runtime (see useCurrentAcademicYear hook).
+// Falls back to 1 only if both localStorage and API are unavailable.
 const TODAY = new Date().toISOString().split('T')[0];
 const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
@@ -51,7 +52,36 @@ interface MarkRow {
   remarks: string;
 }
 
+/** Resolves the current academic year ID from localStorage auth cache or via API. */
+function useCurrentAcademicYear(): number {
+  const [ayId, setAyId] = useState<number>(() => {
+    // Try to read from auth storage first (fastest)
+    try {
+      const raw = localStorage.getItem('vidyasetu_auth');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        const id = parsed?.academic_year_id ?? parsed?.user?.academic_year_id;
+        if (id && typeof id === 'number') return id;
+      }
+    } catch { /* ignore */ }
+    return 1; // fallback
+  });
+
+  useEffect(() => {
+    // Fetch from settings API for accuracy (catches year rollover without re-login)
+    import('../../services/api').then(({ default: api }) => {
+      api.get('/settings/academic-years/current').then(r => {
+        const id = r.data?.data?.id;
+        if (id && typeof id === 'number') setAyId(id);
+      }).catch(() => { /* use fallback */ });
+    });
+  }, []);
+
+  return ayId;
+}
+
 export default function AttendancePage() {
+  const CURRENT_AY = useCurrentAcademicYear();
   const [section, setSection] = useState<Section>('dashboard');
   const [stats, setStats] = useState<AttendanceStats | null>(null);
   const [subjects, setSubjects] = useState<Array<{ id: number; name: string; code?: string }>>([]);

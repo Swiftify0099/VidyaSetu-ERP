@@ -1,24 +1,39 @@
 /**
- * VidyaSetu Mobile — Leave Management Screen
- * Shows leave balance, allows apply, and admin can approve/reject.
- * All staff roles + student/parent.
+ * VidyaSetu Mobile — Leave Management Screen (Premium Redesign)
+ * ==============================================================
+ * Leave balance overview, self-application workflow, and administrator approvals.
  */
 import React, { useEffect, useState, useCallback } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, FlatList, TouchableOpacity,
-  Modal, TextInput, Alert, ActivityIndicator, RefreshControl,
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  FlatList,
+  TouchableOpacity,
+  RefreshControl,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/FontAwesome5';
 import { useTheme } from '../../theme/ThemeContext';
 import { leaveAPI } from '../../services/api';
 import { useAuthStore } from '../../store/authStore';
 import { spacing, radius, typography, shadows } from '../../theme';
-import { formatDateLong, formatStatus, statusColor, today, getErrorMessage } from '../../utils/formatters';
+import { formatDateLong, formatStatus, today, getErrorMessage } from '../../utils/formatters';
 import { CURRENT_ACADEMIC_YEAR } from '../../config/constants';
-import Badge from '../../components/ui/Badge';
-import PremiumCard from '../../components/ui/PremiumCard';
-import SectionHeader from '../../components/ui/SectionHeader';
-import SkeletonLoader from '../../components/ui/SkeletonLoader';
+import {
+  AppCard,
+  AppButton,
+  AppBadge,
+  AppTabs,
+  AppInput,
+  AppSelect,
+  AppDatePicker,
+  AppBottomSheet,
+  AppStatCard,
+  AppEmptyState,
+  AppSkeleton,
+  AppConfirmDialog,
+} from '../../components/ui';
 import Toast from 'react-native-toast-message';
 
 interface LeaveApplication {
@@ -43,17 +58,20 @@ interface LeaveBalance {
   remaining_days: number;
 }
 
-interface LeaveType { id: number; name: string; }
+interface LeaveType {
+  id: number;
+  name: string;
+}
 
 const EMPTY_FORM = {
-  leave_type_id: '',
+  leave_type_id: '1',
   from_date: today(),
   to_date: today(),
   reason: '',
 };
 
 export default function LeaveManagementScreen({ navigation }: { navigation: any }) {
-  const { colors } = useTheme();
+  const { colors, roleAccent } = useTheme();
   const { user } = useAuthStore();
   const role = user?.roles?.[0]?.code ?? '';
   const isAdmin = ['admin', 'super_admin', 'principal', 'vice_principal'].includes(role);
@@ -66,10 +84,12 @@ export default function LeaveManagementScreen({ navigation }: { navigation: any 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [showApply, setShowApply] = useState(false);
-  const [showRemarks, setShowRemarks] = useState(false);
+
+  // Approval/Rejection Dialog
   const [selectedLeave, setSelectedLeave] = useState<LeaveApplication | null>(null);
   const [actionType, setActionType] = useState<'approve' | 'reject'>('approve');
   const [remarks, setRemarks] = useState('');
+  const [showRemarksModal, setShowRemarksModal] = useState(false);
   const [form, setForm] = useState({ ...EMPTY_FORM });
   const [saving, setSaving] = useState(false);
 
@@ -83,25 +103,48 @@ export default function LeaveManagementScreen({ navigation }: { navigation: any 
       if (isAdmin) calls.push(leaveAPI.getPending());
 
       const results = await Promise.allSettled(calls);
-      if (results[0].status === 'fulfilled')
+      if (results[0].status === 'fulfilled') {
         setMyApplications(results[0].value.data?.data?.items ?? results[0].value.data?.data ?? []);
-      if (results[1].status === 'fulfilled')
+      }
+      if (results[1].status === 'fulfilled') {
         setBalance(results[1].value.data?.data ?? []);
-      if (results[2].status === 'fulfilled')
+      }
+      if (results[2].status === 'fulfilled') {
         setLeaveTypes(results[2].value.data?.data ?? []);
-      if (isAdmin && results[3]?.status === 'fulfilled')
+      }
+      if (isAdmin && results[3]?.status === 'fulfilled') {
         setPendingApplications(results[3].value.data?.data?.items ?? results[3].value.data?.data ?? []);
-    } catch { /* ignore */ }
-    finally { setLoading(false); setRefreshing(false); }
+      }
+    } catch {
+      /* ignore */
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
   }, [isAdmin]);
 
-  useEffect(() => { load(); }, [load]);
-  const onRefresh = () => { setRefreshing(true); load(); };
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    load();
+  };
 
   const applyLeave = async () => {
-    if (!form.leave_type_id) { Toast.show({ type: 'error', text1: 'Please select leave type' }); return; }
-    if (!form.reason.trim()) { Toast.show({ type: 'error', text1: 'Reason is required' }); return; }
-    if (form.from_date > form.to_date) { Toast.show({ type: 'error', text1: 'To date must be after from date' }); return; }
+    if (!form.leave_type_id) {
+      Toast.show({ type: 'error', text1: 'Please select leave type' });
+      return;
+    }
+    if (!form.reason.trim()) {
+      Toast.show({ type: 'error', text1: 'Reason is required' });
+      return;
+    }
+    if (form.from_date > form.to_date) {
+      Toast.show({ type: 'error', text1: 'To date must be on or after from date' });
+      return;
+    }
 
     setSaving(true);
     try {
@@ -110,20 +153,22 @@ export default function LeaveManagementScreen({ navigation }: { navigation: any 
         leave_type_id: Number(form.leave_type_id),
         academic_year: CURRENT_ACADEMIC_YEAR,
       });
-      Toast.show({ type: 'success', text1: 'Leave application submitted!' });
+      Toast.show({ type: 'success', text1: 'Leave Application Submitted!' });
       setShowApply(false);
       setForm({ ...EMPTY_FORM });
       load();
     } catch (e) {
       Toast.show({ type: 'error', text1: getErrorMessage(e) });
-    } finally { setSaving(false); }
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleAction = (leave: LeaveApplication, action: 'approve' | 'reject') => {
     setSelectedLeave(leave);
     setActionType(action);
     setRemarks('');
-    setShowRemarks(true);
+    setShowRemarksModal(true);
   };
 
   const confirmAction = async () => {
@@ -136,383 +181,341 @@ export default function LeaveManagementScreen({ navigation }: { navigation: any 
     try {
       if (actionType === 'approve') {
         await leaveAPI.approve(selectedLeave.id, remarks);
-        Toast.show({ type: 'success', text1: 'Leave approved' });
+        Toast.show({ type: 'success', text1: 'Leave Application Approved' });
       } else {
         await leaveAPI.reject(selectedLeave.id, remarks);
-        Toast.show({ type: 'success', text1: 'Leave rejected' });
+        Toast.show({ type: 'info', text1: 'Leave Application Rejected' });
       }
-      setShowRemarks(false);
+      setShowRemarksModal(false);
+      setSelectedLeave(null);
       load();
     } catch (e) {
       Toast.show({ type: 'error', text1: getErrorMessage(e) });
-    } finally { setSaving(false); }
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const cancelLeave = (id: number) => {
-    Alert.alert('Cancel Leave', 'Are you sure you want to cancel this leave application?', [
-      { text: 'No', style: 'cancel' },
-      {
-        text: 'Yes, Cancel', style: 'destructive',
-        onPress: async () => {
-          try {
-            await leaveAPI.cancel(id);
-            Toast.show({ type: 'success', text1: 'Leave cancelled' });
-            load();
-          } catch (e) {
-            Toast.show({ type: 'error', text1: getErrorMessage(e) });
-          }
-        },
-      },
-    ]);
-  };
+  const displayedList = tab === 'mine' ? myApplications : pendingApplications;
 
-  function badgeVariant(status: string): any {
-    if (status === 'approved')  return 'success';
-    if (status === 'pending')   return 'warning';
-    if (status === 'rejected')  return 'danger';
-    return 'default';
-  }
-
-  const LeaveCard = ({ item, showActions }: { item: LeaveApplication; showActions?: boolean }) => (
-    <PremiumCard variant="bordered" style={{ marginBottom: spacing.sm }} padding={12}>
-      <View style={s.leaveRow}>
-        <View style={[s.leaveIcon, { backgroundColor: colors.primaryBg }]}>
-          <Icon name="calendar-minus" size={16} color={colors.primary} solid />
-        </View>
-        <View style={{ flex: 1 }}>
-          <View style={s.leaveTitleRow}>
-            <Text style={[s.leaveType, { color: colors.text }]}>{item.leave_type_name}</Text>
-            <Badge label={formatStatus(item.status)} variant={badgeVariant(item.status)} size="sm" rounded />
-          </View>
-          {showActions && item.applicant_name && (
-            <Text style={[s.applicant, { color: colors.primary }]}>👤 {item.applicant_name}</Text>
-          )}
-          <Text style={[s.leaveDates, { color: colors.textSecondary }]}>
-            {formatDateLong(item.from_date)} → {formatDateLong(item.to_date)}
-            {' '}({item.no_of_days} day{item.no_of_days !== 1 ? 's' : ''})
-          </Text>
-          <Text style={[s.leaveReason, { color: colors.textSecondary }]} numberOfLines={2}>
-            {item.reason}
-          </Text>
-          {item.remarks && (
-            <Text style={[s.leaveRemarks, { color: colors.textTertiary }]}>
-              💬 {item.remarks}
-            </Text>
-          )}
-          {showActions && item.status === 'pending' && (
-            <View style={s.actionRow}>
-              <TouchableOpacity
-                style={[s.approveBtn, { backgroundColor: colors.successBg }]}
-                onPress={() => handleAction(item, 'approve')}
-              >
-                <Icon name="check" size={12} color={colors.success} solid />
-                <Text style={[s.actionBtnText, { color: colors.success }]}>Approve</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[s.rejectBtn, { backgroundColor: colors.dangerBg }]}
-                onPress={() => handleAction(item, 'reject')}
-              >
-                <Icon name="times" size={12} color={colors.danger} solid />
-                <Text style={[s.actionBtnText, { color: colors.danger }]}>Reject</Text>
-              </TouchableOpacity>
-            </View>
-          )}
-          {!showActions && item.status === 'pending' && (
-            <TouchableOpacity
-              style={s.cancelBtn}
-              onPress={() => cancelLeave(item.id)}
-            >
-              <Text style={s.cancelBtnText}>Cancel Application</Text>
-            </TouchableOpacity>
-          )}
-        </View>
-      </View>
-    </PremiumCard>
-  );
+  const leaveTypeOptions = leaveTypes.length > 0
+    ? leaveTypes.map(lt => ({ label: lt.name, value: String(lt.id) }))
+    : [
+        { label: 'Casual Leave (CL)', value: '1' },
+        { label: 'Medical Leave (ML)', value: '2' },
+        { label: 'Earned Leave (EL)', value: '3' },
+      ];
 
   return (
-    <View style={[s.root, { backgroundColor: colors.background }]}>
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} colors={[colors.primary]} />}
-      >
-        {/* Leave Balance */}
-        {balance.length > 0 && (
-          <View style={{ paddingHorizontal: spacing.base, marginTop: spacing.lg }}>
-            <SectionHeader title="Leave Balance" icon="chart-pie" />
-            <View style={s.balanceGrid}>
-              {balance.map((b) => (
-                <PremiumCard key={b.leave_type_id} variant="flat" style={s.balanceCard} padding={12}>
-                  <Text style={[s.balanceType, { color: colors.textSecondary }]}>{b.leave_type_name}</Text>
-                  <View style={s.balanceRow}>
-                    <View style={s.balanceStat}>
-                      <Text style={[s.balanceNum, { color: colors.success }]}>{b.remaining_days}</Text>
-                      <Text style={s.balanceLbl}>Remaining</Text>
-                    </View>
-                    <View style={s.balanceStat}>
-                      <Text style={[s.balanceNum, { color: colors.warning }]}>{b.used_days}</Text>
-                      <Text style={s.balanceLbl}>Used</Text>
-                    </View>
-                    <View style={s.balanceStat}>
-                      <Text style={[s.balanceNum, { color: colors.text }]}>{b.total_days}</Text>
-                      <Text style={s.balanceLbl}>Total</Text>
-                    </View>
-                  </View>
-                  <View style={[s.progressBar, { backgroundColor: colors.border }]}>
-                    <View style={[
-                      s.progressFill,
-                      {
-                        backgroundColor: colors.success,
-                        width: `${b.total_days > 0 ? (b.remaining_days / b.total_days) * 100 : 0}%`,
-                      },
-                    ]} />
-                  </View>
-                </PremiumCard>
-              ))}
-            </View>
-          </View>
-        )}
-
-        {/* Tabs */}
-        {isAdmin && (
-          <View style={[s.tabs, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
-            {(['mine', 'pending'] as const).map(t => (
-              <TouchableOpacity
-                key={t}
-                style={[s.tabBtn, tab === t && { borderBottomColor: colors.primary, borderBottomWidth: 2.5 }]}
-                onPress={() => setTab(t)}
-              >
-                <Text style={[s.tabText, { color: tab === t ? colors.primary : colors.textSecondary }]}>
-                  {t === 'mine' ? 'My Applications' : `Pending Approvals (${pendingApplications.length})`}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        )}
-
-        {/* Content */}
-        <View style={{ paddingHorizontal: spacing.base, marginTop: spacing.lg }}>
-          {loading ? (
-            <SkeletonLoader variant="list" count={4} />
-          ) : tab === 'mine' ? (
-            <>
-              <SectionHeader title="My Applications" icon="file-alt" onViewAll={undefined} />
-              {myApplications.length === 0 ? (
-                <PremiumCard variant="flat" style={s.emptyCard}>
-                  <Text style={s.emptyIcon}>📋</Text>
-                  <Text style={[s.emptyText, { color: colors.textSecondary }]}>No leave applications</Text>
-                </PremiumCard>
-              ) : (
-                myApplications.map(item => <LeaveCard key={item.id} item={item} />)
-              )}
-            </>
-          ) : (
-            <>
-              <SectionHeader title="Pending Approvals" icon="clock" />
-              {pendingApplications.length === 0 ? (
-                <PremiumCard variant="flat" style={s.emptyCard}>
-                  <Text style={s.emptyIcon}>✅</Text>
-                  <Text style={[s.emptyText, { color: colors.textSecondary }]}>No pending applications</Text>
-                </PremiumCard>
-              ) : (
-                pendingApplications.map(item => <LeaveCard key={item.id} item={item} showActions />)
-              )}
-            </>
-          )}
+    <View style={[styles.root, { backgroundColor: colors.background }]}>
+      {/* Tab Switcher if Admin */}
+      {isAdmin && (
+        <View style={[styles.tabsWrap, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
+          <AppTabs
+            tabs={[
+              { key: 'mine', label: 'My Applications', count: myApplications.length },
+              { key: 'pending', label: 'Pending Approvals', count: pendingApplications.length },
+            ]}
+            activeTab={tab}
+            onChangeTab={k => setTab(k as any)}
+            variant="segmented"
+          />
         </View>
+      )}
 
-        <View style={{ height: spacing['4xl'] }} />
-      </ScrollView>
+      {loading ? (
+        <View style={{ padding: spacing.base }}>
+          <AppSkeleton variant="card" count={4} />
+        </View>
+      ) : (
+        <FlatList
+          data={displayedList}
+          keyExtractor={item => String(item.id)}
+          contentContainerStyle={{ padding: spacing.base, paddingBottom: 100 }}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor={colors.primary}
+              colors={[colors.primary]}
+            />
+          }
+          ItemSeparatorComponent={() => <View style={{ height: 8 }} />}
+          ListHeaderComponent={
+            tab === 'mine' && balance.length > 0 ? (
+              <View style={styles.balanceSection}>
+                <Text style={[styles.sectionHeading, { color: colors.textSecondary }]}>
+                  Annual Leave Balances
+                </Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: spacing.sm }}>
+                  {balance.map(bal => (
+                    <AppStatCard
+                      key={bal.leave_type_id}
+                      label={bal.leave_type_name}
+                      value={`${bal.remaining_days} days`}
+                      subtitle={`Used ${bal.used_days} of ${bal.total_days} total`}
+                      icon="calendar-check"
+                      color={bal.remaining_days > 2 ? colors.primary : colors.warning}
+                    />
+                  ))}
+                </ScrollView>
+                <Text style={[styles.sectionHeading, { color: colors.textSecondary, marginTop: spacing.md }]}>
+                  Application History
+                </Text>
+              </View>
+            ) : null
+          }
+          ListEmptyComponent={
+            <AppEmptyState
+              icon="calendar-day"
+              title={tab === 'mine' ? 'No Leave Applications' : 'No Pending Approvals'}
+              description={
+                tab === 'mine'
+                  ? 'You have not submitted any leave applications for this academic cycle.'
+                  : 'All staff leave applications have been reviewed and resolved.'
+              }
+              actionLabel={tab === 'mine' ? 'Apply for Leave' : undefined}
+              onAction={tab === 'mine' ? () => setShowApply(true) : undefined}
+              style={{ flex: 1 }}
+            />
+          }
+          renderItem={({ item }) => {
+            const isPending = item.status === 'pending';
+            const badgeVariant =
+              item.status === 'approved' ? 'success' : item.status === 'rejected' ? 'danger' : 'warning';
 
-      {/* FAB — Apply Leave */}
+            return (
+              <AppCard variant="bordered" padding={14}>
+                <View style={{ gap: 8 }}>
+                  <View style={styles.cardHeaderRow}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.leaveType, { color: colors.text }]}>
+                        {item.leave_type_name || 'General Leave'}
+                      </Text>
+                      {item.applicant_name && (
+                        <Text style={[styles.applicant, { color: colors.primary, fontWeight: '600' }]}>
+                          {item.applicant_name}
+                        </Text>
+                      )}
+                    </View>
+                    <AppBadge
+                      label={formatStatus(item.status)}
+                      variant={badgeVariant}
+                      size="sm"
+                      rounded
+                    />
+                  </View>
+
+                  {/* Dates */}
+                  <View style={styles.dateRow}>
+                    <Icon name="calendar-alt" size={12} color={colors.textTertiary} />
+                    <Text style={[styles.dateText, { color: colors.textSecondary }]}>
+                      {formatDateLong(item.from_date)} → {formatDateLong(item.to_date)}
+                    </Text>
+                    <Text style={[styles.daysTag, { color: colors.textTertiary }]}>
+                      ({item.no_of_days || 1} {item.no_of_days === 1 ? 'day' : 'days'})
+                    </Text>
+                  </View>
+
+                  {/* Reason */}
+                  {item.reason ? (
+                    <Text style={[styles.reason, { color: colors.textSecondary }]} numberOfLines={2}>
+                      Reason: {item.reason}
+                    </Text>
+                  ) : null}
+
+                  {/* Admin Actions for Pending Applications */}
+                  {isAdmin && tab === 'pending' && isPending && (
+                    <View style={styles.actionRow}>
+                      <AppButton
+                        label="Approve"
+                        iconLeft="check"
+                        variant="success"
+                        size="sm"
+                        onPress={() => handleAction(item, 'approve')}
+                      />
+                      <AppButton
+                        label="Reject"
+                        iconLeft="times"
+                        variant="danger"
+                        size="sm"
+                        onPress={() => handleAction(item, 'reject')}
+                      />
+                    </View>
+                  )}
+                </View>
+              </AppCard>
+            );
+          }}
+        />
+      )}
+
+      {/* Floating Apply Button */}
       <TouchableOpacity
-        style={[s.fab, { backgroundColor: colors.primary }]}
-        onPress={() => { setForm({ ...EMPTY_FORM }); setShowApply(true); }}
+        style={[styles.fab, { backgroundColor: colors.primary, ...shadows.lg }]}
+        onPress={() => {
+          setForm({ ...EMPTY_FORM });
+          setShowApply(true);
+        }}
+        activeOpacity={0.85}
+        accessibilityRole="button"
+        accessibilityLabel="Apply for Leave"
       >
         <Icon name="plus" size={20} color="#fff" solid />
       </TouchableOpacity>
 
-      {/* Apply Leave Modal */}
-      <Modal visible={showApply} animationType="slide" presentationStyle="pageSheet">
-        <View style={[s.modal, { backgroundColor: colors.background }]}>
-          <View style={[s.modalHeader, { borderBottomColor: colors.border }]}>
-            <TouchableOpacity onPress={() => setShowApply(false)}>
-              <Icon name="times" size={20} color={colors.text} />
-            </TouchableOpacity>
-            <Text style={[s.modalTitle, { color: colors.text }]}>Apply for Leave</Text>
-            <TouchableOpacity onPress={applyLeave} disabled={saving}>
-              {saving
-                ? <ActivityIndicator size="small" color={colors.primary} />
-                : <Text style={[s.saveText, { color: colors.primary }]}>Submit</Text>}
-            </TouchableOpacity>
-          </View>
-          <ScrollView contentContainerStyle={{ padding: spacing.base, gap: 14 }}>
-            <View>
-              <Text style={[s.formLabel, { color: colors.textSecondary }]}>Leave Type *</Text>
-              <View style={s.typeChips}>
-                {leaveTypes.map(lt => (
-                  <TouchableOpacity
-                    key={lt.id}
-                    style={[s.typeChip, form.leave_type_id === String(lt.id) && { backgroundColor: colors.primary }]}
-                    onPress={() => setForm(f => ({ ...f, leave_type_id: String(lt.id) }))}
-                  >
-                    <Text style={[s.typeChipText, form.leave_type_id === String(lt.id) && { color: '#fff' }]}>
-                      {lt.name}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </View>
-            <View>
-              <Text style={[s.formLabel, { color: colors.textSecondary }]}>From Date *</Text>
-              <TextInput
-                style={[s.input, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder, color: colors.text }]}
-                value={form.from_date}
-                onChangeText={v => setForm(f => ({ ...f, from_date: v }))}
-                placeholder="YYYY-MM-DD"
-                placeholderTextColor={colors.placeholder}
-              />
-            </View>
-            <View>
-              <Text style={[s.formLabel, { color: colors.textSecondary }]}>To Date *</Text>
-              <TextInput
-                style={[s.input, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder, color: colors.text }]}
-                value={form.to_date}
-                onChangeText={v => setForm(f => ({ ...f, to_date: v }))}
-                placeholder="YYYY-MM-DD"
-                placeholderTextColor={colors.placeholder}
-              />
-            </View>
-            <View>
-              <Text style={[s.formLabel, { color: colors.textSecondary }]}>Reason *</Text>
-              <TextInput
-                style={[s.input, s.textarea, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder, color: colors.text }]}
-                value={form.reason}
-                onChangeText={v => setForm(f => ({ ...f, reason: v }))}
-                placeholder="Provide reason for leave..."
-                placeholderTextColor={colors.placeholder}
-                multiline
-                numberOfLines={4}
-              />
-            </View>
-          </ScrollView>
-        </View>
-      </Modal>
+      {/* Apply Leave Bottom Sheet */}
+      <AppBottomSheet
+        visible={showApply}
+        onClose={() => setShowApply(false)}
+        title="Apply for Leave"
+        subtitle="Submit leave request for approval"
+      >
+        <View style={{ gap: spacing.xs }}>
+          <AppSelect
+            label="Leave Type *"
+            value={form.leave_type_id}
+            options={leaveTypeOptions}
+            onSelect={v => setForm(f => ({ ...f, leave_type_id: String(v) }))}
+          />
 
-      {/* Remarks Modal */}
-      <Modal visible={showRemarks} animationType="fade" transparent>
-        <View style={s.remarksBg}>
-          <View style={[s.remarksBox, { backgroundColor: colors.surface }]}>
-            <Text style={[s.remarksTitle, { color: colors.text }]}>
-              {actionType === 'approve' ? '✅ Approve Leave' : '❌ Reject Leave'}
-            </Text>
-            <Text style={[s.remarksLabel, { color: colors.textSecondary }]}>
-              Remarks {actionType === 'reject' ? '(required)' : '(optional)'}
-            </Text>
-            <TextInput
-              style={[s.input, s.textarea, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder, color: colors.text }]}
-              value={remarks}
-              onChangeText={setRemarks}
-              placeholder="Add remarks..."
-              placeholderTextColor={colors.placeholder}
-              multiline
-              numberOfLines={3}
-            />
-            <View style={s.remarksActions}>
-              <TouchableOpacity
-                style={[s.remarksCancelBtn, { borderColor: colors.border }]}
-                onPress={() => setShowRemarks(false)}
-              >
-                <Text style={[s.remarksCancelText, { color: colors.text }]}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[s.remarksConfirmBtn, { backgroundColor: actionType === 'approve' ? colors.success : colors.danger }]}
-                onPress={confirmAction}
-                disabled={saving}
-              >
-                {saving
-                  ? <ActivityIndicator size="small" color="#fff" />
-                  : <Text style={s.remarksConfirmText}>{actionType === 'approve' ? 'Approve' : 'Reject'}</Text>}
-              </TouchableOpacity>
+          <View style={styles.formRow}>
+            <View style={{ flex: 1 }}>
+              <AppDatePicker
+                label="From Date *"
+                value={form.from_date}
+                onChangeDate={d => setForm(f => ({ ...f, from_date: d }))}
+              />
+            </View>
+            <View style={{ flex: 1 }}>
+              <AppDatePicker
+                label="To Date *"
+                value={form.to_date}
+                onChangeDate={d => setForm(f => ({ ...f, to_date: d }))}
+              />
             </View>
           </View>
+
+          <AppInput
+            label="Reason for Leave *"
+            value={form.reason}
+            onChangeText={v => setForm(f => ({ ...f, reason: v }))}
+            icon="align-left"
+            placeholder="Explain reason for leave..."
+            multiline
+          />
+
+          <AppButton
+            label="Submit Leave Application"
+            iconLeft="paper-plane"
+            variant="primary"
+            size="lg"
+            onPress={applyLeave}
+            loading={saving}
+            fullWidth
+            style={{ marginTop: spacing.md }}
+          />
         </View>
-      </Modal>
+      </AppBottomSheet>
+
+      {/* Approve/Reject Remarks Bottom Sheet */}
+      <AppBottomSheet
+        visible={showRemarksModal}
+        onClose={() => setShowRemarksModal(false)}
+        title={actionType === 'approve' ? 'Approve Leave Request' : 'Reject Leave Request'}
+        subtitle={selectedLeave ? `Applicant: ${selectedLeave.applicant_name}` : ''}
+      >
+        <View style={{ gap: spacing.base }}>
+          <AppInput
+            label={actionType === 'reject' ? 'Rejection Remarks *' : 'Approval Notes (Optional)'}
+            value={remarks}
+            onChangeText={setRemarks}
+            placeholder={
+              actionType === 'reject'
+                ? 'State the reason for rejecting this leave request...'
+                : 'Any special instructions or notes...'
+            }
+            multiline
+          />
+          <AppButton
+            label={actionType === 'approve' ? 'Confirm Approval' : 'Confirm Rejection'}
+            variant={actionType === 'approve' ? 'success' : 'danger'}
+            size="lg"
+            onPress={confirmAction}
+            loading={saving}
+            fullWidth
+          />
+        </View>
+      </AppBottomSheet>
     </View>
   );
 }
 
-const s = StyleSheet.create({
-  root: { flex: 1 },
-  tabs: { flexDirection: 'row', borderBottomWidth: 1, marginTop: spacing.md },
-  tabBtn: { flex: 1, padding: 12, alignItems: 'center' },
-  tabText: { fontSize: typography.size.sm, fontWeight: typography.weight.semibold },
-  balanceGrid: { gap: spacing.sm },
-  balanceCard: { borderRadius: radius.xl },
-  balanceType: { fontSize: typography.size.sm, fontWeight: typography.weight.semibold, marginBottom: 8 },
-  balanceRow: { flexDirection: 'row', justifyContent: 'space-around', marginBottom: 10 },
-  balanceStat: { alignItems: 'center' },
-  balanceNum: { fontSize: typography.size.xl, fontWeight: typography.weight.extrabold },
-  balanceLbl: { fontSize: typography.size.xs, color: '#9ca3af', marginTop: 2 },
-  progressBar: { height: 6, borderRadius: 3, overflow: 'hidden' },
-  progressFill: { height: '100%', borderRadius: 3 },
-  leaveRow: { flexDirection: 'row', gap: spacing.sm },
-  leaveIcon: { width: 40, height: 40, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
-  leaveTitleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 3 },
-  leaveType: { fontSize: typography.size.base, fontWeight: typography.weight.bold, flex: 1, marginRight: 6 },
-  applicant: { fontSize: typography.size.sm, fontWeight: typography.weight.semibold, marginBottom: 2 },
-  leaveDates: { fontSize: typography.size.sm, marginBottom: 3 },
-  leaveReason: { fontSize: typography.size.sm },
-  leaveRemarks: { fontSize: typography.size.xs, marginTop: 4, fontStyle: 'italic' },
-  actionRow: { flexDirection: 'row', gap: 8, marginTop: 10 },
-  approveBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 14, paddingVertical: 7, borderRadius: radius.full },
-  rejectBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 14, paddingVertical: 7, borderRadius: radius.full },
-  actionBtnText: { fontSize: typography.size.xs, fontWeight: typography.weight.bold },
-  cancelBtn: { marginTop: 8, alignSelf: 'flex-start' },
-  cancelBtnText: { fontSize: typography.size.xs, color: '#dc2626', fontWeight: typography.weight.semibold },
-  emptyCard: { alignItems: 'center', padding: spacing.xl },
-  emptyIcon: { fontSize: 40, marginBottom: 8 },
-  emptyText: { fontSize: typography.size.base },
+const styles = StyleSheet.create({
+  root: {
+    flex: 1,
+  },
+  tabsWrap: {
+    paddingHorizontal: spacing.base,
+    paddingVertical: spacing.sm,
+    borderBottomWidth: 1,
+  },
+  balanceSection: {
+    marginBottom: spacing.base,
+  },
+  sectionHeading: {
+    fontSize: typography.size.xs,
+    fontWeight: typography.weight.bold,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: spacing.sm,
+  },
+  cardHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  leaveType: {
+    fontSize: typography.size.base,
+    fontWeight: typography.weight.bold,
+  },
+  applicant: {
+    fontSize: typography.size.xs,
+    marginTop: 2,
+  },
+  dateRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  dateText: {
+    fontSize: typography.size.xs,
+  },
+  daysTag: {
+    fontSize: typography.size['2xs'],
+  },
+  reason: {
+    fontSize: typography.size.xs,
+    lineHeight: 18,
+  },
+  actionRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: spacing.sm,
+    marginTop: spacing.xs,
+  },
+  formRow: {
+    flexDirection: 'row',
+    gap: spacing.md,
+  },
   fab: {
-    position: 'absolute', bottom: 24, right: 24,
-    width: 56, height: 56, borderRadius: 28,
-    alignItems: 'center', justifyContent: 'center',
-    elevation: 6,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3, shadowRadius: 8,
+    position: 'absolute',
+    bottom: 24,
+    right: 20,
+    width: 54,
+    height: 54,
+    borderRadius: radius.full,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  modal: { flex: 1 },
-  modalHeader: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    padding: spacing.base, borderBottomWidth: 1,
-  },
-  modalTitle: { fontSize: typography.size.lg, fontWeight: typography.weight.bold },
-  saveText: { fontSize: typography.size.base, fontWeight: typography.weight.bold },
-  formLabel: { fontSize: typography.size.xs, fontWeight: typography.weight.semibold, textTransform: 'uppercase', marginBottom: 6 },
-  input: {
-    height: 48, borderWidth: 1.5, borderRadius: radius.md,
-    paddingHorizontal: spacing.md, fontSize: typography.size.base,
-  },
-  textarea: { height: 100, textAlignVertical: 'top', paddingTop: 12 },
-  typeChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  typeChip: {
-    paddingHorizontal: 14, paddingVertical: 8, borderRadius: radius.full,
-    backgroundColor: '#f3f4f6', borderWidth: 1.5, borderColor: '#e5e7eb',
-  },
-  typeChipText: { fontSize: typography.size.sm, fontWeight: typography.weight.semibold, color: '#6b7280' },
-  remarksBg: {
-    flex: 1, backgroundColor: 'rgba(0,0,0,0.5)',
-    alignItems: 'center', justifyContent: 'center', padding: spacing.base,
-  },
-  remarksBox: {
-    width: '100%', borderRadius: radius.xl, padding: spacing.base, gap: 12,
-    elevation: 8,
-  },
-  remarksTitle: { fontSize: typography.size.lg, fontWeight: typography.weight.bold },
-  remarksLabel: { fontSize: typography.size.sm },
-  remarksActions: { flexDirection: 'row', gap: 10, marginTop: 4 },
-  remarksCancelBtn: { flex: 1, borderWidth: 1.5, borderRadius: radius.md, padding: 12, alignItems: 'center' },
-  remarksCancelText: { fontWeight: typography.weight.semibold },
-  remarksConfirmBtn: { flex: 1, borderRadius: radius.md, padding: 12, alignItems: 'center' },
-  remarksConfirmText: { color: '#fff', fontWeight: typography.weight.bold },
 });

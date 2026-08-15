@@ -45,6 +45,9 @@ router = APIRouter(prefix="/fcm", tags=["FCM Push Notifications"])
     status_code=status.HTTP_200_OK,
     summary="Register or update FCM device token",
 )
+@router.post("/register/", response_model=APIResponse, include_in_schema=False)
+@router.put("/register", response_model=APIResponse, include_in_schema=False)
+@router.put("/register/", response_model=APIResponse, include_in_schema=False)
 async def register_fcm_token(
     body: RegisterTokenRequest,
     current_user: AuthUser,
@@ -70,6 +73,9 @@ async def register_fcm_token(
     response_model=APIResponse,
     summary="Remove FCM token on logout",
 )
+@router.post("/unregister", response_model=APIResponse, include_in_schema=False)
+@router.delete("/unregister/", response_model=APIResponse, include_in_schema=False)
+@router.post("/unregister/", response_model=APIResponse, include_in_schema=False)
 async def unregister_fcm_token(
     body: UnregisterTokenRequest,
     current_user: AuthUser,
@@ -89,6 +95,9 @@ async def unregister_fcm_token(
     response_model=APIResponse,
     summary="Remove ALL FCM tokens for this user (logout-all)",
 )
+@router.post("/unregister-all", response_model=APIResponse, include_in_schema=False)
+@router.delete("/unregister-all/", response_model=APIResponse, include_in_schema=False)
+@router.post("/unregister-all/", response_model=APIResponse, include_in_schema=False)
 async def unregister_all_fcm_tokens(
     current_user: AuthUser,
     db: DBSession,
@@ -109,6 +118,7 @@ async def unregister_all_fcm_tokens(
     response_model=APIResponse,
     summary="List registered devices for current user",
 )
+@router.get("/tokens/", response_model=APIResponse, include_in_schema=False)
 async def get_my_tokens(
     current_user: AuthUser,
     db: DBSession,

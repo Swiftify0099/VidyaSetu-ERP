@@ -84,13 +84,30 @@ export interface NotificationLogRecord {
   body: string;
   category?: string;
   priority?: string;
-  target_type?: string;
-  delivery_status?: string;
-  error_message?: string;
-  sent_via?: string;
-  status?: string;
+  /** Timestamp when the notification was sent */
   sent_at?: string;
+  /** 'broadcast' | 'role' | 'class' | 'user' | 'users' | 'topic' */
+  send_mode?: string;
+  /** Alias used by AdminFCMPanel for the target audience type */
+  target_type?: string;
+  target_role?: string;
+  target_class?: string;
+  target_user_id?: number;
+  total_sent?: number;
+  success_count?: number;
+  failure_count?: number;
+  sent_by?: number;
+  sent_by_name?: string;
+  sent_via?: string;
+  /** 'sent' | 'failed' | 'partial' */
+  status?: string;
+  /** Alias used by AdminFCMPanel */
+  delivery_status?: string;
+  /** Error detail if delivery failed */
+  error_message?: string | null;
   created_at?: string;
+  data?: Record<string, string>;
+  image_url?: string;
 }
 
 // ── Device detection helpers ─────────────────────────────────
@@ -283,8 +300,17 @@ const fcmService = {
         ...deviceInfo,
       });
       console.log('[FCM] ✅ Token registered with backend.');
-    } catch (err) {
-      console.error('[FCM] Failed to register token with backend:', err);
+    } catch (err: any) {
+      // Fallback to communication endpoint if /fcm/register fails
+      try {
+        await api.post('/communication/notifications/fcm-token', { fcm_token: token }, {
+          params: { fcm_token: token },
+        });
+        console.log('[FCM] ✅ Token registered with backend (fallback endpoint).');
+      } catch (fallbackErr: any) {
+        const msg = fallbackErr?.response?.data?.message || fallbackErr?.message || err?.message || 'Registration error';
+        console.warn('[FCM] Token registration note:', msg);
+      }
     }
   },
 
@@ -299,8 +325,13 @@ const fcmService = {
     try {
       await api.delete('/fcm/unregister', { data: { fcm_token: token } });
       console.log('[FCM] ✅ Token unregistered from backend.');
-    } catch (err) {
-      console.warn('[FCM] Failed to unregister token:', err);
+    } catch {
+      try {
+        await api.post('/fcm/unregister', { fcm_token: token });
+        console.log('[FCM] ✅ Token unregistered from backend (POST fallback).');
+      } catch {
+        console.warn('[FCM] Token unregistration deferred (user logged out).');
+      }
     } finally {
       this.clearCachedToken();
       // Also delete from Firebase SDK side
@@ -323,8 +354,12 @@ const fcmService = {
     try {
       await api.delete('/fcm/unregister-all');
       console.log('[FCM] ✅ All tokens unregistered.');
-    } catch (err) {
-      console.warn('[FCM] Failed to unregister all tokens:', err);
+    } catch {
+      try {
+        await api.post('/fcm/unregister-all');
+      } catch (err) {
+        console.warn('[FCM] Failed to unregister all tokens:', err);
+      }
     } finally {
       this.clearCachedToken();
     }

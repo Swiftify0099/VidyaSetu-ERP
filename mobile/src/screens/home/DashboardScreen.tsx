@@ -1,32 +1,39 @@
 /**
- * VidyaSetu Mobile — Dashboard Screen
- * Shows key stats: students, attendance, fees, announcements.
+ * VidyaSetu Mobile — Generic / Fallback Dashboard Screen (Premium Redesign)
+ * ==========================================================================
+ * Executive overview metrics, role quick actions, and recent announcements.
  */
 import React, { useEffect, useState, useCallback } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  RefreshControl, ActivityIndicator, Platform,
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  RefreshControl,
+  Platform,
+  Image,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
+import Icon from 'react-native-vector-icons/FontAwesome5';
+import { useTheme } from '../../theme/ThemeContext';
 import { useAuthStore } from '../../store/authStore';
 import { dashboardAPI, communicationAPI } from '../../services/api';
-
-const COLORS = {
-  primary: '#4f46e5', primaryDark: '#4338ca',
-  success: '#10b981', warning: '#f59e0b', danger: '#ef4444',
-  surface: '#fff', bg: '#f0f0ff', border: '#e5e7eb',
-  text: '#111827', textSecondary: '#6b7280',
-};
-
-interface StatCard {
-  icon: string; label: string; value: string | number;
-  sub?: string; color: string;
-}
+import { spacing, radius, typography, shadows } from '../../theme';
+import {
+  AppCard,
+  AppBadge,
+  AppAvatar,
+  AppStatCard,
+  AppSectionHeader,
+  AppSkeleton,
+} from '../../components/ui';
 
 const CUR_YEAR = '2025-2026';
 
 export default function DashboardScreen({ navigation }: { navigation: any }) {
-  const { user, logout } = useAuthStore();
+  const { colors, roleAccent } = useTheme();
+  const { user } = useAuthStore();
   const [stats, setStats] = useState<Record<string, number>>({});
   const [announcements, setAnnouncements] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -40,59 +47,74 @@ export default function DashboardScreen({ navigation }: { navigation: any }) {
       ]);
       if (sum.status === 'fulfilled') setStats(sum.value.data?.data ?? {});
       if (ann.status === 'fulfilled') setAnnouncements(ann.value.data?.data?.items ?? []);
-    } catch {/* ignore */}
-    finally { setLoading(false); setRefreshing(false); }
+    } catch {
+      // ignore
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
   }, []);
 
-  useEffect(() => { fetchData(); }, [fetchData]);
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
-  const onRefresh = () => { setRefreshing(true); fetchData(); };
+  const onRefresh = () => {
+    setRefreshing(true);
+    fetchData();
+  };
 
-  const statCards: StatCard[] = [
-    { icon: '🎓', label: 'Total Students', value: stats.total_students ?? '—', color: COLORS.primary },
-    { icon: '✅', label: "Today's Attendance", value: stats.today_attendance ? `${stats.today_attendance}%` : '—', color: COLORS.success },
-    { icon: '💰', label: 'Fees Collected', value: stats.fees_collected ? `₹${(stats.fees_collected/1000).toFixed(0)}K` : '—', color: COLORS.warning },
-    { icon: '⚠️', label: 'Pending Dues', value: stats.pending_dues ?? '—', color: COLORS.danger },
-  ];
+  const attVal = stats.today_attendance ?? stats.today_attendance_pct;
+  const feesVal = stats.fees_collected ?? stats.fee_collected;
+  const duesVal = stats.pending_dues ?? stats.fee_pending;
 
-  if (loading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={COLORS.primary} />
-        <Text style={styles.loadingText}>Loading dashboard...</Text>
-      </View>
-    );
-  }
+  const hours = new Date().getHours();
+  const greeting = hours < 12 ? 'Good Morning' : hours < 17 ? 'Good Afternoon' : 'Good Evening';
 
   return (
     <ScrollView
-      style={styles.container}
+      style={[styles.container, { backgroundColor: colors.background }]}
       showsVerticalScrollIndicator={false}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[COLORS.primary]} />}
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={onRefresh}
+          tintColor={colors.primary}
+          colors={[colors.primary]}
+        />
+      }
     >
-      {/* Header */}
+      {/* Hero Header */}
       <LinearGradient
-        colors={[COLORS.primary, COLORS.primaryDark]}
-        style={styles.header}
+        colors={roleAccent.gradient}
+        style={[styles.header, { paddingTop: Platform.OS === 'ios' ? 56 : 40 }]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
       >
         <View style={styles.headerContent}>
-          <View>
-            <Text style={styles.greeting}>
-              {new Date().getHours() < 12 ? '🌅 Good Morning' : new Date().getHours() < 17 ? '☀️ Good Afternoon' : '🌙 Good Evening'}
-            </Text>
-            <Text style={styles.userName}>{user?.full_name?.split(' ')[0]}</Text>
-            <Text style={styles.userRole}>{user?.roles?.[0]?.name ?? 'User'}</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+            <Image
+              source={require('../../assets/icon.png')}
+              style={styles.headerAppIcon}
+            />
+            <View>
+              <Text style={styles.greeting}>{greeting},</Text>
+              <Text style={styles.userName}>{user?.full_name?.split(' ')[0]}</Text>
+              <View style={[styles.rolePill, { backgroundColor: 'rgba(255,255,255,0.18)' }]}>
+                <Text style={styles.rolePillText}>{user?.roles?.[0]?.name ?? 'Portal Member'}</Text>
+              </View>
+            </View>
           </View>
+
           <View style={styles.headerRight}>
             <TouchableOpacity
-              style={styles.notifBtn}
+              style={[styles.notifBtn, { backgroundColor: 'rgba(255,255,255,0.2)' }]}
               onPress={() => navigation.navigate('Announcements')}
+              activeOpacity={0.8}
             >
-              <Text style={styles.notifIcon}>🔔</Text>
+              <Icon name="bell" size={16} color="#fff" solid />
               {announcements.length > 0 && (
-                <View style={styles.badge}>
+                <View style={[styles.badge, { backgroundColor: colors.danger }]}>
                   <Text style={styles.badgeText}>{announcements.length}</Text>
                 </View>
               )}
@@ -101,164 +123,242 @@ export default function DashboardScreen({ navigation }: { navigation: any }) {
         </View>
 
         {/* Academic Year */}
-        <View style={styles.academicBadge}>
-          <Text style={styles.academicText}>📅 {CUR_YEAR}</Text>
+        <View style={[styles.academicBadge, { backgroundColor: 'rgba(255,255,255,0.15)' }]}>
+          <Icon name="calendar-alt" size={11} color="#fff" solid />
+          <Text style={styles.academicText}>Academic Year {CUR_YEAR}</Text>
         </View>
       </LinearGradient>
 
-      {/* Stats Grid */}
+      {/* Metrics Grid */}
       <View style={styles.statsGrid}>
-        {statCards.map((card, i) => (
-          <View key={i} style={[styles.statCard, { borderTopColor: card.color }]}>
-            <Text style={styles.statIcon}>{card.icon}</Text>
-            <Text style={[styles.statValue, { color: card.color }]}>{card.value}</Text>
-            <Text style={styles.statLabel}>{card.label}</Text>
+        {loading ? (
+          <View style={{ width: '100%' }}>
+            <AppSkeleton variant="stat" count={4} />
           </View>
-        ))}
+        ) : (
+          <>
+            <AppStatCard
+              icon="user-graduate"
+              label="Total Students"
+              value={stats.total_students ?? '—'}
+              color={colors.primary}
+              style={{ width: '48%' }}
+            />
+            <AppStatCard
+              icon="clipboard-check"
+              label="Attendance Rate"
+              value={attVal !== undefined ? `${attVal}%` : '—'}
+              color={colors.success}
+              style={{ width: '48%' }}
+            />
+            <AppStatCard
+              icon="rupee-sign"
+              label="Fees Collected"
+              value={feesVal ? `₹${(feesVal / 1000).toFixed(0)}K` : '—'}
+              color={colors.warning}
+              style={{ width: '48%' }}
+            />
+            <AppStatCard
+              icon="exclamation-triangle"
+              label="Pending Dues"
+              value={duesVal !== undefined ? `₹${(duesVal / 1000).toFixed(0)}K` : '—'}
+              color={colors.danger}
+              style={{ width: '48%' }}
+            />
+          </>
+        )}
       </View>
 
       {/* Quick Actions */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Quick Actions</Text>
+        <AppSectionHeader title="Quick Actions" icon="bolt" />
         <View style={styles.actionsGrid}>
           {[
-            { icon: '📅', label: 'Attendance', screen: 'Attendance' },
-            { icon: '🎓', label: 'Students', screen: 'Students' },
-            { icon: '💰', label: 'Fees', screen: 'Fees' },
-            { icon: '📖', label: 'Lesson Plans', screen: 'LessonPlans' },
-            { icon: '🏖️', label: 'Leave', screen: 'Leave' },
-            { icon: '📢', label: 'Notices', screen: 'Announcements' },
+            { icon: 'clipboard-check', label: 'Attendance',   screen: 'Attendance',    color: '#059669' },
+            { icon: 'user-graduate',   label: 'Students',     screen: 'Students',      color: '#4f46e5' },
+            { icon: 'rupee-sign',      label: 'Fees',         screen: 'Fees',          color: '#d97706' },
+            { icon: 'bullhorn',        label: 'Announcements',screen: 'Announcements', color: '#7c3aed' },
           ].map((item, i) => (
             <TouchableOpacity
               key={i}
-              style={styles.actionCard}
+              style={[
+                styles.actionBtn,
+                { backgroundColor: colors.surface, ...shadows.sm, borderColor: colors.border },
+              ]}
               onPress={() => navigation.navigate(item.screen)}
-              activeOpacity={0.8}
+              activeOpacity={0.75}
             >
-              <Text style={styles.actionIcon}>{item.icon}</Text>
-              <Text style={styles.actionLabel}>{item.label}</Text>
+              <View style={[styles.actionIconWrap, { backgroundColor: `${item.color}18` }]}>
+                <Icon name={item.icon} size={20} color={item.color} solid />
+              </View>
+              <Text style={[styles.actionLabel, { color: colors.text }]}>{item.label}</Text>
             </TouchableOpacity>
           ))}
         </View>
       </View>
 
-      {/* Recent Announcements */}
-      {announcements.length > 0 && (
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Recent Announcements</Text>
-            <TouchableOpacity onPress={() => navigation.navigate('Announcements')}>
-              <Text style={styles.viewAll}>View All →</Text>
+      {/* Announcements Carousel / List */}
+      <View style={[styles.section, { paddingBottom: spacing['3xl'] }]}>
+        <AppSectionHeader
+          title="Recent Notices"
+          icon="bullhorn"
+          onViewAll={() => navigation.navigate('Announcements')}
+        />
+        {loading ? (
+          <AppSkeleton variant="list" count={3} />
+        ) : announcements.length === 0 ? (
+          <AppCard variant="bordered" padding={16}>
+            <Text style={{ textAlign: 'center', color: colors.textSecondary, fontSize: typography.size.xs }}>
+              No recent school circulars at this time.
+            </Text>
+          </AppCard>
+        ) : (
+          announcements.map((item, idx) => (
+            <TouchableOpacity
+              key={idx}
+              activeOpacity={0.8}
+              onPress={() => navigation.navigate('Announcements')}
+              style={{ marginBottom: spacing.sm }}
+            >
+              <AppCard variant="bordered" padding={12}>
+                <Text style={[styles.noticeTitle, { color: colors.text }]}>{item.title}</Text>
+                <Text style={[styles.noticeBody, { color: colors.textSecondary }]} numberOfLines={2}>
+                  {item.content}
+                </Text>
+              </AppCard>
             </TouchableOpacity>
-          </View>
-          {announcements.slice(0, 3).map((ann: any) => (
-            <View key={ann.id} style={styles.announcementCard}>
-              <View style={styles.annIconWrap}>
-                <Text style={styles.annIcon}>📢</Text>
-              </View>
-              <View style={styles.annContent}>
-                <Text style={styles.annTitle} numberOfLines={1}>{ann.title}</Text>
-                <Text style={styles.annBody} numberOfLines={2}>{ann.content}</Text>
-                <Text style={styles.annDate}>{new Date(ann.created_at).toLocaleDateString('en-IN')}</Text>
-              </View>
-            </View>
-          ))}
-        </View>
-      )}
-
-      <View style={{ height: 24 }} />
+          ))
+        )}
+      </View>
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.bg },
-  loadingContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
-  loadingText: { color: COLORS.textSecondary, fontSize: 14 },
-
-  /* Header */
+  container: {
+    flex: 1,
+  },
   header: {
-    paddingTop: Platform.OS === 'ios' ? 54 : 24,
-    paddingBottom: 28,
-    paddingHorizontal: 20,
-    borderBottomLeftRadius: 28,
-    borderBottomRightRadius: 28,
+    padding: spacing.xl,
+    borderBottomLeftRadius: radius['2xl'],
+    borderBottomRightRadius: radius['2xl'],
+    ...shadows.md,
   },
-  headerContent: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
-  greeting: { color: 'rgba(255,255,255,0.8)', fontSize: 13, fontWeight: '500' },
-  userName: { color: '#fff', fontSize: 24, fontWeight: '800', marginTop: 2 },
-  userRole: { color: 'rgba(255,255,255,0.7)', fontSize: 12, marginTop: 2 },
-  headerRight: { alignItems: 'flex-end', gap: 8 },
+  headerContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: spacing.md,
+  },
+  headerAppIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: radius.md,
+  },
+  greeting: {
+    color: 'rgba(255,255,255,0.85)',
+    fontSize: typography.size.xs,
+  },
+  userName: {
+    color: '#ffffff',
+    fontSize: typography.size.xl,
+    fontWeight: typography.weight.extrabold,
+  },
+  rolePill: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: radius.full,
+    alignSelf: 'flex-start',
+    marginTop: 2,
+  },
+  rolePillText: {
+    color: '#ffffff',
+    fontSize: typography.size['2xs'],
+    fontWeight: typography.weight.bold,
+  },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
   notifBtn: {
-    width: 40, height: 40, borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    alignItems: 'center', justifyContent: 'center',
+    width: 40,
+    height: 40,
+    borderRadius: radius.full,
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
   },
-  notifIcon: { fontSize: 18 },
   badge: {
-    position: 'absolute', top: -4, right: -4,
-    backgroundColor: COLORS.danger,
-    width: 18, height: 18, borderRadius: 9,
-    alignItems: 'center', justifyContent: 'center',
+    position: 'absolute',
+    top: -2,
+    right: -2,
+    minWidth: 16,
+    height: 16,
+    borderRadius: radius.full,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 3,
   },
-  badgeText: { color: '#fff', fontSize: 10, fontWeight: '700' },
+  badgeText: {
+    color: '#ffffff',
+    fontSize: 9,
+    fontWeight: 'bold',
+  },
   academicBadge: {
-    marginTop: 12, alignSelf: 'flex-start',
-    backgroundColor: 'rgba(255,255,255,0.15)',
-    paddingHorizontal: 12, paddingVertical: 4,
-    borderRadius: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: radius.full,
+    alignSelf: 'flex-start',
   },
-  academicText: { color: '#fff', fontSize: 12, fontWeight: '600' },
-
-  /* Stats Grid */
+  academicText: {
+    color: '#ffffff',
+    fontSize: typography.size['2xs'],
+    fontWeight: typography.weight.semibold,
+  },
   statsGrid: {
-    flexDirection: 'row', flexWrap: 'wrap',
-    paddingHorizontal: 12, paddingTop: 16, gap: 8,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.md,
+    padding: spacing.base,
   },
-  statCard: {
-    width: '47%', backgroundColor: COLORS.surface,
-    borderRadius: 14, padding: 16,
-    borderTopWidth: 3, borderTopColor: COLORS.primary,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06, shadowRadius: 6, elevation: 3,
+  section: {
+    paddingHorizontal: spacing.base,
+    marginTop: spacing.md,
   },
-  statIcon: { fontSize: 24, marginBottom: 6 },
-  statValue: { fontSize: 22, fontWeight: '800', color: COLORS.primary },
-  statLabel: { fontSize: 11, color: COLORS.textSecondary, marginTop: 2, fontWeight: '500' },
-
-  /* Sections */
-  section: { paddingHorizontal: 16, marginTop: 20 },
-  sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
-  sectionTitle: { fontSize: 16, fontWeight: '700', color: COLORS.text, marginBottom: 12 },
-  viewAll: { fontSize: 12, color: COLORS.primary, fontWeight: '600' },
-
-  /* Quick Actions */
-  actionsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  actionCard: {
-    width: '30%', backgroundColor: COLORS.surface,
-    borderRadius: 14, padding: 14,
-    alignItems: 'center', gap: 6,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05, shadowRadius: 4, elevation: 2,
+  actionsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.md,
   },
-  actionIcon: { fontSize: 26 },
-  actionLabel: { fontSize: 11, fontWeight: '600', color: COLORS.text, textAlign: 'center' },
-
-  /* Announcements */
-  announcementCard: {
-    backgroundColor: COLORS.surface, borderRadius: 12, padding: 12,
-    flexDirection: 'row', gap: 10, marginBottom: 8,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05, shadowRadius: 4, elevation: 2,
+  actionBtn: {
+    width: '48%',
+    padding: spacing.md,
+    borderRadius: radius.lg,
+    alignItems: 'center',
+    gap: spacing.xs,
+    borderWidth: 1,
   },
-  annIconWrap: {
-    width: 40, height: 40, borderRadius: 20,
-    backgroundColor: '#ede9fe',
-    alignItems: 'center', justifyContent: 'center',
+  actionIconWrap: {
+    width: 44,
+    height: 44,
+    borderRadius: radius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  annIcon: { fontSize: 18 },
-  annContent: { flex: 1 },
-  annTitle: { fontSize: 13, fontWeight: '700', color: COLORS.text },
-  annBody: { fontSize: 12, color: COLORS.textSecondary, marginTop: 2, lineHeight: 16 },
-  annDate: { fontSize: 10, color: COLORS.textSecondary, marginTop: 4 },
+  actionLabel: {
+    fontSize: typography.size.xs,
+    fontWeight: typography.weight.bold,
+  },
+  noticeTitle: {
+    fontSize: typography.size.sm,
+    fontWeight: typography.weight.bold,
+  },
+  noticeBody: {
+    fontSize: typography.size.xs,
+    lineHeight: 18,
+    marginTop: 2,
+  },
 });

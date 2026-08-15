@@ -180,7 +180,7 @@ async def verify_device_login(
     db: DBSession,
 ):
     """
-    Process 'I'M IN — I WANT TO LOGIN' approval.
+    Process 'I'M IN — I WANT TO LOGIN' / 'Yes, This Is Me' approval.
 
     Flow:
     1. Validate approval token (hash, expiry, single-use).

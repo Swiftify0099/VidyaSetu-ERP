@@ -1,11 +1,8 @@
-/**
- * VidyaSetu Mobile — Auth Store (Zustand)
- * Manages login state, tokens, and user info globally.
- */
 import { create } from 'zustand';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { authAPI, STORAGE_KEYS } from '../services/api';
+import { api, authAPI, STORAGE_KEYS } from '../services/api';
 import mobileFcmService from '../services/fcmService';
+import { buildMobileDeviceContext } from '../services/deviceService';
 
 interface Role { id: number; name: string; code: string; color: string; }
 interface User {
@@ -26,7 +23,7 @@ interface AuthState {
   isLoading: boolean;
   error: string | null;
 
-  login: (username: string, password: string) => Promise<void>;
+  login: (username: string, password: string, navigation?: any) => Promise<void>;
   logout: () => Promise<void>;
   loadFromStorage: () => Promise<void>;
   clearError: () => void;
@@ -41,11 +38,35 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   isLoading: false,
   error: null,
 
-  login: async (username: string, password: string) => {
+  login: async (username: string, password: string, navigation?: any) => {
     set({ isLoading: true, error: null });
     try {
-      const res = await authAPI.login(username, password);
-      const { access_token, refresh_token, user } = res.data?.data ?? res.data;
+      // Build device context — sends installation ID, platform, OS version.
+      // Never contains IMEI, MAC address, or other hardware identifiers.
+      const deviceContext = await buildMobileDeviceContext();
+
+      const res = await api.post('/auth/login', {
+        username,
+        password,
+        ...deviceContext,
+      });
+
+      const responseData = res.data?.data ?? res.data;
+
+      // ── HTTP 202: New device detected — verification email sent ──
+      // Backend returns 202 with requires_verification=true and login_attempt_id.
+      // Navigate to the DeviceVerification screen to wait for email approval.
+      if (res.status === 202 || responseData?.requires_verification) {
+        set({ isLoading: false });
+        const loginAttemptId = responseData?.login_attempt_id ?? '';
+        if (navigation) {
+          navigation.navigate('DeviceVerification', { loginAttemptId });
+        }
+        return;
+      }
+
+      // ── HTTP 200: Normal successful login ──
+      const { access_token, refresh_token, user } = responseData;
 
       const itemsToSave: [string, string][] = [
         [STORAGE_KEYS.ACCESS_TOKEN, access_token],
@@ -112,6 +133,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
       if (accessToken && user) {
         set({ accessToken, user, isAuthenticated: true, isLoading: false });
+        mobileFcmService.init().catch(console.warn);
       } else {
         set({ isLoading: false });
       }

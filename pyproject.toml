@@ -41,3 +41,10 @@ dependencies = [
     "uvicorn[standard]==0.30.6",
     "xlsxwriter==3.2.0",
 ]
+
+[tool.pyright]
+include = ["backend"]
+extraPaths = ["backend"]
+venvPath = "backend"
+venv = ".venv"
+

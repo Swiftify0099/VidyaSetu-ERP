@@ -90,6 +90,7 @@ async def lifespan(app: FastAPI):
         import app.modules.leave.models, app.modules.lesson_plan.models, app.modules.behaviour.models
         import app.modules.transport.models
         import app.modules.fcm.models  # FCM device tokens + notification logs
+        import app.modules.video.models  # Video content (lectures uploaded by teachers)
         import app.modules.device_security.models  # Trusted devices + login events
         BaseModel.metadata.create_all(bind=engine)
         from sqlalchemy import text
@@ -167,17 +168,32 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)  # ty
 app.add_middleware(SlowAPIMiddleware)
 
 # ── CORS Middleware ───────────────────────────────────────────
-cors_origins = [o for o in settings.allowed_origins_list if o != "*"]
+# Build the allowed origins list from settings (env vars on Render override .env)
+cors_origins = [o for o in settings.allowed_origins_list if o.strip()]
+
+# Safety fallback: always include known Cloudflare Pages patterns
+_default_cf_origins = [
+    "https://vidyasetu-erp.pages.dev",
+    "https://vidyasetu.pages.dev",
+    "https://vidyasetu-erp.vidyasetu001.workers.dev",
+]
+for _o in _default_cf_origins:
+    if _o not in cors_origins:
+        cors_origins.append(_o)
+
+logger.info(f"   CORS Origins: {cors_origins}")
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=cors_origins,
-    allow_origin_regex=r"https?://.*" if settings.APP_ENV == "development" else r"https://.*\.(pages|workers)\.dev",
+    # Regex: allow ALL Cloudflare Pages/Workers subdomains (handles preview deploys too)
+    allow_origin_regex=r"https://.*\.(pages\.dev|workers\.dev)$",
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"],
     allow_headers=["*"],
     expose_headers=["Content-Disposition"],
 )
+
 
 
 # ── Security Headers Middleware ───────────────────────────────

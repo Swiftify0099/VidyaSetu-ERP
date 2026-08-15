@@ -269,7 +269,7 @@ export default function StudentPortalPage() {
         setLoading(false);
       })
       .catch(e => {
-        setError(e?.response?.data?.message ?? 'Could not load student profile.');
+        setError(e?.response?.data?.detail ?? e?.response?.data?.message ?? 'Could not load student profile.');
         setLoading(false);
       });
   }, []);

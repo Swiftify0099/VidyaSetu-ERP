@@ -1,22 +1,38 @@
 /**
- * VidyaSetu Mobile — Admission Management Screen
- * Admission applications, GR management, bulk promotion.
- * clerk, receptionist, admin
+ * VidyaSetu Mobile — Admission Management Screen (Premium Redesign)
+ * =================================================================
+ * Admission applications list, approval workflows, status filters,
+ * and structured new admission form.
  */
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import {
-  View, Text, StyleSheet, FlatList, TouchableOpacity, Modal,
-  TextInput, Alert, ActivityIndicator, ScrollView, RefreshControl,
+  View,
+  Text,
+  StyleSheet,
+  FlatList,
+  TouchableOpacity,
+  RefreshControl,
+  ScrollView,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/FontAwesome5';
 import { useTheme } from '../../theme/ThemeContext';
 import { admissionAPI } from '../../services/api';
-import { spacing, radius, typography } from '../../theme';
+import { spacing, radius, typography, shadows } from '../../theme';
 import { formatDateLong, formatStatus, getErrorMessage } from '../../utils/formatters';
-import Badge from '../../components/ui/Badge';
-import PremiumCard from '../../components/ui/PremiumCard';
-import SectionHeader from '../../components/ui/SectionHeader';
-import SkeletonLoader from '../../components/ui/SkeletonLoader';
+import {
+  AppCard,
+  AppButton,
+  AppBadge,
+  AppChip,
+  AppAvatar,
+  AppSearchBar,
+  AppInput,
+  AppSelect,
+  AppBottomSheet,
+  AppEmptyState,
+  AppSkeleton,
+  AppConfirmDialog,
+} from '../../components/ui';
 import Toast from 'react-native-toast-message';
 import { BLOOD_GROUPS, GENDER_OPTIONS } from '../../config/constants';
 
@@ -48,7 +64,10 @@ const EMPTY_FORM = {
   blood_group: '',
 };
 
-const CLASSES = ['1','2','3','4','5','6','7','8','9','10','11','12'];
+const CLASS_OPTIONS = Array.from({ length: 12 }, (_, i) => ({
+  label: `Standard ${i + 1}`,
+  value: String(i + 1),
+}));
 
 export default function AdmissionManagementScreen({ navigation }: { navigation: any }) {
   const { colors } = useTheme();
@@ -61,6 +80,11 @@ export default function AdmissionManagementScreen({ navigation }: { navigation: 
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
   const [search, setSearch] = useState('');
 
+  // Confirmation dialogs
+  const [selectedAdmission, setSelectedAdmission] = useState<Admission | null>(null);
+  const [confirmAction, setConfirmAction] = useState<'approve' | 'reject' | null>(null);
+  const [confirmLoading, setConfirmLoading] = useState(false);
+
   const load = useCallback(async () => {
     try {
       const res = await admissionAPI.list({
@@ -68,15 +92,28 @@ export default function AdmissionManagementScreen({ navigation }: { navigation: 
         search: search || undefined,
       });
       setAdmissions(res.data?.data?.items ?? res.data?.data ?? []);
-    } catch { /* ignore */ }
-    finally { setLoading(false); setRefreshing(false); }
+    } catch (e) {
+      Toast.show({ type: 'error', text1: 'Failed to load admissions', text2: getErrorMessage(e) });
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
   }, [statusFilter, search]);
 
-  useEffect(() => { load(); }, [load]);
-  const onRefresh = () => { setRefreshing(true); load(); };
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    load();
+  };
 
   const createAdmission = async () => {
-    if (!form.applicant_name.trim()) { Toast.show({ type: 'error', text1: 'Applicant name is required' }); return; }
+    if (!form.applicant_name.trim()) {
+      Toast.show({ type: 'error', text1: 'Applicant name is required' });
+      return;
+    }
     setSaving(true);
     try {
       await admissionAPI.create(form);
@@ -86,272 +123,352 @@ export default function AdmissionManagementScreen({ navigation }: { navigation: 
       load();
     } catch (e) {
       Toast.show({ type: 'error', text1: getErrorMessage(e) });
-    } finally { setSaving(false); }
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const approveAdmission = async (id: number) => {
-    Alert.alert('Approve Admission', 'Approve this admission application? A GR number will be assigned.', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Approve',
-        onPress: async () => {
-          try {
-            await admissionAPI.approve(id);
-            Toast.show({ type: 'success', text1: 'Admission approved! GR number assigned.' });
-            load();
-          } catch (e) { Toast.show({ type: 'error', text1: getErrorMessage(e) }); }
-        },
-      },
-    ]);
-  };
-
-  const rejectAdmission = async (id: number) => {
-    Alert.alert('Reject Admission', 'Reject this admission application?', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Reject', style: 'destructive',
-        onPress: async () => {
-          try {
-            await admissionAPI.reject(id, 'Rejected by administrator');
-            Toast.show({ type: 'success', text1: 'Admission rejected' });
-            load();
-          } catch (e) { Toast.show({ type: 'error', text1: getErrorMessage(e) }); }
-        },
-      },
-    ]);
+  const handleConfirmAction = async () => {
+    if (!selectedAdmission || !confirmAction) return;
+    setConfirmLoading(true);
+    try {
+      if (confirmAction === 'approve') {
+        await admissionAPI.approve(selectedAdmission.id);
+        Toast.show({ type: 'success', text1: 'Admission Approved', text2: 'GR Number has been automatically assigned.' });
+      } else {
+        await admissionAPI.reject(selectedAdmission.id, 'Rejected by administrator');
+        Toast.show({ type: 'info', text1: 'Admission Application Rejected' });
+      }
+      load();
+    } catch (e) {
+      Toast.show({ type: 'error', text1: getErrorMessage(e) });
+    } finally {
+      setConfirmLoading(false);
+      setConfirmAction(null);
+      setSelectedAdmission(null);
+    }
   };
 
   function badgeVariant(status: string): any {
     if (status === 'approved') return 'success';
     if (status === 'pending')  return 'warning';
     if (status === 'rejected') return 'danger';
-    return 'default';
+    return 'neutral';
   }
 
+  const filteredAdmissions = useMemo(() => {
+    if (!search.trim()) return admissions;
+    const q = search.toLowerCase();
+    return admissions.filter(a =>
+      a.applicant_name.toLowerCase().includes(q) ||
+      (a.gr_number && a.gr_number.includes(q)) ||
+      (a.mobile && a.mobile.includes(q))
+    );
+  }, [admissions, search]);
+
   return (
-    <View style={[s.root, { backgroundColor: colors.background }]}>
-      {/* Search */}
-      <View style={[s.topBar, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
-        <View style={[s.searchBox, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder }]}>
-          <Icon name="search" size={14} color={colors.textTertiary} />
-          <TextInput
-            style={[s.searchInput, { color: colors.text }]}
-            value={search}
-            onChangeText={setSearch}
-            placeholder="Search by name..."
-            placeholderTextColor={colors.placeholder}
-          />
-        </View>
-        <View style={s.filterBtns}>
+    <View style={[styles.root, { backgroundColor: colors.background }]}>
+      {/* Search & Filter Header */}
+      <View style={[styles.topBar, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
+        <AppSearchBar
+          value={search}
+          onChangeText={setSearch}
+          placeholder="Search by applicant name, mobile, GR..."
+          style={{ marginVertical: 0 }}
+        />
+
+        {/* Filter Chips */}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{ gap: spacing.sm, paddingTop: spacing.xs }}
+        >
           {[null, 'pending', 'approved', 'rejected'].map((f, i) => (
-            <TouchableOpacity
+            <AppChip
               key={i}
-              style={[s.filterBtn, statusFilter === f && { backgroundColor: colors.primary }]}
+              label={f === null ? 'All' : formatStatus(f)}
+              selected={statusFilter === f}
               onPress={() => setStatusFilter(f)}
-            >
-              <Text style={[s.filterBtnText, statusFilter === f && { color: '#fff' }]}>
-                {f === null ? 'All' : formatStatus(f)}
-              </Text>
-            </TouchableOpacity>
+            />
           ))}
-        </View>
+        </ScrollView>
       </View>
 
+      {/* Main List */}
       {loading ? (
         <View style={{ padding: spacing.base }}>
-          <SkeletonLoader variant="list" count={5} />
+          <AppSkeleton variant="list" count={6} />
         </View>
       ) : (
         <FlatList
-          data={admissions}
+          data={filteredAdmissions}
           keyExtractor={a => String(a.id)}
           contentContainerStyle={{ padding: spacing.base, paddingBottom: 100 }}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} colors={[colors.primary]} />}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor={colors.primary}
+              colors={[colors.primary]}
+            />
+          }
           ItemSeparatorComponent={() => <View style={{ height: 8 }} />}
           renderItem={({ item }) => (
-            <PremiumCard variant="bordered" padding={12}>
-              <View style={s.admRow}>
-                <View style={[s.admAvatar, { backgroundColor: colors.primaryBg }]}>
-                  <Text style={[s.admAvatarText, { color: colors.primary }]}>
-                    {item.applicant_name[0]?.toUpperCase()}
-                  </Text>
-                </View>
+            <AppCard variant="bordered" padding={14}>
+              <View style={styles.admRow}>
+                <AppAvatar name={item.applicant_name} size="md" />
+
                 <View style={{ flex: 1 }}>
-                  <View style={s.admTitleRow}>
-                    <Text style={[s.admName, { color: colors.text }]}>{item.applicant_name}</Text>
-                    <Badge label={formatStatus(item.status)} variant={badgeVariant(item.status)} size="sm" rounded />
+                  <View style={styles.admTitleRow}>
+                    <Text style={[styles.admName, { color: colors.text }]}>
+                      {item.applicant_name}
+                    </Text>
+                    <AppBadge
+                      label={formatStatus(item.status)}
+                      variant={badgeVariant(item.status)}
+                      size="sm"
+                      rounded
+                    />
                   </View>
+
                   {(item.father_name || item.mother_name) && (
-                    <Text style={[s.admParents, { color: colors.textSecondary }]}>
+                    <Text style={[styles.admParents, { color: colors.textSecondary }]}>
                       {[item.father_name, item.mother_name].filter(Boolean).join(' / ')}
                     </Text>
                   )}
-                  <Text style={[s.admMeta, { color: colors.textTertiary }]}>
-                    📚 Std {item.standard_applied}
-                    {item.mobile ? ` • 📞 ${item.mobile}` : ''}
-                    {item.gr_number ? ` • GR: ${item.gr_number}` : ''}
-                  </Text>
-                  <Text style={[s.admDate, { color: colors.textTertiary }]}>
+
+                  <View style={styles.metaRow}>
+                    <Icon name="graduation-cap" size={11} color={colors.textTertiary} solid />
+                    <Text style={[styles.admMeta, { color: colors.textTertiary }]}>
+                      Std {item.standard_applied}
+                    </Text>
+                    {item.mobile && (
+                      <>
+                        <Text style={{ color: colors.textTertiary }}>•</Text>
+                        <Icon name="phone" size={10} color={colors.textTertiary} solid />
+                        <Text style={[styles.admMeta, { color: colors.textTertiary }]}>
+                          {item.mobile}
+                        </Text>
+                      </>
+                    )}
+                    {item.gr_number && (
+                      <Text style={[styles.admMeta, { color: colors.primary, fontWeight: 'bold' }]}>
+                        • GR: {item.gr_number}
+                      </Text>
+                    )}
+                  </View>
+
+                  <Text style={[styles.admDate, { color: colors.textTertiary }]}>
                     Applied: {formatDateLong(item.applied_on)}
                   </Text>
+
+                  {/* Actions for Pending Applications */}
                   {item.status === 'pending' && (
-                    <View style={s.admActions}>
-                      <TouchableOpacity
-                        style={[s.admBtn, { backgroundColor: colors.successBg }]}
-                        onPress={() => approveAdmission(item.id)}
-                      >
-                        <Icon name="check" size={12} color={colors.success} solid />
-                        <Text style={[s.admBtnText, { color: colors.success }]}>Approve</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        style={[s.admBtn, { backgroundColor: colors.dangerBg }]}
-                        onPress={() => rejectAdmission(item.id)}
-                      >
-                        <Icon name="times" size={12} color={colors.danger} solid />
-                        <Text style={[s.admBtnText, { color: colors.danger }]}>Reject</Text>
-                      </TouchableOpacity>
+                    <View style={styles.admActions}>
+                      <AppButton
+                        label="Approve"
+                        iconLeft="check"
+                        variant="success"
+                        size="sm"
+                        onPress={() => {
+                          setSelectedAdmission(item);
+                          setConfirmAction('approve');
+                        }}
+                      />
+                      <AppButton
+                        label="Reject"
+                        iconLeft="times"
+                        variant="danger"
+                        size="sm"
+                        onPress={() => {
+                          setSelectedAdmission(item);
+                          setConfirmAction('reject');
+                        }}
+                      />
                     </View>
                   )}
                 </View>
               </View>
-            </PremiumCard>
+            </AppCard>
           )}
           ListEmptyComponent={
-            <View style={s.emptyWrap}>
-              <Text style={s.emptyIcon}>📋</Text>
-              <Text style={[s.emptyText, { color: colors.textSecondary }]}>No admission applications found</Text>
-            </View>
+            <AppEmptyState
+              icon="user-plus"
+              title="No Applications Found"
+              description="No admission applications matching your current search or filter criteria."
+              actionLabel="New Admission"
+              onAction={() => {
+                setForm({ ...EMPTY_FORM });
+                setShowForm(true);
+              }}
+              style={{ flex: 1 }}
+            />
           }
         />
       )}
 
-      {/* FAB */}
+      {/* Floating Action Button */}
       <TouchableOpacity
-        style={[s.fab, { backgroundColor: colors.primary }]}
-        onPress={() => { setForm({ ...EMPTY_FORM }); setShowForm(true); }}
+        style={[styles.fab, { backgroundColor: colors.primary, ...shadows.lg }]}
+        onPress={() => {
+          setForm({ ...EMPTY_FORM });
+          setShowForm(true);
+        }}
+        activeOpacity={0.85}
+        accessibilityRole="button"
+        accessibilityLabel="New Admission"
       >
         <Icon name="plus" size={20} color="#fff" solid />
       </TouchableOpacity>
 
-      {/* New Admission Modal */}
-      <Modal visible={showForm} animationType="slide" presentationStyle="pageSheet">
-        <View style={[s.modal, { backgroundColor: colors.background }]}>
-          <View style={[s.modalHeader, { borderBottomColor: colors.border }]}>
-            <TouchableOpacity onPress={() => setShowForm(false)}>
-              <Icon name="times" size={20} color={colors.text} />
-            </TouchableOpacity>
-            <Text style={[s.modalTitle, { color: colors.text }]}>New Admission</Text>
-            <TouchableOpacity onPress={createAdmission} disabled={saving}>
-              {saving
-                ? <ActivityIndicator size="small" color={colors.primary} />
-                : <Text style={[s.saveText, { color: colors.primary }]}>Submit</Text>}
-            </TouchableOpacity>
-          </View>
-          <ScrollView contentContainerStyle={{ padding: spacing.base, gap: 14 }}>
-            <View>
-              <Text style={[s.label, { color: colors.textSecondary }]}>Applicant Name *</Text>
-              <TextInput style={[s.input, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder, color: colors.text }]}
-                value={form.applicant_name} onChangeText={v => setForm(f => ({ ...f, applicant_name: v }))}
-                placeholder="Student full name..." placeholderTextColor={colors.placeholder} />
-            </View>
-            <View>
-              <Text style={[s.label, { color: colors.textSecondary }]}>Father's Name</Text>
-              <TextInput style={[s.input, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder, color: colors.text }]}
-                value={form.father_name} onChangeText={v => setForm(f => ({ ...f, father_name: v }))}
-                placeholder="Father's name..." placeholderTextColor={colors.placeholder} />
-            </View>
-            <View>
-              <Text style={[s.label, { color: colors.textSecondary }]}>Mother's Name</Text>
-              <TextInput style={[s.input, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder, color: colors.text }]}
-                value={form.mother_name} onChangeText={v => setForm(f => ({ ...f, mother_name: v }))}
-                placeholder="Mother's name..." placeholderTextColor={colors.placeholder} />
-            </View>
-            <View>
-              <Text style={[s.label, { color: colors.textSecondary }]}>Date of Birth</Text>
-              <TextInput style={[s.input, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder, color: colors.text }]}
-                value={form.date_of_birth} onChangeText={v => setForm(f => ({ ...f, date_of_birth: v }))}
-                placeholder="YYYY-MM-DD" placeholderTextColor={colors.placeholder} />
-            </View>
-            <View>
-              <Text style={[s.label, { color: colors.textSecondary }]}>Gender</Text>
-              <View style={s.chips}>
-                {GENDER_OPTIONS.map(g => (
-                  <TouchableOpacity key={g.value}
-                    style={[s.chip, form.gender === g.value && { backgroundColor: colors.primary }]}
-                    onPress={() => setForm(f => ({ ...f, gender: g.value }))}>
-                    <Text style={[s.chipText, form.gender === g.value && { color: '#fff' }]}>{g.label}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </View>
-            <View>
-              <Text style={[s.label, { color: colors.textSecondary }]}>Mobile</Text>
-              <TextInput style={[s.input, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder, color: colors.text }]}
-                value={form.mobile} onChangeText={v => setForm(f => ({ ...f, mobile: v }))}
-                placeholder="10-digit mobile..." placeholderTextColor={colors.placeholder} keyboardType="phone-pad" />
-            </View>
-            <View>
-              <Text style={[s.label, { color: colors.textSecondary }]}>Applying for Standard</Text>
-              <View style={s.chips}>
-                {CLASSES.map(c => (
-                  <TouchableOpacity key={c}
-                    style={[s.chip, form.standard_applied === c && { backgroundColor: colors.primary }]}
-                    onPress={() => setForm(f => ({ ...f, standard_applied: c }))}>
-                    <Text style={[s.chipText, form.standard_applied === c && { color: '#fff' }]}>{c}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </View>
-            <View>
-              <Text style={[s.label, { color: colors.textSecondary }]}>Address</Text>
-              <TextInput style={[s.input, s.textarea, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder, color: colors.text }]}
-                value={form.address} onChangeText={v => setForm(f => ({ ...f, address: v }))}
-                placeholder="Residential address..." placeholderTextColor={colors.placeholder}
-                multiline numberOfLines={3} />
-            </View>
-          </ScrollView>
+      {/* New Admission Bottom Sheet Form */}
+      <AppBottomSheet
+        visible={showForm}
+        onClose={() => setShowForm(false)}
+        title="New Admission Application"
+        subtitle="Enter prospective student information"
+      >
+        <View style={{ gap: spacing.xs }}>
+          <AppInput
+            label="Applicant Full Name *"
+            value={form.applicant_name}
+            onChangeText={v => setForm(f => ({ ...f, applicant_name: v }))}
+            icon="user"
+            placeholder="e.g. Aarav Sharma"
+          />
+
+          <AppSelect
+            label="Applying for Standard *"
+            value={form.standard_applied}
+            options={CLASS_OPTIONS}
+            onSelect={v => setForm(f => ({ ...f, standard_applied: String(v) }))}
+            icon="graduation-cap"
+          />
+
+          <AppInput
+            label="Father's Name"
+            value={form.father_name}
+            onChangeText={v => setForm(f => ({ ...f, father_name: v }))}
+            icon="user-friends"
+          />
+
+          <AppInput
+            label="Mother's Name"
+            value={form.mother_name}
+            onChangeText={v => setForm(f => ({ ...f, mother_name: v }))}
+            icon="user-friends"
+          />
+
+          <AppInput
+            label="Mobile Number"
+            value={form.mobile}
+            onChangeText={v => setForm(f => ({ ...f, mobile: v }))}
+            icon="phone"
+            keyboardType="phone-pad"
+            maxLength={10}
+          />
+
+          <AppInput
+            label="Residential Address"
+            value={form.address}
+            onChangeText={v => setForm(f => ({ ...f, address: v }))}
+            icon="map-marker-alt"
+            multiline
+          />
+
+          <AppButton
+            label="Submit Admission"
+            iconLeft="paper-plane"
+            variant="primary"
+            size="lg"
+            onPress={createAdmission}
+            loading={saving}
+            fullWidth
+            style={{ marginTop: spacing.md }}
+          />
         </View>
-      </Modal>
+      </AppBottomSheet>
+
+      {/* Confirmation Dialog */}
+      <AppConfirmDialog
+        visible={!!confirmAction}
+        onClose={() => {
+          setConfirmAction(null);
+          setSelectedAdmission(null);
+        }}
+        onConfirm={handleConfirmAction}
+        title={confirmAction === 'approve' ? 'Approve Admission' : 'Reject Admission'}
+        message={
+          confirmAction === 'approve'
+            ? `Approve application for ${selectedAdmission?.applicant_name}? A permanent GR number will be assigned.`
+            : `Are you sure you want to reject ${selectedAdmission?.applicant_name}'s admission application?`
+        }
+        confirmLabel={confirmAction === 'approve' ? 'Approve Application' : 'Reject Application'}
+        variant={confirmAction === 'approve' ? 'success' : 'danger'}
+        loading={confirmLoading}
+      />
     </View>
   );
 }
 
-const s = StyleSheet.create({
-  root: { flex: 1 },
-  topBar: { padding: spacing.sm, gap: 8, borderBottomWidth: 1 },
-  searchBox: { flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1.5, borderRadius: radius.md, paddingHorizontal: 12, height: 40 },
-  searchInput: { flex: 1, fontSize: typography.size.base },
-  filterBtns: { flexDirection: 'row', gap: 6, flexWrap: 'wrap' },
-  filterBtn: { paddingHorizontal: 12, paddingVertical: 5, borderRadius: radius.full, backgroundColor: '#f3f4f6', borderWidth: 1, borderColor: '#e5e7eb' },
-  filterBtnText: { fontSize: typography.size.xs, fontWeight: typography.weight.bold, color: '#6b7280' },
-  admRow: { flexDirection: 'row', gap: 12 },
-  admAvatar: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
-  admAvatarText: { fontSize: typography.size.xl, fontWeight: typography.weight.bold },
-  admTitleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 2 },
-  admName: { fontSize: typography.size.base, fontWeight: typography.weight.bold, flex: 1, marginRight: 6 },
-  admParents: { fontSize: typography.size.sm, marginBottom: 2 },
-  admMeta: { fontSize: typography.size.xs, marginBottom: 2 },
-  admDate: { fontSize: typography.size.xs, marginBottom: 6 },
-  admActions: { flexDirection: 'row', gap: 8 },
-  admBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 12, paddingVertical: 6, borderRadius: radius.full },
-  admBtnText: { fontSize: typography.size.xs, fontWeight: typography.weight.bold },
-  emptyWrap: { alignItems: 'center', padding: spacing.xl },
-  emptyIcon: { fontSize: 44, marginBottom: 12 },
-  emptyText: { fontSize: typography.size.base },
-  fab: {
-    position: 'absolute', bottom: 24, right: 24,
-    width: 56, height: 56, borderRadius: 28,
-    alignItems: 'center', justifyContent: 'center',
-    elevation: 6, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8,
+const styles = StyleSheet.create({
+  root: {
+    flex: 1,
   },
-  modal: { flex: 1 },
-  modalHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: spacing.base, borderBottomWidth: 1 },
-  modalTitle: { fontSize: typography.size.lg, fontWeight: typography.weight.bold },
-  saveText: { fontSize: typography.size.base, fontWeight: typography.weight.bold },
-  label: { fontSize: typography.size.xs, fontWeight: typography.weight.semibold, textTransform: 'uppercase', marginBottom: 6 },
-  input: { height: 48, borderWidth: 1.5, borderRadius: radius.md, paddingHorizontal: spacing.md, fontSize: typography.size.base },
-  textarea: { height: 90, textAlignVertical: 'top', paddingTop: 10 },
-  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  chip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: radius.full, backgroundColor: '#f3f4f6', borderWidth: 1.5, borderColor: '#e5e7eb' },
-  chipText: { fontSize: typography.size.sm, fontWeight: typography.weight.semibold, color: '#6b7280' },
+  topBar: {
+    padding: spacing.base,
+    borderBottomWidth: 1,
+    gap: spacing.sm,
+  },
+  admRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing.md,
+  },
+  admTitleRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 2,
+  },
+  admName: {
+    fontSize: typography.size.base,
+    fontWeight: typography.weight.bold,
+    flex: 1,
+    marginRight: spacing.sm,
+  },
+  admParents: {
+    fontSize: typography.size.xs,
+    marginBottom: 4,
+  },
+  metaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 2,
+    flexWrap: 'wrap',
+  },
+  admMeta: {
+    fontSize: typography.size.xs,
+    fontWeight: typography.weight.medium,
+  },
+  admDate: {
+    fontSize: typography.size['2xs'],
+    marginTop: 4,
+  },
+  admActions: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginTop: spacing.md,
+  },
+  fab: {
+    position: 'absolute',
+    bottom: 24,
+    right: 20,
+    width: 54,
+    height: 54,
+    borderRadius: radius.full,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
 });

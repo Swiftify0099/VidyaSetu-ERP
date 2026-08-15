@@ -1,31 +1,34 @@
 /**
- * EduShakti One ERP — Premium Design System
- * ==========================================
- * Single source of truth for all design tokens.
- * Every component, screen, and style imports from here.
- * NO hardcoded colors, fonts, or spacing anywhere else.
+ * VidyaSetu Mobile ERP — Premium Design System Tokens
+ * ====================================================
+ * Single source of truth for all visual tokens:
+ * colors, typography scale, spacing, radii, elevations, role accents.
  */
 
 // ─────────────────────────────────────────────────────────────────────────────
-// SPACING — 4px base unit
+// SPACING SYSTEM (4px base unit)
 // ─────────────────────────────────────────────────────────────────────────────
 export const spacing = {
-  xs:  4,
-  sm:  8,
-  md:  12,
+  none: 0,
+  xs:   4,
+  sm:   8,
+  md:   12,
   base: 16,
-  lg:  20,
-  xl:  24,
+  lg:   20,
+  xl:   24,
   '2xl': 32,
   '3xl': 40,
   '4xl': 48,
   '5xl': 64,
 } as const;
 
+export type SpacingKey = keyof typeof spacing;
+
 // ─────────────────────────────────────────────────────────────────────────────
-// BORDER RADIUS
+// BORDER RADIUS SYSTEM
 // ─────────────────────────────────────────────────────────────────────────────
 export const radius = {
+  none: 0,
   xs:   4,
   sm:   8,
   md:   12,
@@ -36,16 +39,19 @@ export const radius = {
   full: 9999,
 } as const;
 
+export type RadiusKey = keyof typeof radius;
+
 // ─────────────────────────────────────────────────────────────────────────────
-// TYPOGRAPHY
+// TYPOGRAPHY SYSTEM
 // ─────────────────────────────────────────────────────────────────────────────
 export const typography = {
   size: {
-    xs:   10,
-    sm:   12,
-    base: 14,
-    md:   15,
-    lg:   17,
+    '2xs': 10,
+    xs:   11,
+    sm:   13,
+    base: 15,
+    md:   16,
+    lg:   18,
     xl:   20,
     '2xl': 24,
     '3xl': 28,
@@ -61,80 +67,184 @@ export const typography = {
     black:     '900' as const,
   },
   lineHeight: {
-    tight:   1.2,
+    none:    1,
+    tight:   1.25,
     normal:  1.5,
     relaxed: 1.75,
+  },
+  letterSpacing: {
+    tighter: -0.8,
+    tight:   -0.4,
+    normal:   0,
+    wide:     0.4,
+    wider:    0.8,
+    widest:   1.2,
+  },
+} as const;
+
+// Semantic typography presets for consistent app-wide usage
+export const textPresets = {
+  display: {
+    fontSize: typography.size['4xl'],
+    lineHeight: 40,
+    fontWeight: typography.weight.extrabold,
+    letterSpacing: typography.letterSpacing.tight,
+  },
+  h1: {
+    fontSize: typography.size['2xl'],
+    lineHeight: 30,
+    fontWeight: typography.weight.bold,
+    letterSpacing: typography.letterSpacing.tight,
+  },
+  h2: {
+    fontSize: typography.size.xl,
+    lineHeight: 26,
+    fontWeight: typography.weight.bold,
+    letterSpacing: typography.letterSpacing.normal,
+  },
+  h3: {
+    fontSize: typography.size.lg,
+    lineHeight: 24,
+    fontWeight: typography.weight.semibold,
+    letterSpacing: typography.letterSpacing.normal,
+  },
+  bodyLarge: {
+    fontSize: typography.size.md,
+    lineHeight: 22,
+    fontWeight: typography.weight.regular,
+    letterSpacing: typography.letterSpacing.normal,
+  },
+  body: {
+    fontSize: typography.size.base,
+    lineHeight: 20,
+    fontWeight: typography.weight.regular,
+    letterSpacing: typography.letterSpacing.normal,
+  },
+  bodySmall: {
+    fontSize: typography.size.sm,
+    lineHeight: 18,
+    fontWeight: typography.weight.regular,
+    letterSpacing: typography.letterSpacing.normal,
+  },
+  caption: {
+    fontSize: typography.size.xs,
+    lineHeight: 15,
+    fontWeight: typography.weight.medium,
+    letterSpacing: typography.letterSpacing.wide,
+  },
+  label: {
+    fontSize: typography.size.sm,
+    lineHeight: 16,
+    fontWeight: typography.weight.semibold,
+    letterSpacing: typography.letterSpacing.wide,
+  },
+  button: {
+    fontSize: typography.size.base,
+    lineHeight: 20,
+    fontWeight: typography.weight.bold,
+    letterSpacing: typography.letterSpacing.wide,
   },
 } as const;
 
 // ─────────────────────────────────────────────────────────────────────────────
-// PALETTE — Base colors (not exposed directly, used to build themes)
+// BASE PALETTE
 // ─────────────────────────────────────────────────────────────────────────────
 const palette = {
-  // Indigo (primary brand)
+  // Brand Primary (Deep Royal Indigo)
   indigo50:  '#eef2ff',
   indigo100: '#e0e7ff',
   indigo200: '#c7d2fe',
+  indigo300: '#a5b4fc',
   indigo400: '#818cf8',
   indigo500: '#6366f1',
   indigo600: '#4f46e5',
   indigo700: '#4338ca',
   indigo800: '#3730a3',
   indigo900: '#312e81',
+  indigo950: '#1e1b4b',
 
-  // Emerald (student/success)
+  // Emerald (Success & Student identity)
   emerald50:  '#ecfdf5',
   emerald100: '#d1fae5',
+  emerald200: '#a7f3d0',
+  emerald300: '#6ee7b7',
   emerald400: '#34d399',
   emerald500: '#10b981',
   emerald600: '#059669',
   emerald700: '#047857',
+  emerald800: '#065f46',
+  emerald900: '#064e3b',
 
-  // Amber (parent/warning)
+  // Amber (Warning & Parent identity)
   amber50:  '#fffbeb',
   amber100: '#fef3c7',
+  amber200: '#fde68a',
+  amber300: '#fcd34d',
   amber400: '#fbbf24',
   amber500: '#f59e0b',
   amber600: '#d97706',
   amber700: '#b45309',
+  amber800: '#92400e',
 
-  // Blue (teacher)
+  // Cobalt / Blue (Teacher identity & Info)
   blue50:  '#eff6ff',
   blue100: '#dbeafe',
+  blue200: '#bfdbfe',
+  blue300: '#93c5fd',
   blue400: '#60a5fa',
   blue500: '#3b82f6',
   blue600: '#2563eb',
   blue700: '#1d4ed8',
+  blue800: '#1e40af',
+  blue900: '#1e3a8a',
 
-  // Cyan (librarian)
+  // Cyan / Teal (Office & Library)
+  cyan50:  '#ecfeff',
+  cyan100: '#cffafe',
+  cyan400: '#22d3ee',
   cyan500: '#06b6d4',
   cyan600: '#0891b2',
+  cyan700: '#0e7490',
 
-  // Rose (danger/error)
+  // Rose / Crimson (Danger / Error / Absent)
   rose50:  '#fff1f2',
   rose100: '#ffe4e6',
+  rose200: '#fecdd3',
+  rose300: '#fda4af',
   rose400: '#fb7185',
   rose500: '#f43f5e',
   rose600: '#e11d48',
+  rose700: '#be123c',
+  rose800: '#9f1239',
 
-  // Neutral
-  white:    '#ffffff',
-  black:    '#000000',
-  neutral50:  '#f9fafb',
-  neutral100: '#f3f4f6',
-  neutral200: '#e5e7eb',
-  neutral300: '#d1d5db',
-  neutral400: '#9ca3af',
-  neutral500: '#6b7280',
-  neutral600: '#4b5563',
-  neutral700: '#374151',
-  neutral800: '#1f2937',
-  neutral900: '#111827',
-  neutral950: '#030712',
+  // Violet / Purple (Exams / Badges)
+  purple50:  '#f5f3ff',
+  purple100: '#ede9fe',
+  purple400: '#a78bfa',
+  purple500: '#8b5cf6',
+  purple600: '#7c3aed',
+  purple700: '#6d28d9',
+  purple800: '#5b21b6',
+
+  // Neutrals / Slate
+  white:      '#ffffff',
+  black:      '#000000',
+  slate25:    '#fafbfc',
+  slate50:    '#f8fafc',
+  slate100:   '#f1f5f9',
+  slate200:   '#e2e8f0',
+  slate300:   '#cbd5e1',
+  slate400:   '#94a3b8',
+  slate500:   '#64748b',
+  slate600:   '#475569',
+  slate700:   '#334155',
+  slate800:   '#1e293b',
+  slate900:   '#0f172a',
+  slate950:   '#020617',
 } as const;
 
 // ─────────────────────────────────────────────────────────────────────────────
-// SHADOWS
+// ELEVATION & SHADOW SYSTEM
 // ─────────────────────────────────────────────────────────────────────────────
 export const shadows = {
   none: {
@@ -144,40 +254,47 @@ export const shadows = {
     shadowRadius: 0,
     elevation: 0,
   },
-  sm: {
-    shadowColor: '#000',
+  xs: {
+    shadowColor: '#0f172a',
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 3,
+    shadowOpacity: 0.04,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  sm: {
+    shadowColor: '#0f172a',
+    shadowOffset: { width: 0, height: 1.5 },
+    shadowOpacity: 0.06,
+    shadowRadius: 4,
     elevation: 2,
   },
   md: {
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
+    shadowColor: '#0f172a',
+    shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.08,
     shadowRadius: 8,
     elevation: 4,
   },
   lg: {
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
+    shadowColor: '#0f172a',
+    shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.12,
     shadowRadius: 16,
     elevation: 8,
   },
   xl: {
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.18,
+    shadowColor: '#0f172a',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.16,
     shadowRadius: 24,
-    elevation: 16,
+    elevation: 14,
   },
   colored: (color: string) => ({
     shadowColor: color,
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.35,
-    shadowRadius: 12,
-    elevation: 8,
+    shadowOpacity: 0.28,
+    shadowRadius: 10,
+    elevation: 6,
   }),
 } as const;
 
@@ -195,62 +312,84 @@ export const lightTheme = {
     primaryBg:     palette.indigo50,
     primaryBorder: palette.indigo200,
 
-    // Semantic
-    success:      palette.emerald500,
-    successLight: palette.emerald50,
-    successBg:    palette.emerald100,
+    // Secondary / Accent
+    secondary:       palette.blue600,
+    secondaryBg:     palette.blue50,
+    secondaryBorder: palette.blue200,
 
-    warning:      palette.amber500,
-    warningLight: palette.amber400,
-    warningBg:    palette.amber50,
+    // Semantic Status
+    success:       palette.emerald600,
+    successLight:  palette.emerald400,
+    successBg:     palette.emerald50,
+    successBorder: palette.emerald200,
 
-    danger:       palette.rose500,
+    warning:       palette.amber600,
+    warningLight:  palette.amber400,
+    warningBg:     palette.amber50,
+    warningBorder: palette.amber200,
+
+    danger:       palette.rose600,
     dangerLight:  palette.rose400,
     dangerBg:     palette.rose50,
+    dangerBorder: palette.rose200,
 
-    info:         palette.blue500,
+    error:        palette.rose600,
+    errorBg:      palette.rose50,
+
+    info:         palette.blue600,
+    infoLight:    palette.blue400,
     infoBg:       palette.blue50,
+    infoBorder:   palette.blue200,
 
-    // Surface
-    background:   palette.neutral50,
-    surface:      palette.white,
-    surfaceAlt:   palette.neutral100,
-    surfaceRaised: palette.white,
-    border:       palette.neutral200,
-    borderFocus:  palette.indigo500,
-    divider:      palette.neutral100,
+    // Surfaces & Backgrounds
+    background:     palette.slate50,
+    surface:        palette.white,
+    surfaceAlt:     palette.slate100,
+    surfaceRaised:  palette.white,
+    surfaceSubtle:  palette.slate25,
+    border:         palette.slate200,
+    borderSubtle:   '#f1f5f9',
+    borderFocus:    palette.indigo600,
+    divider:        palette.slate200,
 
-    // Text
-    text:          palette.neutral900,
-    textSecondary: palette.neutral500,
-    textTertiary:  palette.neutral400,
-    textInverse:   palette.white,
-    textOnPrimary: palette.white,
+    // Typography
+    text:           palette.slate900,
+    textPrimary:    palette.slate900,
+    textSecondary:  palette.slate600,
+    textTertiary:   palette.slate400,
+    textMuted:      palette.slate500,
+    textInverse:    palette.white,
+    textOnPrimary:  palette.white,
 
-    // Tab Bar
+    // Navigation & Tab Bar
     tabBar:         palette.white,
-    tabBarBorder:   palette.neutral100,
+    tabBarBorder:   palette.slate200,
     tabActive:      palette.indigo600,
-    tabInactive:    palette.neutral400,
+    tabInactive:    palette.slate400,
 
     // Header
     header:         palette.white,
-    headerText:     palette.neutral900,
+    headerText:     palette.slate900,
+    headerBorder:   palette.slate200,
 
     // Input
-    inputBg:        palette.neutral50,
-    inputBorder:    palette.neutral200,
-    placeholder:    palette.neutral400,
+    inputBg:        palette.white,
+    inputBorder:    palette.slate200,
+    placeholder:    palette.slate400,
+    disabled:       palette.slate300,
+    disabledBg:     palette.slate100,
 
-    // Overlay
-    overlay:        'rgba(0,0,0,0.5)',
-    glass:          'rgba(255,255,255,0.85)',
-    glassBorder:    'rgba(255,255,255,0.5)',
+    // Overlay & Glass
+    overlay:        'rgba(15, 23, 42, 0.6)',
+    glass:          'rgba(255, 255, 255, 0.92)',
+    glassBorder:    'rgba(255, 255, 255, 0.7)',
 
     // Gradient stops
     gradientPrimary: [palette.indigo600, palette.indigo800] as string[],
-    gradientHero:    [palette.indigo600, palette.indigo900, '#1e1b4b'] as string[],
-    gradientCard:    ['rgba(99,102,241,0.08)', 'rgba(99,102,241,0.02)'] as string[],
+    gradientHero:    [palette.indigo600, palette.indigo900, palette.indigo950] as string[],
+    gradientCard:    ['rgba(99, 102, 241, 0.07)', 'rgba(99, 102, 241, 0.01)'] as string[],
+    gradientSuccess: [palette.emerald500, palette.emerald700] as string[],
+    gradientWarning: [palette.amber500, palette.amber700] as string[],
   },
 } as const;
 
@@ -262,89 +401,114 @@ export const darkTheme = {
 
   colors: {
     // Brand
-    primary:       palette.indigo500,
-    primaryLight:  palette.indigo400,
+    primary:       palette.indigo400,
+    primaryLight:  palette.indigo300,
     primaryDark:   palette.indigo600,
-    primaryBg:     'rgba(99,102,241,0.12)',
-    primaryBorder: 'rgba(99,102,241,0.3)',
+    primaryBg:     'rgba(99, 102, 241, 0.14)',
+    primaryBorder: 'rgba(99, 102, 241, 0.32)',
 
-    // Semantic
-    success:      palette.emerald400,
-    successLight: palette.emerald500,
-    successBg:    'rgba(16,185,129,0.12)',
+    // Secondary / Accent
+    secondary:       palette.blue400,
+    secondaryBg:     'rgba(59, 130, 246, 0.14)',
+    secondaryBorder: 'rgba(59, 130, 246, 0.32)',
 
-    warning:      palette.amber400,
-    warningLight: palette.amber500,
-    warningBg:    'rgba(245,158,11,0.12)',
+    // Semantic Status
+    success:       palette.emerald400,
+    successLight:  palette.emerald300,
+    successBg:     'rgba(16, 185, 129, 0.14)',
+    successBorder: 'rgba(16, 185, 129, 0.32)',
+
+    warning:       palette.amber400,
+    warningLight:  palette.amber300,
+    warningBg:     'rgba(245, 158, 11, 0.14)',
+    warningBorder: 'rgba(245, 158, 11, 0.32)',
 
     danger:       palette.rose400,
-    dangerLight:  palette.rose500,
-    dangerBg:     'rgba(244,63,94,0.12)',
+    dangerLight:  palette.rose300,
+    dangerBg:     'rgba(244, 63, 94, 0.14)',
+    dangerBorder: 'rgba(244, 63, 94, 0.32)',
+
+    error:        palette.rose400,
+    errorBg:      'rgba(244, 63, 94, 0.14)',
 
     info:         palette.blue400,
-    infoBg:       'rgba(59,130,246,0.12)',
+    infoLight:    palette.blue300,
+    infoBg:       'rgba(59, 130, 246, 0.14)',
+    infoBorder:   'rgba(59, 130, 246, 0.32)',
 
-    // Surface
-    background:    '#0a0a0f',
-    surface:       '#13131a',
-    surfaceAlt:    '#1a1a24',
-    surfaceRaised: '#1f1f2e',
-    border:        'rgba(255,255,255,0.08)',
-    borderFocus:   palette.indigo500,
-    divider:       'rgba(255,255,255,0.05)',
+    // Surfaces & Backgrounds
+    background:     '#0b0f19',
+    surface:        '#121827',
+    surfaceAlt:     '#1e2638',
+    surfaceRaised:  '#253046',
+    surfaceSubtle:  '#0e1422',
+    border:         'rgba(255, 255, 255, 0.09)',
+    borderSubtle:   'rgba(255, 255, 255, 0.05)',
+    borderFocus:    palette.indigo400,
+    divider:        'rgba(255, 255, 255, 0.07)',
 
-    // Text
-    text:          '#f1f1f5',
-    textSecondary: '#9090a8',
-    textTertiary:  '#606078',
-    textInverse:   palette.neutral900,
-    textOnPrimary: palette.white,
+    // Typography
+    text:           '#f8fafc',
+    textPrimary:    '#f8fafc',
+    textSecondary:  '#94a3b8',
+    textTertiary:   '#64748b',
+    textMuted:      '#818cf8',
+    textInverse:    palette.slate900,
+    textOnPrimary:  palette.white,
 
-    // Tab Bar
-    tabBar:         '#13131a',
-    tabBarBorder:   'rgba(255,255,255,0.06)',
+    // Navigation & Tab Bar
+    tabBar:         '#121827',
+    tabBarBorder:   'rgba(255, 255, 255, 0.08)',
     tabActive:      palette.indigo400,
-    tabInactive:    '#606078',
+    tabInactive:    '#64748b',
 
     // Header
-    header:         '#13131a',
-    headerText:     '#f1f1f5',
+    header:         '#121827',
+    headerText:     '#f8fafc',
+    headerBorder:   'rgba(255, 255, 255, 0.08)',
 
     // Input
-    inputBg:        '#1a1a24',
-    inputBorder:    'rgba(255,255,255,0.1)',
-    placeholder:    '#606078',
+    inputBg:        '#1a2234',
+    inputBorder:    'rgba(255, 255, 255, 0.12)',
+    placeholder:    '#64748b',
+    disabled:       '#475569',
+    disabledBg:     '#131a2a',
 
-    // Overlay
-    overlay:        'rgba(0,0,0,0.7)',
-    glass:          'rgba(19,19,26,0.9)',
-    glassBorder:    'rgba(255,255,255,0.08)',
+    // Overlay & Glass
+    overlay:        'rgba(0, 0, 0, 0.75)',
+    glass:          'rgba(18, 24, 39, 0.92)',
+    glassBorder:    'rgba(255, 255, 255, 0.09)',
 
     // Gradient stops
     gradientPrimary: [palette.indigo500, palette.indigo700] as string[],
     gradientHero:    ['#1e1b4b', '#312e81', palette.indigo700] as string[],
-    gradientCard:    ['rgba(99,102,241,0.15)', 'rgba(99,102,241,0.05)'] as string[],
+    gradientCard:    ['rgba(99, 102, 241, 0.16)', 'rgba(99, 102, 241, 0.04)'] as string[],
+    gradientSuccess: [palette.emerald600, palette.emerald800] as string[],
+    gradientWarning: [palette.amber600, palette.amber800] as string[],
   },
 } as const;
 
 // ─────────────────────────────────────────────────────────────────────────────
-// ROLE-BASED ACCENTS
+// ROLE-BASED ACCENT PALETTES
 // ─────────────────────────────────────────────────────────────────────────────
 export const roleAccents = {
-  admin:          { primary: palette.indigo600, light: palette.indigo50,  gradient: [palette.indigo600, palette.indigo800] as string[] },
-  super_admin:    { primary: palette.indigo700, light: palette.indigo50,  gradient: [palette.indigo700, palette.indigo900] as string[] },
-  principal:      { primary: palette.indigo600, light: palette.indigo50,  gradient: [palette.indigo600, palette.indigo800] as string[] },
-  vice_principal: { primary: palette.indigo500, light: palette.indigo50,  gradient: [palette.indigo500, palette.indigo700] as string[] },
-  teacher:        { primary: palette.blue600,   light: palette.blue50,    gradient: [palette.blue500,   palette.blue700]   as string[] },
-  class_teacher:  { primary: palette.blue700,   light: palette.blue50,    gradient: [palette.blue600,   '#1e40af']   as string[] },
-  student:        { primary: palette.emerald600, light: palette.emerald50, gradient: [palette.emerald500, palette.emerald700] as string[] },
-  parent:         { primary: palette.amber600,  light: palette.amber50,   gradient: [palette.amber500,  palette.amber700]  as string[] },
-  accountant:     { primary: palette.emerald600, light: palette.emerald50, gradient: [palette.emerald500, palette.emerald700] as string[] },
-  librarian:      { primary: palette.cyan600,   light: '#ecfeff',         gradient: [palette.cyan500,   palette.cyan600]   as string[] },
-  clerk:          { primary: palette.cyan600,   light: '#ecfeff',         gradient: [palette.cyan500,   palette.cyan600]   as string[] },
-  receptionist:   { primary: palette.cyan600,   light: '#ecfeff',         gradient: [palette.cyan500,   palette.cyan600]   as string[] },
-  office_staff:   { primary: palette.cyan600,   light: '#ecfeff',         gradient: [palette.cyan500,   palette.cyan600]   as string[] },
-  default:        { primary: palette.indigo600, light: palette.indigo50,  gradient: [palette.indigo600, palette.indigo800] as string[] },
+  admin:              { primary: palette.indigo600, light: palette.indigo50,  dark: palette.indigo800, gradient: [palette.indigo600, palette.indigo800] as string[] },
+  super_admin:        { primary: palette.indigo700, light: palette.indigo50,  dark: palette.indigo900, gradient: [palette.indigo700, palette.indigo950] as string[] },
+  principal:          { primary: palette.indigo600, light: palette.indigo50,  dark: palette.indigo800, gradient: [palette.indigo600, palette.indigo800] as string[] },
+  vice_principal:     { primary: palette.indigo500, light: palette.indigo50,  dark: palette.indigo700, gradient: [palette.indigo500, palette.indigo700] as string[] },
+  teacher:            { primary: palette.blue600,   light: palette.blue50,    dark: palette.blue800,   gradient: [palette.blue600,   palette.blue800]   as string[] },
+  class_teacher:      { primary: palette.blue700,   light: palette.blue50,    dark: palette.blue900,   gradient: [palette.blue600,   '#1e40af']         as string[] },
+  student:            { primary: palette.emerald600, light: palette.emerald50, dark: palette.emerald800, gradient: [palette.emerald500, palette.emerald700] as string[] },
+  parent:             { primary: palette.amber600,  light: palette.amber50,   dark: palette.amber800,  gradient: [palette.amber500,  palette.amber700]  as string[] },
+  accountant:         { primary: palette.emerald600, light: palette.emerald50, dark: palette.emerald800, gradient: [palette.emerald600, palette.emerald800] as string[] },
+  librarian:          { primary: palette.cyan600,   light: palette.cyan50,    dark: palette.cyan700,   gradient: [palette.cyan500,   palette.cyan700]   as string[] },
+  transport_incharge: { primary: palette.amber600,  light: palette.amber50,   dark: palette.amber800,  gradient: [palette.amber500,  palette.amber700]  as string[] },
+  exam_coordinator:   { primary: palette.purple600, light: palette.purple50,  dark: palette.purple800, gradient: [palette.purple600, palette.purple800] as string[] },
+  clerk:              { primary: palette.cyan600,   light: palette.cyan50,    dark: palette.cyan700,   gradient: [palette.cyan500,   palette.cyan600]   as string[] },
+  receptionist:       { primary: palette.cyan600,   light: palette.cyan50,    dark: palette.cyan700,   gradient: [palette.cyan500,   palette.cyan600]   as string[] },
+  office_staff:       { primary: palette.cyan600,   light: palette.cyan50,    dark: palette.cyan700,   gradient: [palette.cyan500,   palette.cyan600]   as string[] },
+  support_staff:      { primary: palette.slate600,  light: palette.slate100,  dark: palette.slate800,  gradient: [palette.slate600,  palette.slate800]  as string[] },
+  default:            { primary: palette.indigo600, light: palette.indigo50,  dark: palette.indigo800, gradient: [palette.indigo600, palette.indigo800] as string[] },
 } as const;
 
 // ─────────────────────────────────────────────────────────────────────────────

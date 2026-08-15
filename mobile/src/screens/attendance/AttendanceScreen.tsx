@@ -1,20 +1,36 @@
 /**
- * VidyaSetu Mobile — Attendance Marking Screen
- * Teacher marks class attendance for the day.
+ * VidyaSetu Mobile — Attendance Marking Screen (Premium Redesign)
+ * ================================================================
+ * Daily class attendance roster with one-tap status toggling,
+ * bulk actions, search filtering, progress breakdown, and real-time synchronization.
  */
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import {
-  View, Text, StyleSheet, FlatList, TouchableOpacity,
-  Alert, ActivityIndicator, Platform, TextInput,
+  View,
+  Text,
+  StyleSheet,
+  FlatList,
+  TouchableOpacity,
+  ScrollView,
+  Platform,
 } from 'react-native';
-import { attendanceAPI } from '../../services/api';
+import Icon from 'react-native-vector-icons/FontAwesome5';
+import { useTheme } from '../../theme/ThemeContext';
+import { attendanceAPI, teacherPortalAPI } from '../../services/api';
+import { CLASSES, DIVISIONS, CURRENT_ACADEMIC_YEAR } from '../../config/constants';
+import { spacing, radius, typography, shadows } from '../../theme';
+import {
+  AppCard,
+  AppButton,
+  AppBadge,
+  AppSearchBar,
+  AppProgress,
+  AppEmptyState,
+  AppSkeleton,
+  AppChip,
+} from '../../components/ui';
 import Toast from 'react-native-toast-message';
-
-const COLORS = {
-  primary: '#4f46e5', success: '#10b981', danger: '#ef4444',
-  warning: '#f59e0b', surface: '#fff', bg: '#f0f0ff',
-  border: '#e5e7eb', text: '#111827', textSecondary: '#6b7280',
-};
+import { getErrorMessage } from '../../utils/formatters';
 
 type AttendanceStatus = 'present' | 'absent' | 'leave' | 'late';
 
@@ -26,21 +42,43 @@ interface StudentRecord {
   status: AttendanceStatus;
 }
 
-const STATUS_CONFIG: Record<AttendanceStatus, { label: string; color: string; bg: string; icon: string }> = {
-  present: { label: 'P', color: '#fff', bg: COLORS.success, icon: '✓' },
-  absent:  { label: 'A', color: '#fff', bg: COLORS.danger,  icon: '✗' },
-  leave:   { label: 'L', color: '#fff', bg: COLORS.warning, icon: 'L' },
-  late:    { label: 'LT', color: '#fff', bg: '#8b5cf6',     icon: '⏰' },
+const STATUS_MAP: Record<AttendanceStatus, { label: string; icon: string; color: string; bg: string; badgeVariant: any }> = {
+  present: { label: 'Present', icon: 'check',          color: '#059669', bg: '#d1fae5', badgeVariant: 'success' },
+  absent:  { label: 'Absent',  icon: 'times',          color: '#dc2626', bg: '#fee2e2', badgeVariant: 'danger'  },
+  leave:   { label: 'Leave',   icon: 'umbrella-beach', color: '#d97706', bg: '#fef3c7', badgeVariant: 'warning' },
+  late:    { label: 'Late',    icon: 'clock',          color: '#7c3aed', bg: '#ede9fe', badgeVariant: 'info'    },
 };
 
 export default function AttendanceScreen() {
-  const [standard, setStandard] = useState('8');
-  const [division, setDivision] = useState('A');
+  const { colors, roleAccent } = useTheme();
+  const [standard, setStandard] = useState(CLASSES[0]);
+  const [division, setDivision] = useState(DIVISIONS[0]);
+  const [availableClasses, setAvailableClasses] = useState<string[]>(CLASSES);
+  const [availableDivisions, setAvailableDivisions] = useState<string[]>(DIVISIONS);
   const [date] = useState(new Date().toISOString().split('T')[0]);
   const [students, setStudents] = useState<StudentRecord[]>([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [fetched, setFetched] = useState(false);
+  const [search, setSearch] = useState('');
+
+  // Load teacher assigned classes
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await teacherPortalAPI.getMyClasses();
+        const classes = res.data?.data ?? [];
+        if (Array.isArray(classes) && classes.length > 0) {
+          const standards = [...new Set(classes.map((c: any) => String(c.standard)))];
+          const divisions = [...new Set(classes.map((c: any) => String(c.division ?? 'A')))];
+          if (standards.length > 0) { setAvailableClasses(standards); setStandard(standards[0]); }
+          if (divisions.length > 0) { setAvailableDivisions(divisions); setDivision(divisions[0]); }
+        }
+      } catch {
+        // use defaults
+      }
+    })();
+  }, []);
 
   const fetchClassList = useCallback(async () => {
     if (!standard || !division) return;
@@ -49,11 +87,14 @@ export default function AttendanceScreen() {
     try {
       const res = await attendanceAPI.getClassAttendance(standard, division, date);
       const data = res.data?.data ?? [];
-      setStudents(data.map((s: any) => ({ ...s, status: s.status ?? 'present' })));
+      const rows = Array.isArray(data) ? data : (data.students ?? []);
+      setStudents(rows.map((s: any) => ({ ...s, status: s.status ?? 'present' })));
       setFetched(true);
-    } catch {
-      Toast.show({ type: 'error', text1: 'Failed to load class list' });
-    } finally { setLoading(false); }
+    } catch (e) {
+      Toast.show({ type: 'error', text1: 'Failed to load class roster', text2: getErrorMessage(e) });
+    } finally {
+      setLoading(false);
+    }
   }, [standard, division, date]);
 
   const toggleStatus = (id: number) => {
@@ -76,149 +117,252 @@ export default function AttendanceScreen() {
       const records = students.map(s => ({
         student_id: s.id,
         status: s.status,
-        date,
+      }));
+      await attendanceAPI.markAttendance({
+        att_date: date,
         standard,
         division,
-      }));
-      await attendanceAPI.markAttendance(records);
+        academic_year_id: 1,
+        records,
+      });
       Toast.show({
         type: 'success',
-        text1: 'Attendance Saved!',
-        text2: `${students.filter(s => s.status === 'present').length} present, ${students.filter(s => s.status === 'absent').length} absent`,
+        text1: 'Attendance Recorded Successfully',
+        text2: `${presentCount} Present • ${absentCount} Absent • ${leaveCount} Leave`,
       });
-    } catch {
-      Toast.show({ type: 'error', text1: 'Failed to save attendance' });
-    } finally { setSaving(false); }
+    } catch (e) {
+      Toast.show({ type: 'error', text1: 'Failed to save attendance', text2: getErrorMessage(e) });
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const presentCount  = students.filter(s => s.status === 'present').length;
-  const absentCount   = students.filter(s => s.status === 'absent').length;
+  const filteredStudents = useMemo(() => {
+    if (!search.trim()) return students;
+    const q = search.toLowerCase();
+    return students.filter(s =>
+      s.full_name.toLowerCase().includes(q) || s.gr_number.includes(q) || String(s.roll_number).includes(q)
+    );
+  }, [students, search]);
+
+  const presentCount = students.filter(s => s.status === 'present').length;
+  const absentCount  = students.filter(s => s.status === 'absent').length;
+  const leaveCount   = students.filter(s => s.status === 'leave').length;
+  const lateCount    = students.filter(s => s.status === 'late').length;
+
+  const attendancePercent = students.length > 0 ? (presentCount / students.length) * 100 : 0;
 
   return (
-    <View style={styles.container}>
-      {/* Toolbar */}
-      <View style={styles.toolbar}>
-        <View style={styles.pickerRow}>
-          <View style={styles.pickerGroup}>
-            <Text style={styles.pickerLabel}>Standard</Text>
-            <View style={styles.pickerWrap}>
-              {['5','6','7','8','9','10'].map(s => (
-                <TouchableOpacity
-                  key={s} style={[styles.pickerBtn, standard === s && styles.pickerActive]}
-                  onPress={() => setStandard(s)}
-                >
-                  <Text style={[styles.pickerText, standard === s && styles.pickerActiveText]}>{s}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-          <View style={styles.pickerGroup}>
-            <Text style={styles.pickerLabel}>Division</Text>
-            <View style={styles.pickerWrap}>
-              {['A','B','C','D'].map(d => (
-                <TouchableOpacity
-                  key={d} style={[styles.pickerBtn, division === d && styles.pickerActive]}
-                  onPress={() => setDivision(d)}
-                >
-                  <Text style={[styles.pickerText, division === d && styles.pickerActiveText]}>{d}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      {/* Top Class Selection Controls */}
+      <View style={[styles.toolbar, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
+        {/* Class Selection Chips */}
+        <View style={styles.pickerSection}>
+          <Text style={[styles.pickerLabel, { color: colors.textSecondary }]}>Standard</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
+            {availableClasses.map(s => (
+              <AppChip
+                key={s}
+                label={`Std ${s}`}
+                selected={standard === s}
+                onPress={() => setStandard(s)}
+              />
+            ))}
+          </ScrollView>
+        </View>
+
+        {/* Division Selection Chips */}
+        <View style={styles.pickerSection}>
+          <Text style={[styles.pickerLabel, { color: colors.textSecondary }]}>Division</Text>
+          <View style={{ flexDirection: 'row', gap: 6 }}>
+            {availableDivisions.map(d => (
+              <AppChip
+                key={d}
+                label={`Div ${d}`}
+                selected={division === d}
+                onPress={() => setDivision(d)}
+              />
+            ))}
           </View>
         </View>
 
-        <TouchableOpacity style={styles.loadBtn} onPress={fetchClassList}>
-          <Text style={styles.loadBtnText}>Load Class</Text>
-        </TouchableOpacity>
+        {/* Load Roster Button */}
+        <AppButton
+          label="Load Class Roster"
+          iconLeft="sync-alt"
+          onPress={fetchClassList}
+          loading={loading}
+          fullWidth
+          size="md"
+        />
       </View>
 
-      {/* Date display */}
-      <View style={styles.dateBadge}>
-        <Text style={styles.dateText}>📅 {new Date(date).toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</Text>
+      {/* Date Header Strip */}
+      <View style={[styles.dateStrip, { backgroundColor: colors.primaryBg, borderColor: colors.primaryBorder }]}>
+        <Icon name="calendar-alt" size={13} color={colors.primary} solid />
+        <Text style={[styles.dateText, { color: colors.primary }]}>
+          {new Date(date).toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+        </Text>
       </View>
 
       {loading ? (
-        <View style={styles.center}>
-          <ActivityIndicator size="large" color={COLORS.primary} />
+        <View style={{ padding: spacing.base }}>
+          <AppSkeleton variant="list" count={6} />
         </View>
       ) : !fetched ? (
-        <View style={styles.center}>
-          <Text style={styles.emptyIcon}>📚</Text>
-          <Text style={styles.emptyText}>Select standard & division,{'\n'}then tap "Load Class"</Text>
-        </View>
+        <AppEmptyState
+          icon="clipboard-list"
+          title="Select Class & Division"
+          description="Choose a standard and division above, then tap 'Load Class Roster' to take attendance."
+          actionLabel="Load Now"
+          onAction={fetchClassList}
+          style={{ flex: 1 }}
+        />
       ) : students.length === 0 ? (
-        <View style={styles.center}>
-          <Text style={styles.emptyIcon}>🎓</Text>
-          <Text style={styles.emptyText}>No students found in this class</Text>
-        </View>
+        <AppEmptyState
+          icon="user-graduate"
+          title="No Students Enrolled"
+          description={`There are no students enrolled in Standard ${standard} - Division ${division}.`}
+          actionLabel="Refresh"
+          onAction={fetchClassList}
+          style={{ flex: 1 }}
+        />
       ) : (
         <>
-          {/* Stats Bar */}
-          <View style={styles.statsBar}>
-            <View style={styles.stat}>
-              <Text style={[styles.statNum, { color: COLORS.success }]}>{presentCount}</Text>
-              <Text style={styles.statLabel}>Present</Text>
+          {/* Summary Metric Stats Card */}
+          <View style={[styles.summaryCard, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
+            <View style={styles.statsRow}>
+              <View style={styles.statBox}>
+                <Text style={[styles.statNum, { color: colors.success }]}>{presentCount}</Text>
+                <Text style={[styles.statLbl, { color: colors.textSecondary }]}>Present</Text>
+              </View>
+              <View style={styles.statBox}>
+                <Text style={[styles.statNum, { color: colors.danger }]}>{absentCount}</Text>
+                <Text style={[styles.statLbl, { color: colors.textSecondary }]}>Absent</Text>
+              </View>
+              <View style={styles.statBox}>
+                <Text style={[styles.statNum, { color: colors.warning }]}>{leaveCount}</Text>
+                <Text style={[styles.statLbl, { color: colors.textSecondary }]}>Leave</Text>
+              </View>
+              <View style={styles.statBox}>
+                <Text style={[styles.statNum, { color: colors.info }]}>{lateCount}</Text>
+                <Text style={[styles.statLbl, { color: colors.textSecondary }]}>Late</Text>
+              </View>
+              <View style={styles.statBox}>
+                <Text style={[styles.statNum, { color: colors.text }]}>{students.length}</Text>
+                <Text style={[styles.statLbl, { color: colors.textSecondary }]}>Total</Text>
+              </View>
             </View>
-            <View style={styles.stat}>
-              <Text style={[styles.statNum, { color: COLORS.danger }]}>{absentCount}</Text>
-              <Text style={styles.statLabel}>Absent</Text>
-            </View>
-            <View style={styles.stat}>
-              <Text style={styles.statNum}>{students.length}</Text>
-              <Text style={styles.statLabel}>Total</Text>
-            </View>
+
+            <AppProgress
+              value={attendancePercent}
+              label="Turnout Rate"
+              color={colors.success}
+              style={{ marginTop: spacing.xs }}
+            />
           </View>
 
-          {/* Bulk actions */}
-          <View style={styles.bulkRow}>
-            <Text style={styles.bulkLabel}>Mark All:</Text>
-            {(['present','absent','leave'] as AttendanceStatus[]).map(s => (
+          {/* Quick Bulk Actions & Search */}
+          <View style={[styles.filterBar, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
+            <View style={styles.bulkRow}>
+              <Text style={[styles.bulkTitle, { color: colors.textSecondary }]}>Mark All:</Text>
               <TouchableOpacity
-                key={s} onPress={() => setAll(s)}
-                style={[styles.bulkBtn, { backgroundColor: STATUS_CONFIG[s].bg }]}
+                style={[styles.bulkChip, { backgroundColor: colors.successBg }]}
+                onPress={() => setAll('present')}
+                activeOpacity={0.75}
               >
-                <Text style={styles.bulkBtnText}>{s.charAt(0).toUpperCase() + s.slice(1)}</Text>
+                <Icon name="check" size={10} color={colors.success} solid />
+                <Text style={{ color: colors.success, fontSize: 11, fontWeight: '700' }}>Present</Text>
               </TouchableOpacity>
-            ))}
+              <TouchableOpacity
+                style={[styles.bulkChip, { backgroundColor: colors.dangerBg }]}
+                onPress={() => setAll('absent')}
+                activeOpacity={0.75}
+              >
+                <Icon name="times" size={10} color={colors.danger} solid />
+                <Text style={{ color: colors.danger, fontSize: 11, fontWeight: '700' }}>Absent</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.bulkChip, { backgroundColor: colors.warningBg }]}
+                onPress={() => setAll('leave')}
+                activeOpacity={0.75}
+              >
+                <Icon name="umbrella-beach" size={10} color={colors.warning} solid />
+                <Text style={{ color: colors.warning, fontSize: 11, fontWeight: '700' }}>Leave</Text>
+              </TouchableOpacity>
+            </View>
+
+            <AppSearchBar
+              value={search}
+              onChangeText={setSearch}
+              placeholder="Search by student name or roll..."
+              style={{ marginVertical: 0 }}
+            />
           </View>
 
-          {/* Student List */}
+          {/* Student Roster List */}
           <FlatList
-            data={students}
+            data={filteredStudents}
             keyExtractor={item => String(item.id)}
-            contentContainerStyle={{ padding: 12, paddingBottom: 100 }}
-            ItemSeparatorComponent={() => <View style={{ height: 6 }} />}
+            contentContainerStyle={{ padding: spacing.base, paddingBottom: 110 }}
+            ItemSeparatorComponent={() => <View style={{ height: 8 }} />}
             renderItem={({ item }) => {
-              const cfg = STATUS_CONFIG[item.status];
+              const cfg = STATUS_MAP[item.status] ?? STATUS_MAP.present;
               return (
-                <TouchableOpacity style={styles.studentCard} onPress={() => toggleStatus(item.id)} activeOpacity={0.85}>
-                  <View style={styles.rollBadge}>
-                    <Text style={styles.rollText}>{item.roll_number}</Text>
-                  </View>
-                  <View style={styles.studentInfo}>
-                    <Text style={styles.studentName}>{item.full_name}</Text>
-                    <Text style={styles.studentGr}>GR: {item.gr_number}</Text>
-                  </View>
-                  <View style={[styles.statusBtn, { backgroundColor: cfg.bg }]}>
-                    <Text style={[styles.statusBtnText, { color: cfg.color }]}>{cfg.label}</Text>
-                  </View>
+                <TouchableOpacity
+                  activeOpacity={0.85}
+                  onPress={() => toggleStatus(item.id)}
+                >
+                  <AppCard variant="bordered" padding={12}>
+                    <View style={styles.studentCardRow}>
+                      {/* Roll Number Circle */}
+                      <View style={[styles.rollCircle, { backgroundColor: colors.primaryBg }]}>
+                        <Text style={[styles.rollNum, { color: colors.primary }]}>
+                          {item.roll_number}
+                        </Text>
+                      </View>
+
+                      {/* Name & GR Info */}
+                      <View style={{ flex: 1 }}>
+                        <Text style={[styles.studName, { color: colors.text }]}>{item.full_name}</Text>
+                        <Text style={[styles.studGr, { color: colors.textSecondary }]}>
+                          GR: {item.gr_number}
+                        </Text>
+                      </View>
+
+                      {/* Interactive Status Toggle Pill */}
+                      <View style={[styles.statusToggle, { backgroundColor: cfg.bg }]}>
+                        <Icon name={cfg.icon} size={12} color={cfg.color} solid />
+                        <Text style={[styles.statusToggleText, { color: cfg.color }]}>
+                          {cfg.label}
+                        </Text>
+                      </View>
+                    </View>
+                  </AppCard>
                 </TouchableOpacity>
               );
             }}
           />
 
-          {/* Save Button */}
-          <View style={styles.saveWrap}>
-            <TouchableOpacity
-              style={[styles.saveBtn, saving && styles.saveBtnDisabled]}
+          {/* Floating Save Footer */}
+          <View
+            style={[
+              styles.saveWrap,
+              {
+                backgroundColor: colors.surface,
+                borderTopColor: colors.border,
+                ...shadows.lg,
+              },
+            ]}
+          >
+            <AppButton
+              label={`Save Attendance (${students.length} students)`}
+              iconLeft="save"
               onPress={saveAttendance}
-              disabled={saving}
-            >
-              {saving
-                ? <ActivityIndicator color="#fff" size="small" />
-                : <Text style={styles.saveBtnText}>💾 Save Attendance ({students.length} students)</Text>
-              }
-            </TouchableOpacity>
+              loading={saving}
+              fullWidth
+              size="lg"
+            />
           </View>
         </>
       )}
@@ -227,65 +371,125 @@ export default function AttendanceScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.bg },
-  toolbar: { backgroundColor: COLORS.surface, padding: 14, borderBottomWidth: 1, borderBottomColor: COLORS.border },
-  pickerRow: { gap: 10, marginBottom: 10 },
-  pickerGroup: { gap: 6 },
-  pickerLabel: { fontSize: 11, fontWeight: '600', color: COLORS.textSecondary, textTransform: 'uppercase' },
-  pickerWrap: { flexDirection: 'row', gap: 6, flexWrap: 'wrap' },
-  pickerBtn: {
-    paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8,
-    backgroundColor: '#f3f4f6', borderWidth: 1.5, borderColor: COLORS.border,
+  container: {
+    flex: 1,
   },
-  pickerActive: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
-  pickerText: { fontSize: 13, fontWeight: '600', color: COLORS.textSecondary },
-  pickerActiveText: { color: '#fff' },
-  loadBtn: {
-    backgroundColor: COLORS.primary, borderRadius: 10,
-    paddingVertical: 10, alignItems: 'center',
+  toolbar: {
+    padding: spacing.base,
+    borderBottomWidth: 1,
+    gap: spacing.sm,
   },
-  loadBtnText: { color: '#fff', fontWeight: '700', fontSize: 14 },
-  dateBadge: { backgroundColor: '#ede9fe', paddingHorizontal: 16, paddingVertical: 8 },
-  dateText: { fontSize: 13, color: COLORS.primary, fontWeight: '600' },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10 },
-  emptyIcon: { fontSize: 48 },
-  emptyText: { fontSize: 14, color: COLORS.textSecondary, textAlign: 'center', lineHeight: 22 },
-  statsBar: { flexDirection: 'row', backgroundColor: COLORS.surface, padding: 12, gap: 0 },
-  stat: { flex: 1, alignItems: 'center' },
-  statNum: { fontSize: 22, fontWeight: '800', color: COLORS.text },
-  statLabel: { fontSize: 11, color: COLORS.textSecondary, fontWeight: '500', marginTop: 2 },
-  bulkRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 8, gap: 8, backgroundColor: COLORS.surface, borderTopWidth: 1, borderTopColor: COLORS.border },
-  bulkLabel: { fontSize: 12, color: COLORS.textSecondary, fontWeight: '600', marginRight: 4 },
-  bulkBtn: { paddingHorizontal: 12, paddingVertical: 5, borderRadius: 8 },
-  bulkBtnText: { color: '#fff', fontSize: 11, fontWeight: '700' },
-  studentCard: {
-    backgroundColor: COLORS.surface, borderRadius: 10, padding: 12,
-    flexDirection: 'row', alignItems: 'center', gap: 10,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.04, shadowRadius: 3, elevation: 1,
+  pickerSection: {
+    gap: 4,
   },
-  rollBadge: {
-    width: 36, height: 36, borderRadius: 18,
-    backgroundColor: '#ede9fe', alignItems: 'center', justifyContent: 'center',
+  pickerLabel: {
+    fontSize: typography.size.xs,
+    fontWeight: typography.weight.bold,
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
   },
-  rollText: { fontSize: 13, fontWeight: '700', color: COLORS.primary },
-  studentInfo: { flex: 1 },
-  studentName: { fontSize: 14, fontWeight: '600', color: COLORS.text },
-  studentGr: { fontSize: 11, color: COLORS.textSecondary, marginTop: 1 },
-  statusBtn: {
-    width: 44, height: 36, borderRadius: 8,
-    alignItems: 'center', justifyContent: 'center',
+  dateStrip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: spacing.base,
+    paddingVertical: spacing.sm,
+    gap: spacing.sm,
+    borderBottomWidth: 1,
   },
-  statusBtnText: { fontSize: 12, fontWeight: '800' },
+  dateText: {
+    fontSize: typography.size.xs,
+    fontWeight: typography.weight.bold,
+  },
+  summaryCard: {
+    paddingHorizontal: spacing.base,
+    paddingVertical: spacing.md,
+    borderBottomWidth: 1,
+  },
+  statsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: spacing.xs,
+  },
+  statBox: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  statNum: {
+    fontSize: typography.size.xl,
+    fontWeight: typography.weight.extrabold,
+  },
+  statLbl: {
+    fontSize: typography.size['2xs'],
+    fontWeight: typography.weight.semibold,
+    marginTop: 1,
+  },
+  filterBar: {
+    paddingHorizontal: spacing.base,
+    paddingVertical: spacing.sm,
+    borderBottomWidth: 1,
+    gap: spacing.sm,
+  },
+  bulkRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  bulkTitle: {
+    fontSize: typography.size.xs,
+    fontWeight: typography.weight.bold,
+    textTransform: 'uppercase',
+  },
+  bulkChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: spacing.sm + 2,
+    paddingVertical: spacing.xs,
+    borderRadius: radius.full,
+  },
+  studentCardRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+  },
+  rollCircle: {
+    width: 38,
+    height: 38,
+    borderRadius: radius.full,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  rollNum: {
+    fontSize: typography.size.sm,
+    fontWeight: typography.weight.extrabold,
+  },
+  studName: {
+    fontSize: typography.size.base,
+    fontWeight: typography.weight.bold,
+  },
+  studGr: {
+    fontSize: typography.size.xs,
+    marginTop: 2,
+  },
+  statusToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: radius.md,
+  },
+  statusToggleText: {
+    fontSize: typography.size.xs,
+    fontWeight: typography.weight.bold,
+  },
   saveWrap: {
-    position: 'absolute', bottom: 0, left: 0, right: 0,
-    padding: 16, backgroundColor: COLORS.surface,
-    borderTopWidth: 1, borderTopColor: COLORS.border,
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    padding: spacing.base,
+    borderTopWidth: 1,
   },
-  saveBtn: {
-    backgroundColor: COLORS.primary, borderRadius: 12,
-    paddingVertical: 14, alignItems: 'center',
-  },
-  saveBtnDisabled: { opacity: 0.65 },
-  saveBtnText: { color: '#fff', fontWeight: '700', fontSize: 15 },
 });

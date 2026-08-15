@@ -1,44 +1,16 @@
 """
-VidyaSetu ERP — Global Search + Health Check Router
-====================================================
+VidyaSetu ERP — Global Search Router
+====================================
 - /api/v1/search?q=...  — cross-module search
-- /api/health            — system health check
 """
-from datetime import datetime
 from typing import Optional
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import select, or_, text
-from sqlalchemy.orm import Session
+from sqlalchemy import select, or_
 
 from app.core.dependencies import AuthUser, DBSession, require_permission
-from app.database.session import engine
 from app.shared.responses import APIResponse
 
-router = APIRouter(tags=["Search & Health"])
-
-
-# ── Health Check ──────────────────────────────────────────────
-@router.get("/health", include_in_schema=True)
-async def health_check():
-    """System health check endpoint — used by Docker, load balancers, monitoring."""
-    db_ok = False
-    try:
-        with engine.connect() as conn:
-            conn.execute(text("SELECT 1"))
-        db_ok = True
-    except Exception:
-        db_ok = False
-
-    status = "healthy" if db_ok else "degraded"
-    return {
-        "status": status,
-        "timestamp": datetime.utcnow().isoformat() + "Z",
-        "services": {
-            "api": "up",
-            "database": "up" if db_ok else "down",
-        },
-        "version": "1.0.0",
-    }
+router = APIRouter(tags=["Search"])
 
 
 # ── Global Search ─────────────────────────────────────────────

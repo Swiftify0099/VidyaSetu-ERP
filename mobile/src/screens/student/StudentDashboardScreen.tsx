@@ -88,7 +88,7 @@ export default function StudentDashboardScreen({ navigation }: { navigation: any
             <View style={styles.attendanceLeft}>
               <Text style={styles.attendanceLabel}>Attendance</Text>
               <Text style={styles.attendanceValue}>{attendance > 0 ? `${attendance}%` : '—'}</Text>
-              <Text style={styles.attendanceSub}>{attendance >= 75 ? '✓ Eligible' : 'Below minimum'}</Text>
+              <Text style={styles.attendanceSub}>{attendance >= 75 ? 'Eligible' : 'Below minimum'}</Text>
             </View>
             <View style={styles.attendanceRight}>
               {/* Simple ring indicator */}

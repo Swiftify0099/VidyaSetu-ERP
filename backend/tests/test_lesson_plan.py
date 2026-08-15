@@ -53,18 +53,15 @@ class TestLessonPlanCreate:
     """Lesson plan creation tests."""
 
     VALID_PLAN = {
-        "plan_date": "2025-08-01",
         "standard": "8",
         "division": "A",
-        "subject": "Mathematics",
+        "subject_name": "Mathematics",
         "chapter_name": "Linear Equations",
-        "topic": "Solving one-variable equations",
+        "topics_planned": "Solving one-variable equations",
         "learning_objectives": "Students will solve linear equations",
-        "teaching_aids": "Blackboard, Charts",
-        "activities": "Practice problems",
-        "homework": "Exercise 3.1",
         "academic_year": "2025-2026",
-        "period_number": 1,
+        "month": 8,
+        "planned_periods": 5,
     }
 
     def test_create_requires_auth(self, client: TestClient):
@@ -75,7 +72,7 @@ class TestLessonPlanCreate:
         """Missing required fields should return validation error."""
         resp = client.post(
             "/api/v1/lesson-plans",
-            json={"subject": "Mathematics"},  # missing many required fields
+            json={"subject_name": "Mathematics"},  # missing many required fields
             headers=auth_headers,
         )
         assert resp.status_code == 422
@@ -103,7 +100,7 @@ class TestLessonPlanCreate:
         if resp.status_code in (200, 201):
             data = resp.json()["data"]
             assert "id" in data
-            assert data["subject"] == "Mathematics"
+            assert data["subject_name"] == "Mathematics"
 
 
 class TestTeachingDiary:

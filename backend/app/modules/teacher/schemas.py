@@ -81,6 +81,52 @@ class TeacherCreateRequest(BaseModel):
             return None
         return v
 
+    @field_validator("first_name", "last_name")
+    @classmethod
+    def validate_names(cls, v: str) -> str:
+        from app.core.validators import validate_person_name
+        return validate_person_name(v)
+
+    @field_validator("mobile", "mobile_alt", "emergency_contact_mobile")
+    @classmethod
+    def validate_phones(cls, v: Optional[str]) -> Optional[str]:
+        from app.core.validators import validate_indian_phone
+        return validate_indian_phone(v, required=False)
+
+    @field_validator("email", "email_official")
+    @classmethod
+    def validate_emails(cls, v: Optional[str]) -> Optional[str]:
+        from app.core.validators import validate_email_str
+        return validate_email_str(v, required=False)
+
+    @field_validator("basic_salary", "grade_pay")
+    @classmethod
+    def validate_salary(cls, v: Optional[float]) -> Optional[float]:
+        if v is not None:
+            from app.core.validators import validate_financial_amount
+            return validate_financial_amount(v, field_name="Salary/Grade Pay", min_val=0.0)
+        return v
+
+    @field_validator("aadhaar_number")
+    @classmethod
+    def validate_aadhaar(cls, v: Optional[str]) -> Optional[str]:
+        if not v:
+            return None
+        cleaned = v.strip().replace(" ", "").replace("-", "")
+        if cleaned and (not cleaned.isdigit() or len(cleaned) != 12):
+            raise ValueError("Aadhaar number must be exactly 12 digits.")
+        return cleaned
+
+    @field_validator("pan_number")
+    @classmethod
+    def validate_pan(cls, v: Optional[str]) -> Optional[str]:
+        if not v:
+            return None
+        cleaned = v.strip().upper()
+        if len(cleaned) != 10 or not cleaned[:5].isalpha() or not cleaned[5:9].isdigit() or not cleaned[9].isalpha():
+            raise ValueError("PAN number must be in standard format (e.g. ABCDE1234F).")
+        return cleaned
+
 
 class TeacherUpdateRequest(BaseModel):
     first_name: Optional[str] = None

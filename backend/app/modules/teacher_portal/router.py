@@ -11,11 +11,13 @@ GET  /api/v1/teacher-portal/attendance     → View submitted attendance
 GET  /api/v1/teacher-portal/notices        → School notices
 GET  /api/v1/teacher-portal/leaves         → Leave history
 POST /api/v1/teacher-portal/leaves         → Apply leave
+POST /api/v1/teacher-portal/me/photo       → Upload own profile photo
+POST /api/v1/teacher-portal/videos/upload  → Upload video lecture file
 """
 from datetime import date, datetime
 from typing import List, Optional
 
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, File, HTTPException, Query, UploadFile, status
 from pydantic import BaseModel
 from sqlalchemy import and_, func, select
 
@@ -26,7 +28,9 @@ from app.modules.attendance.models import StudentAttendance, Holiday
 from app.modules.timetable.models import TimetableEntry, PeriodConfig, Subject
 from app.modules.settings.models import AcademicYear
 from app.modules.communication.models import Notice
+from app.modules.video.models import VideoContent
 from app.shared.responses import APIResponse
+from app.shared.storage import StorageService
 
 router = APIRouter(prefix="/teacher-portal", tags=["Teacher Portal"])
 
@@ -104,9 +108,7 @@ def get_my_teacher_profile(current_user: AuthUser, db: DBSession):
         StudentAttendance.marked_by == teacher.user_id,
     ).scalar() or 0
 
-    photo_url = None
-    if teacher.photo_path:
-        photo_url = f"/storage/{teacher.photo_path}"
+    photo_url = StorageService.storage_url(teacher.photo_path)
 
     return APIResponse.ok(data={
         "teacher": {
@@ -133,6 +135,37 @@ def get_my_teacher_profile(current_user: AuthUser, db: DBSession):
             "academic_year": ac_year.name if ac_year else "2025-26",
         },
     })
+
+
+@router.post("/me/photo", response_model=APIResponse)
+async def upload_my_photo(
+    current_user: AuthUser,
+    db: DBSession,
+    file: UploadFile = File(...),
+):
+    """
+    Self-service teacher profile photo upload.
+    The binary file is saved to local storage; only the relative path is stored in the DB.
+    Returns the absolute URL of the uploaded photo.
+    """
+    teacher = _get_teacher(db, current_user)
+
+    # Delete old photo from disk if it exists
+    if teacher.photo_path:
+        StorageService.delete_file(teacher.photo_path)
+
+    # Save new photo
+    relative_path = await StorageService.save_image(file, "teacher_photos")
+
+    # Persist path in DB
+    teacher.photo_path = relative_path
+    teacher.updated_by = current_user.user_id
+    db.commit()
+
+    return APIResponse.ok(
+        data={"photo_url": StorageService.storage_url(relative_path)},
+        message="Profile photo updated successfully.",
+    )
 
 
 # ─────────────────────────────────────────────────────────────
@@ -249,7 +282,7 @@ def get_assigned_students(
                 "division": s.division,
                 "roll_number": s.roll_number,
                 "gender": s.gender,
-                "photo_url": f"/storage/{s.photo_path}" if s.photo_path else None,
+                "photo_url": StorageService.storage_url(s.photo_path),
             }
             for s in students
         ],
@@ -288,7 +321,23 @@ def submit_attendance(
     if not attendance_items:
         raise HTTPException(status_code=400, detail="No attendance entries provided.")
 
+    # ── Future date guard ────────────────────────────────────────
+    if body.date > date.today():
+        raise HTTPException(status_code=400, detail=f"Cannot mark attendance for a future date ({body.date}).")
+
     teacher = _get_teacher(db, current_user)
+
+    # ── Teacher class authorization ──────────────────────────────
+    # Non-admin teachers can only submit for their assigned classes.
+    if not ("super_admin" in current_user.role_codes or "admin" in current_user.role_codes):
+        assigned = [c.strip() for c in (teacher.classes_assigned or "").split(",") if c.strip()]
+        if assigned and body.standard not in assigned:
+            raise HTTPException(
+                status_code=403,
+                detail=f"You are not authorized to mark attendance for Standard {body.standard}. "
+                       f"Your assigned classes: {', '.join(assigned)}."
+            )
+
     saved = 0
     for entry in attendance_items:
         existing = db.query(StudentAttendance).filter(
@@ -852,7 +901,7 @@ def delete_teacher_homework(homework_id: int, current_user: AuthUser, db: DBSess
 
 
 # ─────────────────────────────────────────────────────────────
-# STUDY MATERIALS & VIDEOS (Teacher Portal)
+# STUDY MATERIALS (Teacher Portal — in-memory, lightweight)
 # ─────────────────────────────────────────────────────────────
 
 _MATERIALS_STORE = [
@@ -882,21 +931,6 @@ _MATERIALS_STORE = [
     }
 ]
 
-_VIDEOS_STORE = [
-    {
-        "id": 1,
-        "standard": "9",
-        "subject": "Mathematics",
-        "title": "Understanding Quadratic Equations Step by Step",
-        "video_url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
-        "description": "Comprehensive video lecture breaking down factoring and formula method.",
-        "teacher": "Shri. Ramesh Jadhav",
-        "duration": "18:45",
-        "created_at": "2026-07-25T09:00:00",
-        "is_active": True,
-    }
-]
-
 
 class MaterialCreateRequest(BaseModel):
     standard: str
@@ -905,14 +939,6 @@ class MaterialCreateRequest(BaseModel):
     description: Optional[str] = None
     material_type: str = "notes"
     file_url: Optional[str] = None
-
-
-class VideoCreateRequest(BaseModel):
-    standard: str
-    subject: str
-    title: str
-    video_url: str
-    description: Optional[str] = None
 
 
 @router.get("/materials", response_model=APIResponse)
@@ -941,30 +967,160 @@ def create_teacher_material(body: MaterialCreateRequest, current_user: AuthUser,
     return APIResponse.created(data=new_mat, message="Study material uploaded successfully!")
 
 
+# ─────────────────────────────────────────────────────────────
+# VIDEO LECTURES (Teacher Portal — DB-backed, fully persistent)
+# Binary video data is NEVER stored in PostgreSQL.
+# Local uploads → StorageService saves file → stores relative path in DB.
+# External links (YouTube etc.) → stored as video_url in DB.
+# ─────────────────────────────────────────────────────────────
+
+
+def _serialize_video(v: VideoContent) -> dict:
+    """Serialize a VideoContent DB row to JSON-safe dict."""
+    return {
+        "id": v.id,
+        "title": v.title,
+        "description": v.description or "",
+        "standard": v.standard,
+        "division": v.division,
+        "subject": v.subject,
+        "topic": v.topic,
+        "teacher": v.teacher.full_name if v.teacher else "Teacher",
+        "duration": v.duration or "",
+        # file_url: absolute URL for locally stored videos; None for external links
+        "file_url": StorageService.storage_url(v.file_path) if v.file_path else None,
+        # video_url: external link (YouTube etc.); None for local uploads
+        "video_url": v.video_url,
+        # display_url: whichever is available — frontend should prefer video_url for embeds
+        "display_url": v.video_url or StorageService.storage_url(v.file_path),
+        "is_local": v.file_path is not None,
+        "mime_type": v.mime_type,
+        "file_size_bytes": v.file_size_bytes,
+        "is_published": v.is_published,
+        "is_active": v.is_published,
+        "created_at": v.created_at.isoformat() if v.created_at else None,
+    }
+
+
+class VideoCreateRequest(BaseModel):
+    """Create a video by linking an external URL (YouTube, Vimeo, etc.)."""
+    standard: str
+    subject: str
+    title: str
+    video_url: str
+    description: Optional[str] = None
+    topic: Optional[str] = None
+    division: Optional[str] = None
+    duration: Optional[str] = None
+
+
 @router.get("/videos", response_model=APIResponse)
-def get_teacher_videos(current_user: AuthUser, db: DBSession):
-    items = [v for v in _VIDEOS_STORE if v.get("is_active", True)]
-    return APIResponse.ok(data={"videos": items, "total": len(items)})
+def get_teacher_videos(
+    current_user: AuthUser,
+    db: DBSession,
+    standard: Optional[str] = Query(None),
+    subject: Optional[str] = Query(None),
+):
+    """List all video lectures (persisted in DB). Optionally filter by standard / subject."""
+    q = select(VideoContent).where(
+        VideoContent.is_published == True,
+        VideoContent.is_deleted == False,
+    ).order_by(VideoContent.created_at.desc())
+
+    if standard:
+        q = q.where(VideoContent.standard == standard)
+    if subject:
+        q = q.where(VideoContent.subject.ilike(f"%{subject}%"))
+
+    videos = list(db.scalars(q).all())
+    return APIResponse.ok(data={"videos": [_serialize_video(v) for v in videos], "total": len(videos)})
 
 
 @router.post("/videos", response_model=APIResponse, status_code=201)
 def create_teacher_video(body: VideoCreateRequest, current_user: AuthUser, db: DBSession):
+    """Link an external video URL (YouTube, Vimeo, etc.) to a class. Persisted in DB."""
     teacher = _get_teacher(db, current_user)
-    new_id = max((v["id"] for v in _VIDEOS_STORE), default=0) + 1
-    new_vid = {
-        "id": new_id,
-        "standard": body.standard,
-        "subject": body.subject,
-        "title": body.title,
-        "video_url": body.video_url,
-        "description": body.description or "",
-        "teacher": teacher.full_name,
-        "duration": "15:00",
-        "created_at": datetime.now().isoformat(),
-        "is_active": True,
-    }
-    _VIDEOS_STORE.insert(0, new_vid)
-    return APIResponse.created(data=new_vid, message="Video lecture added successfully!")
+    video = VideoContent(
+        title=body.title,
+        description=body.description or "",
+        standard=body.standard,
+        division=body.division,
+        subject=body.subject,
+        topic=body.topic,
+        video_url=body.video_url,
+        duration=body.duration,
+        teacher_id=teacher.id,
+        uploaded_by=current_user.user_id,
+        created_by=current_user.user_id,
+        is_published=True,
+    )
+    db.add(video)
+    db.commit()
+    db.refresh(video)
+    return APIResponse.created(data=_serialize_video(video), message="Video lecture added successfully!")
+
+
+@router.post("/videos/upload", response_model=APIResponse, status_code=201)
+async def upload_teacher_video(
+    current_user: AuthUser,
+    db: DBSession,
+    standard: str = Query(..., description="Standard / class (e.g. 9, 10)"),
+    subject: str = Query(..., description="Subject name"),
+    title: str = Query(..., description="Video title"),
+    description: Optional[str] = Query(None),
+    topic: Optional[str] = Query(None),
+    division: Optional[str] = Query(None),
+    file: UploadFile = File(...),
+):
+    """
+    Upload a video file. The file is saved to local storage (./storage/videos/).
+    Only the relative file path is stored in the database — binary data never goes into PostgreSQL.
+    Returns an absolute URL that the frontend can use to play the video.
+    """
+    teacher = _get_teacher(db, current_user)
+
+    # Save file via StorageService (validates type, enforces size limit from .env)
+    relative_path = await StorageService.save_video(file, "videos")
+
+    video = VideoContent(
+        title=title,
+        description=description or "",
+        standard=standard,
+        division=division,
+        subject=subject,
+        topic=topic,
+        file_path=relative_path,
+        mime_type=file.content_type,
+        teacher_id=teacher.id,
+        uploaded_by=current_user.user_id,
+        created_by=current_user.user_id,
+        is_published=True,
+    )
+    db.add(video)
+    db.commit()
+    db.refresh(video)
+
+    return APIResponse.created(
+        data=_serialize_video(video),
+        message=f"Video '{title}' uploaded successfully!"
+    )
+
+
+@router.delete("/videos/{video_id}", response_model=APIResponse)
+def delete_teacher_video(video_id: int, current_user: AuthUser, db: DBSession):
+    """Soft-delete a video. If it was a local file upload, the file is also removed from disk."""
+    video = db.scalar(select(VideoContent).where(VideoContent.id == video_id, VideoContent.is_deleted == False))
+    if not video:
+        raise HTTPException(status_code=404, detail="Video not found.")
+
+    # Delete physical file if it was a local upload
+    if video.file_path:
+        StorageService.delete_file(video.file_path)
+
+    video.is_deleted = True
+    video.updated_by = current_user.user_id
+    db.commit()
+    return APIResponse.ok(message="Video deleted successfully.")
 
 
 # ─────────────────────────────────────────────────────────────

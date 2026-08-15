@@ -87,7 +87,9 @@ export default function TeacherPortalPage() {
 
   // Videos
   const [videos, setVideos] = useState<any[]>([]);
-  const [vidForm, setVidForm] = useState({ standard: '', subject: '', title: '', video_url: '', description: '', });
+  const [vidMode, setVidMode] = useState<'url' | 'file'>('url');
+  const [vidForm, setVidForm] = useState({ standard: '', subject: '', title: '', video_url: '', description: '' });
+  const [vidFile, setVidFile] = useState<File | null>(null);
   const [savingVid, setSavingVid] = useState(false);
 
   // Marks Entry
@@ -330,11 +332,39 @@ export default function TeacherPortalPage() {
     e.preventDefault();
     setSavingVid(true);
     try {
-      await api.post('/teacher-portal/videos', vidForm);
-      toast.success('Video lecture added!'); loadVideos();
+      if (vidMode === 'file' && vidFile) {
+        // File upload: POST multipart form to /teacher-portal/videos/upload
+        const params = new URLSearchParams({
+          standard: vidForm.standard,
+          subject: vidForm.subject,
+          title: vidForm.title,
+          ...(vidForm.description ? { description: vidForm.description } : {}),
+        });
+        const fd = new FormData();
+        fd.append('file', vidFile);
+        await api.post(`/teacher-portal/videos/upload?${params.toString()}`, fd, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        });
+        toast.success('Video uploaded successfully!');
+        setVidFile(null);
+      } else {
+        // URL link: POST JSON to /teacher-portal/videos
+        if (!vidForm.video_url) { toast.error('Please enter a video URL'); return; }
+        await api.post('/teacher-portal/videos', vidForm);
+        toast.success('Video lecture linked!');
+      }
+      loadVideos();
       setVidForm({ standard: '', subject: '', title: '', video_url: '', description: '' });
-    } catch (err: any) { toast.error(err?.response?.data?.detail || 'Failed'); }
+    } catch (err: any) { toast.error(err?.response?.data?.detail || 'Failed to save video'); }
     finally { setSavingVid(false); }
+  };
+
+  const handleDeleteVideo = async (id: number) => {
+    if (!window.confirm('Delete this video?')) return;
+    try {
+      await api.delete(`/teacher-portal/videos/${id}`);
+      toast.success('Video deleted.'); loadVideos();
+    } catch { toast.error('Failed to delete video'); }
   };
 
   // Attendance Save
@@ -915,25 +945,85 @@ export default function TeacherPortalPage() {
       {/* 10. VIDEOS */}
       {tab === 'videos' && (
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-5)' }}>
+          {/* Left: Add Video Form */}
           <div className={styles.card}>
-            <div className={styles.cardHeader}><h3 className={styles.cardTitle}><UserCheck size={18} color="var(--color-primary)" /> Add Video Lecture</h3></div>
+            <div className={styles.cardHeader}>
+              <h3 className={styles.cardTitle}><UserCheck size={18} color="var(--color-primary)" /> Add Video Lecture</h3>
+              {/* Mode toggle */}
+              <div style={{ display: 'flex', background: 'var(--color-surface-2)', borderRadius: 'var(--radius-sm)', overflow: 'hidden', border: '1px solid var(--color-border)' }}>
+                {(['url', 'file'] as const).map(m => (
+                  <button key={m} type="button"
+                    style={{ padding: '4px 14px', fontSize: '0.75rem', fontWeight: 700, border: 'none', cursor: 'pointer',
+                      background: vidMode === m ? 'var(--color-primary)' : 'transparent',
+                      color: vidMode === m ? '#fff' : 'var(--color-text-muted)' }}
+                    onClick={() => setVidMode(m)}>
+                    {m === 'url' ? '🔗 URL Link' : '📁 Upload File'}
+                  </button>
+                ))}
+              </div>
+            </div>
             <form onSubmit={handleAddVideo} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
-              {[['Standard', 'standard', 'text'], ['Subject', 'subject', 'text'], ['Title', 'title', 'text'], ['Video URL (YouTube)', 'video_url', 'url']].map(([lbl, key, type]) => (
+              {/* Common fields */}
+              {[['Standard', 'standard', 'text'], ['Subject', 'subject', 'text'], ['Title', 'title', 'text']].map(([lbl, key, type]) => (
                 <div key={key} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                   <label style={{ fontSize: 'var(--font-size-xs)', fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>{lbl}</label>
                   <input type={type} className={styles.inputField} value={(vidForm as any)[key]} onChange={e => setVidForm(f => ({ ...f, [key]: e.target.value }))} required />
                 </div>
               ))}
-              <button type="submit" className={styles.primaryBtn} disabled={savingVid}>{savingVid ? 'Adding...' : 'Add Video'}</button>
+              {/* Mode-specific */}
+              {vidMode === 'url' ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  <label style={{ fontSize: 'var(--font-size-xs)', fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>Video URL (YouTube / External)</label>
+                  <input type="url" className={styles.inputField} placeholder="https://youtube.com/watch?v=..." value={vidForm.video_url} onChange={e => setVidForm(f => ({ ...f, video_url: e.target.value }))} required />
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  <label style={{ fontSize: 'var(--font-size-xs)', fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>Video File (mp4, mov, webm — max 500 MB)</label>
+                  <input type="file" accept="video/*" className={styles.inputField} style={{ padding: '8px' }}
+                    onChange={e => setVidFile(e.target.files?.[0] || null)} required />
+                  {vidFile && <span style={{ fontSize: '0.75rem', color: 'var(--color-success)' }}>✓ {vidFile.name} ({(vidFile.size / 1024 / 1024).toFixed(1)} MB)</span>}
+                </div>
+              )}
+              <button type="submit" className={styles.primaryBtn} disabled={savingVid}>
+                {savingVid ? (vidMode === 'file' ? 'Uploading...' : 'Adding...') : (vidMode === 'file' ? '📤 Upload Video' : '🔗 Link Video')}
+              </button>
             </form>
           </div>
+
+          {/* Right: Video Library */}
           <div className={styles.card}>
-            <div className={styles.cardHeader}><h3 className={styles.cardTitle}>Video Library</h3></div>
-            {videos.length === 0 ? <p style={{ color: 'var(--color-text-muted)', textAlign: 'center', padding: 'var(--space-8)' }}>No videos uploaded</p> : videos.map((v: any) => (
+            <div className={styles.cardHeader}>
+              <h3 className={styles.cardTitle}>📹 Video Library</h3>
+              <button className={styles.secondaryBtn} onClick={loadVideos}><RefreshCw size={14} /> Refresh</button>
+            </div>
+            {videos.length === 0 ? (
+              <p style={{ color: 'var(--color-text-muted)', textAlign: 'center', padding: 'var(--space-8)' }}>No videos added yet. Add one on the left!</p>
+            ) : videos.map((v: any) => (
               <div key={v.id} style={{ padding: 'var(--space-3)', background: 'var(--color-surface-2)', borderRadius: 'var(--radius-md)', marginBottom: 'var(--space-2)', border: '1px solid var(--color-border)' }}>
-                <div style={{ fontWeight: 600, fontSize: 'var(--font-size-sm)' }}>{v.title}</div>
-                <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)' }}>Std {v.standard} • {v.subject}</div>
-                {v.video_url && <a href={v.video_url} target="_blank" rel="noreferrer" style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-primary)' }}>▶ Watch</a>}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: 600, fontSize: 'var(--font-size-sm)' }}>{v.title}</div>
+                    <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', marginTop: 2 }}>
+                      Std {v.standard} • {v.subject}
+                      {v.is_local && <span style={{ marginLeft: 6, padding: '1px 6px', background: 'var(--color-success-light)', color: 'var(--color-success)', borderRadius: 4, fontSize: '0.7rem', fontWeight: 700 }}>LOCAL FILE</span>}
+                    </div>
+                  </div>
+                  <button onClick={() => handleDeleteVideo(v.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-danger)', padding: 4 }}>
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+                {/* Video display: local file → <video> player; external → link */}
+                {v.is_local && v.file_url ? (
+                  <video controls style={{ width: '100%', marginTop: 8, borderRadius: 'var(--radius-sm)', maxHeight: 140, background: '#000' }}>
+                    <source src={v.file_url} type={v.mime_type || 'video/mp4'} />
+                    Your browser does not support the video tag.
+                  </video>
+                ) : v.display_url ? (
+                  <a href={v.display_url} target="_blank" rel="noreferrer"
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: 4, marginTop: 8, fontSize: 'var(--font-size-xs)', color: 'var(--color-primary)', fontWeight: 600 }}>
+                    ▶ Watch Video
+                  </a>
+                ) : null}
               </div>
             ))}
           </div>
@@ -1023,6 +1113,82 @@ export default function TeacherPortalPage() {
           </div>
           <div style={{ marginTop: 'var(--space-4)', padding: 'var(--space-4)', background: 'var(--color-primary-light)', borderRadius: 'var(--radius-lg)', fontSize: 'var(--font-size-sm)', color: 'var(--color-primary)' }}>
             <Lightbulb size={16} className="inline mr-1" /> These tools use the VidyaSetu AI Hub. Click any tool to open the AI assistant with the relevant prompt pre-loaded.
+          </div>
+        </div>
+      )}
+
+      {/* 13. MY PROFILE */}
+      {tab === 'profile' && profile && (
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-5)' }}>
+          {/* Left: Profile Info */}
+          <div className={styles.card}>
+            <div className={styles.cardHeader}><h3 className={styles.cardTitle}>👤 My Profile</h3></div>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--space-4)', padding: 'var(--space-4) 0' }}>
+              {/* Profile Photo */}
+              <div style={{ position: 'relative' }}>
+                {profile.teacher?.photo_url ? (
+                  <img src={profile.teacher.photo_url} alt="Profile" style={{ width: 96, height: 96, borderRadius: '50%', objectFit: 'cover', border: '3px solid var(--color-primary)' }} />
+                ) : (
+                  <div style={{ width: 96, height: 96, borderRadius: '50%', background: 'var(--color-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '2.5rem', color: '#fff' }}>
+                    {profile.teacher?.full_name?.[0] || '?'}
+                  </div>
+                )}
+              </div>
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: 'var(--font-size-lg)', fontWeight: 700 }}>{profile.teacher?.full_name}</div>
+                <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-muted)' }}>{profile.teacher?.designation} • {profile.teacher?.department}</div>
+                <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-primary)', fontWeight: 600, marginTop: 4 }}>Emp ID: {profile.teacher?.employee_id}</div>
+              </div>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+              {[
+                ['📧 Email', profile.teacher?.email],
+                ['📱 Mobile', profile.teacher?.mobile],
+                ['📚 Subjects', Array.isArray(profile.teacher?.subjects) ? profile.teacher.subjects.join(', ') : profile.teacher?.subjects],
+                ['🏫 Classes Assigned', profile.teacher?.classes_assigned],
+                ['📅 Date of Joining', profile.teacher?.date_of_joining],
+                ['🩸 Blood Group', profile.teacher?.blood_group],
+              ].map(([label, value]) => value ? (
+                <div key={label as string} style={{ display: 'flex', gap: 12, padding: '8px 0', borderBottom: '1px solid var(--color-border)' }}>
+                  <span style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-muted)', minWidth: 130 }}>{label}</span>
+                  <span style={{ fontSize: 'var(--font-size-sm)', fontWeight: 600 }}>{value}</span>
+                </div>
+              ) : null)}
+            </div>
+          </div>
+
+          {/* Right: Upload Profile Photo */}
+          <div className={styles.card}>
+            <div className={styles.cardHeader}><h3 className={styles.cardTitle}>📷 Update Profile Photo</h3></div>
+            <form
+              onSubmit={async e => {
+                e.preventDefault();
+                const input = (e.target as HTMLFormElement).querySelector<HTMLInputElement>('input[type=file]');
+                if (!input?.files?.[0]) { toast.error('Please select an image'); return; }
+                const fd = new FormData();
+                fd.append('file', input.files[0]);
+                try {
+                  const res = await api.post('/teacher-portal/me/photo', fd, { headers: { 'Content-Type': 'multipart/form-data' } });
+                  toast.success('Profile photo updated!');
+                  // Refresh profile to show new photo
+                  const refreshed = await api.get('/teacher-portal/me');
+                  if (refreshed.data?.data) setProfile(refreshed.data.data);
+                } catch (err: any) {
+                  toast.error(err?.response?.data?.detail || 'Upload failed');
+                }
+              }}
+              style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)', alignItems: 'center', padding: 'var(--space-6) 0' }}
+            >
+              <div style={{ fontSize: '3rem' }}>📸</div>
+              <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-muted)', textAlign: 'center' }}>
+                Upload a professional photo. Supported formats: JPG, PNG, WebP. Max size: 50 MB.
+              </p>
+              <input type="file" accept="image/jpeg,image/png,image/webp" className={styles.inputField}
+                style={{ width: '100%', padding: '10px' }} />
+              <button type="submit" className={styles.primaryBtn} style={{ width: '100%' }}>
+                📤 Upload Profile Photo
+              </button>
+            </form>
           </div>
         </div>
       )}

@@ -25,6 +25,7 @@ from app.modules.settings.models import AcademicYear
 from app.modules.office.service import BonafideService
 from app.modules.office.schemas import BonafideApplyRequest
 from app.shared.responses import APIResponse
+from app.shared.storage import StorageService
 
 router = APIRouter(prefix="/student-portal", tags=["Student Portal"])
 
@@ -105,7 +106,7 @@ def get_my_profile(current_user: AuthUser, db: DBSession):
         "dob": student.dob.isoformat() if student.dob else None,
         "gender": student.gender,
         "blood_group": student.blood_group,
-        "photo_path": student.photo_path,
+        "photo_url": StorageService.storage_url(student.photo_path),
         "father_name": getattr(student, "father_name", None),
         "mother_name_full": getattr(student, "mother_name_full", None),
         "father_mobile": getattr(student, "father_mobile", None),

@@ -25,12 +25,12 @@ const { width } = Dimensions.get('window');
 const CUR_YEAR = '2025-2026';
 
 const QUICK_ACTIONS = [
-  { icon: 'clipboard-check', label: 'Attendance', screen: 'Attendance', color: '#6366f1' },
-  { icon: 'user-graduate',   label: 'Students',   screen: 'Students',   color: '#10b981' },
-  { icon: 'rupee-sign',      label: 'Fees',        screen: 'Fees',       color: '#f59e0b' },
-  { icon: 'book-open',       label: 'Lessons',     screen: 'Plans',      color: '#3b82f6' },
-  { icon: 'calendar-alt',    label: 'Timetable',   screen: 'Timetable',  color: '#8b5cf6' },
-  { icon: 'bullhorn',        label: 'Notices',     screen: 'Notifications', color: '#ec4899' },
+  { icon: 'clipboard-check', label: 'Attendance',  screen: 'Attendance',     color: '#6366f1' },
+  { icon: 'user-graduate',   label: 'Students',    screen: 'Students',       color: '#10b981' },
+  { icon: 'rupee-sign',      label: 'Finance',     screen: 'FinanceDashboard', color: '#f59e0b' },
+  { icon: 'user-plus',       label: 'Admissions',  screen: 'Admission',      color: '#3b82f6' },
+  { icon: 'file-alt',        label: 'Leave',       screen: 'Leave',          color: '#8b5cf6' },
+  { icon: 'bullhorn',        label: 'Notices',     screen: 'Announcements',  color: '#ec4899' },
 ];
 
 function getGreeting() {
@@ -154,26 +154,26 @@ export default function AdminDashboardScreen({ navigation }: { navigation: any }
               />
               <StatCard
                 label="Today's Attendance"
-                value={stats.today_attendance ? `${stats.today_attendance}%` : '—'}
+                value={(stats.today_attendance ?? stats.today_attendance_pct) !== undefined ? `${stats.today_attendance ?? stats.today_attendance_pct}%` : '—'}
                 icon="clipboard-check"
                 color={colors.success}
-                trend={stats.today_attendance >= 80 ? 'up' : 'down'}
-                trendValue={stats.today_attendance >= 80 ? 'Good' : 'Low'}
+                trend={(stats.today_attendance ?? stats.today_attendance_pct ?? 0) >= 80 ? 'up' : 'down'}
+                trendValue={(stats.today_attendance ?? stats.today_attendance_pct ?? 0) >= 80 ? 'Good' : 'Low'}
               />
               <StatCard
                 label="Fees Collected"
-                value={stats.fees_collected ? `₹${(stats.fees_collected / 1000).toFixed(0)}K` : '—'}
+                value={(stats.fees_collected ?? stats.fee_collected) ? `₹${(((stats.fees_collected ?? stats.fee_collected) ?? 0) / 1000).toFixed(0)}K` : '—'}
                 icon="rupee-sign"
                 color={colors.warning}
                 gradient={['#f59e0b', '#d97706']}
               />
               <StatCard
                 label="Pending Dues"
-                value={stats.pending_dues ?? '—'}
+                value={(stats.pending_dues ?? stats.fee_pending) !== undefined ? `₹${(((stats.pending_dues ?? stats.fee_pending) ?? 0) / 1000).toFixed(0)}K` : '—'}
                 icon="exclamation-triangle"
                 color={colors.danger}
-                trend={stats.pending_dues > 0 ? 'down' : 'neutral'}
-                trendValue={stats.pending_dues > 0 ? 'Needs attention' : 'All clear'}
+                trend={(stats.pending_dues ?? stats.fee_pending ?? 0) > 0 ? 'down' : 'neutral'}
+                trendValue={(stats.pending_dues ?? stats.fee_pending ?? 0) > 0 ? 'Needs attention' : 'All clear'}
               />
             </View>
           )}

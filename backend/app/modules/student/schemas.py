@@ -101,16 +101,53 @@ class StudentCreateRequest(BaseModel):
     @classmethod
     def validate_standard(cls, v: str) -> str:
         valid = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12"]
-        v_str = str(v)
+        v_str = str(v).strip()
         if v_str not in valid:
             raise ValueError(f"Standard must be one of: {', '.join(valid)}")
         return v_str
 
+    @field_validator("roll_number")
+    @classmethod
+    def validate_roll(cls, v: Optional[int]) -> Optional[int]:
+        if v is not None and (v <= 0 or v > 500):
+            raise ValueError("Roll number must be between 1 and 500.")
+        return v
+
+    @field_validator("mobile", "father_mobile", "mother_mobile", "guardian_mobile")
+    @classmethod
+    def validate_phones(cls, v: Optional[str]) -> Optional[str]:
+        from app.core.validators import validate_indian_phone
+        return validate_indian_phone(v, required=False)
+
+    @field_validator("email", "father_email", "mother_email")
+    @classmethod
+    def validate_emails(cls, v: Optional[str]) -> Optional[str]:
+        from app.core.validators import validate_email_str
+        return validate_email_str(v, required=False)
+
+    @field_validator("aadhaar_number")
+    @classmethod
+    def validate_aadhaar(cls, v: Optional[str]) -> Optional[str]:
+        if not v:
+            return None
+        cleaned = v.strip().replace(" ", "").replace("-", "")
+        if cleaned and (not cleaned.isdigit() or len(cleaned) != 12):
+            raise ValueError("Aadhaar number must be exactly 12 digits.")
+        return cleaned
+
     @model_validator(mode="after")
     def populate_aliases_and_names(self):
+        from app.core.validators import validate_date_range
         # 1. Alias date_of_birth -> dob
         if not self.dob and self.date_of_birth:
             self.dob = self.date_of_birth
+
+        if self.dob and self.dob >= date.today():
+            raise ValueError("Date of birth cannot be today or in the future.")
+
+        if self.dob and self.admission_date:
+            if self.dob >= self.admission_date:
+                raise ValueError("Date of birth must be before admission date.")
 
         # 2. Alias address -> address_line1
         if not self.address_line1 and self.address:

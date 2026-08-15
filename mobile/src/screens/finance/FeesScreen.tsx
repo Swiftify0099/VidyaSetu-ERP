@@ -1,16 +1,53 @@
 /**
- * VidyaSetu Mobile — Fee Collection Screen (Accountant Tab)
+ * VidyaSetu Mobile — Fee Collection Screen (Premium Redesign)
+ * =============================================================
+ * Student GR balance lookup, multi-mode fee collection (Cash, UPI, Cheque, Bank Transfer),
+ * quick preset amounts, and instant receipt recording.
  */
 import React, { useState, useCallback } from 'react';
 import {
-  View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView,
-  Alert, ActivityIndicator,
+  View,
+  Text,
+  StyleSheet,
+  TextInput,
+  TouchableOpacity,
+  ScrollView,
+  Platform,
 } from 'react-native';
-import { api } from '../../services/api';
+import LinearGradient from 'react-native-linear-gradient';
+import Icon from 'react-native-vector-icons/FontAwesome5';
+import { useTheme } from '../../theme/ThemeContext';
+import { financeAPI } from '../../services/api';
+import { spacing, radius, typography, shadows } from '../../theme';
+import { formatCurrency, getErrorMessage } from '../../utils/formatters';
+import {
+  AppCard,
+  AppButton,
+  AppBadge,
+  AppChip,
+  AppSectionHeader,
+  AppInput,
+} from '../../components/ui';
+import Toast from 'react-native-toast-message';
 
-interface StudentFee { student_id: number; full_name: string; gr_number: string; balance: number; }
+interface StudentFee {
+  student_id: number;
+  full_name: string;
+  gr_number: string;
+  balance: number;
+  standard?: string;
+  division?: string;
+}
+
+const PAYMENT_MODES = [
+  { id: 'cash',          label: 'Cash',          icon: 'money-bill-wave' },
+  { id: 'upi',           label: 'UPI / QR',      icon: 'mobile-alt' },
+  { id: 'cheque',        label: 'Cheque',        icon: 'money-check' },
+  { id: 'bank_transfer', label: 'Bank Transfer', icon: 'university' },
+];
 
 export default function FeesScreen() {
+  const { colors, roleAccent } = useTheme();
   const [grInput, setGrInput] = useState('');
   const [student, setStudent] = useState<StudentFee | null>(null);
   const [amount, setAmount] = useState('');
@@ -18,131 +55,339 @@ export default function FeesScreen() {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  const PAYMENT_MODES = ['cash', 'upi', 'cheque', 'bank_transfer'];
-
   const searchStudent = useCallback(async () => {
     if (!grInput.trim()) return;
     setLoading(true);
     setStudent(null);
     try {
-      const res = await api.get('/finance/student-balance', { params: { gr_number: grInput.trim() } });
-      setStudent(res.data?.data);
-    } catch {
-      Alert.alert('❌ Not Found', 'No student found with this GR number.');
-    } finally { setLoading(false); }
+      const res = await financeAPI.getStudentBalance(grInput.trim());
+      const data = res.data?.data;
+      if (data) {
+        setStudent(data);
+        setAmount(String(data.balance ?? ''));
+      } else {
+        Toast.show({ type: 'error', text1: 'No student found with this GR Number' });
+      }
+    } catch (e) {
+      Toast.show({ type: 'error', text1: 'Student lookup failed', text2: getErrorMessage(e) });
+    } finally {
+      setLoading(false);
+    }
   }, [grInput]);
 
   const collectFee = async () => {
-    if (!student || !amount) { Alert.alert('⚠️', 'Fill GR and amount'); return; }
+    if (!student || !amount) {
+      Toast.show({ type: 'error', text1: 'Enter GR Number and collection amount' });
+      return;
+    }
     const amtNum = Number(amount);
-    if (isNaN(amtNum) || amtNum <= 0) { Alert.alert('⚠️', 'Enter a valid amount'); return; }
+    if (isNaN(amtNum) || amtNum <= 0) {
+      Toast.show({ type: 'error', text1: 'Enter a valid payment amount' });
+      return;
+    }
     setSaving(true);
     try {
-      await api.post('/finance/collect', {
+      await financeAPI.collectFee({
         student_id: student.student_id,
         amount: amtNum,
         payment_mode: payMode,
         academic_year: '2025-2026',
       });
-      Alert.alert('✅ Collected', `₹${amtNum.toLocaleString('en-IN')} collected from ${student.full_name}`);
-      setGrInput(''); setStudent(null); setAmount('');
-    } catch {
-      Alert.alert('❌ Error', 'Failed to collect fee. Please retry.');
-    } finally { setSaving(false); }
+      Toast.show({
+        type: 'success',
+        text1: 'Payment Collected Successfully!',
+        text2: `${formatCurrency(amtNum)} recorded for ${student.full_name}`,
+      });
+      setGrInput('');
+      setStudent(null);
+      setAmount('');
+    } catch (e) {
+      Toast.show({ type: 'error', text1: 'Fee Collection Failed', text2: getErrorMessage(e) });
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
-    <ScrollView style={s.page} contentContainerStyle={{ padding: 16, paddingBottom: 60 }}>
-      <Text style={s.heading}>🧾 Fee Collection</Text>
-
-      {/* GR Search */}
-      <Text style={s.label}>Student GR Number</Text>
-      <View style={s.searchRow}>
-        <TextInput
-          style={s.input}
-          value={grInput}
-          onChangeText={setGrInput}
-          placeholder="Enter GR Number..."
-          placeholderTextColor="#9ca3af"
-          onSubmitEditing={searchStudent}
-          autoCapitalize="characters"
-        />
-        <TouchableOpacity style={s.searchBtn} onPress={searchStudent} disabled={loading}>
-          {loading ? <ActivityIndicator color="#fff" size="small" /> : <Text style={s.searchBtnText}>Search</Text>}
-        </TouchableOpacity>
-      </View>
-
-      {/* Student Card */}
-      {student && (
-        <View style={s.studentCard}>
-          <Text style={s.studentName}>{student.full_name}</Text>
-          <Text style={s.studentGR}>GR: {student.gr_number}</Text>
-          <View style={s.balanceRow}>
-            <Text style={s.balanceLabel}>Outstanding Balance:</Text>
-            <Text style={[s.balanceValue, { color: student.balance > 0 ? '#dc2626' : '#059669' }]}>
-              ₹{student.balance.toLocaleString('en-IN')}
+    <ScrollView
+      style={[styles.page, { backgroundColor: colors.background }]}
+      contentContainerStyle={styles.content}
+      showsVerticalScrollIndicator={false}
+    >
+      {/* Header Banner */}
+      <LinearGradient
+        colors={roleAccent.gradient}
+        style={styles.headerBanner}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+      >
+        <View style={styles.headerRow}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.headerTitle}>Collect Student Fees</Text>
+            <Text style={styles.headerSub}>
+              Search student by GR Number to verify outstanding dues & record receipts
             </Text>
           </View>
-        </View>
-      )}
-
-      {/* Amount */}
-      {student && (
-        <>
-          <Text style={s.label}>Amount to Collect (₹)</Text>
-          <TextInput
-            style={s.input}
-            value={amount}
-            onChangeText={setAmount}
-            placeholder="e.g. 5000"
-            placeholderTextColor="#9ca3af"
-            keyboardType="numeric"
-          />
-
-          {/* Payment Mode */}
-          <Text style={s.label}>Payment Mode</Text>
-          <View style={s.modeRow}>
-            {PAYMENT_MODES.map(m => (
-              <TouchableOpacity
-                key={m}
-                style={[s.modeBtn, payMode === m && s.modeBtnActive]}
-                onPress={() => setPayMode(m)}
-              >
-                <Text style={[s.modeBtnText, payMode === m && s.modeBtnTextActive]}>
-                  {m === 'cash' ? '💵' : m === 'upi' ? '📱' : m === 'cheque' ? '🏦' : '🔄'}  {m.replace('_', ' ').toUpperCase()}
-                </Text>
-              </TouchableOpacity>
-            ))}
+          <View style={styles.headerIconWrap}>
+            <Icon name="receipt" size={22} color="#fff" solid />
           </View>
+        </View>
+      </LinearGradient>
 
-          <TouchableOpacity style={s.collectBtn} onPress={collectFee} disabled={saving}>
-            <Text style={s.collectBtnText}>{saving ? '⏳ Processing...' : `💰 Collect ₹${amount || '0'}`}</Text>
-          </TouchableOpacity>
-        </>
-      )}
+      <View style={{ padding: spacing.base, gap: spacing.base }}>
+        {/* GR Lookup Card */}
+        <AppCard variant="bordered" padding={16}>
+          <AppSectionHeader title="Lookup Student Record" icon="search" />
+          <View style={styles.lookupRow}>
+            <View style={{ flex: 1 }}>
+              <AppInput
+                label="Student GR Number"
+                value={grInput}
+                onChangeText={setGrInput}
+                icon="id-card"
+                placeholder="e.g. GR-2025-001"
+                autoCapitalize="characters"
+                onSubmitEditing={searchStudent}
+                containerStyle={{ marginBottom: 0 }}
+              />
+            </View>
+            <AppButton
+              label="Search"
+              iconLeft="search"
+              onPress={searchStudent}
+              loading={loading}
+              style={{ marginTop: 20 }}
+            />
+          </View>
+        </AppCard>
+
+        {/* Student Balance Card */}
+        {student && (
+          <AppCard
+            variant="default"
+            padding={18}
+            style={{ borderLeftWidth: 4, borderLeftColor: colors.primary }}
+          >
+            <View style={styles.studentTitleRow}>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.studentName, { color: colors.text }]}>{student.full_name}</Text>
+                <Text style={[styles.studentGR, { color: colors.textSecondary }]}>
+                  GR: {student.gr_number} {student.standard ? `• Std ${student.standard}-${student.division || 'A'}` : ''}
+                </Text>
+              </View>
+              <AppBadge
+                label={student.balance > 0 ? 'Dues Pending' : 'Fully Paid'}
+                variant={student.balance > 0 ? 'danger' : 'success'}
+                size="sm"
+                rounded
+              />
+            </View>
+
+            {/* Outstanding Balance Banner */}
+            <View style={[styles.balanceBox, { backgroundColor: colors.surfaceAlt, borderColor: colors.border }]}>
+              <Text style={[styles.balanceLabel, { color: colors.textSecondary }]}>Outstanding Balance</Text>
+              <Text
+                style={[
+                  styles.balanceValue,
+                  { color: student.balance > 0 ? colors.danger : colors.success },
+                ]}
+              >
+                {formatCurrency(student.balance)}
+              </Text>
+            </View>
+
+            {/* Collection Amount Input */}
+            <View style={{ marginTop: spacing.md }}>
+              <AppInput
+                label="Amount to Collect (₹)"
+                value={amount}
+                onChangeText={setAmount}
+                icon="rupee-sign"
+                placeholder="0.00"
+                keyboardType="numeric"
+              />
+
+              {/* Quick Amount Chips */}
+              <View style={styles.quickAmounts}>
+                {student.balance > 0 && (
+                  <AppChip
+                    label={`Full Due (${formatCurrency(student.balance)})`}
+                    selected={amount === String(student.balance)}
+                    onPress={() => setAmount(String(student.balance))}
+                  />
+                )}
+                {[1000, 2000, 5000].map(val => (
+                  <AppChip
+                    key={val}
+                    label={`₹${val.toLocaleString('en-IN')}`}
+                    selected={amount === String(val)}
+                    onPress={() => setAmount(String(val))}
+                  />
+                ))}
+              </View>
+            </View>
+
+            {/* Payment Mode Selector */}
+            <View style={{ marginTop: spacing.base }}>
+              <Text style={[styles.modeHeading, { color: colors.textSecondary }]}>Payment Mode</Text>
+              <View style={styles.modeGrid}>
+                {PAYMENT_MODES.map(m => {
+                  const isSelected = payMode === m.id;
+                  return (
+                    <TouchableOpacity
+                      key={m.id}
+                      style={[
+                        styles.modeBtn,
+                        isSelected
+                          ? { backgroundColor: colors.primary, borderColor: colors.primary }
+                          : { backgroundColor: colors.surfaceAlt, borderColor: colors.border },
+                      ]}
+                      onPress={() => setPayMode(m.id)}
+                      activeOpacity={0.8}
+                    >
+                      <Icon
+                        name={m.icon}
+                        size={14}
+                        color={isSelected ? colors.textOnPrimary : colors.textSecondary}
+                        solid
+                      />
+                      <Text
+                        style={[
+                          styles.modeText,
+                          {
+                            color: isSelected ? colors.textOnPrimary : colors.textSecondary,
+                            fontWeight: isSelected ? typography.weight.bold : typography.weight.medium,
+                          },
+                        ]}
+                      >
+                        {m.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+
+            {/* Confirm Submit Button */}
+            <AppButton
+              label={`Collect ${formatCurrency(amount || 0)} & Issue Receipt`}
+              iconLeft="check-circle"
+              variant="success"
+              size="lg"
+              onPress={collectFee}
+              loading={saving}
+              fullWidth
+              style={{ marginTop: spacing.xl }}
+            />
+          </AppCard>
+        )}
+      </View>
     </ScrollView>
   );
 }
 
-const s = StyleSheet.create({
-  page: { flex: 1, backgroundColor: '#f8fafc' },
-  heading: { fontSize: 20, fontWeight: '900', color: '#1e293b', marginBottom: 20 },
-  label: { fontSize: 12, fontWeight: '700', color: '#6b7280', textTransform: 'uppercase', marginBottom: 6, marginTop: 14 },
-  searchRow: { flexDirection: 'row', gap: 8 },
-  input: { flex: 1, height: 48, borderWidth: 1.5, borderColor: '#e2e8f0', borderRadius: 12, paddingHorizontal: 14, backgroundColor: '#fff', fontSize: 15, color: '#1e293b' },
-  searchBtn: { backgroundColor: '#059669', borderRadius: 12, paddingHorizontal: 18, alignItems: 'center', justifyContent: 'center' },
-  searchBtnText: { color: '#fff', fontWeight: '800', fontSize: 13 },
-  studentCard: { backgroundColor: '#fff', borderRadius: 14, padding: 16, marginTop: 14, borderWidth: 1.5, borderColor: '#059669', shadowColor: '#059669', shadowOpacity: 0.1, shadowRadius: 8, elevation: 2 },
-  studentName: { fontSize: 17, fontWeight: '900', color: '#1e293b' },
-  studentGR: { fontSize: 12, color: '#6b7280', marginTop: 4 },
-  balanceRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: '#f1f5f9' },
-  balanceLabel: { fontSize: 13, color: '#6b7280', fontWeight: '600' },
-  balanceValue: { fontSize: 22, fontWeight: '900' },
-  modeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  modeBtn: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, backgroundColor: '#f1f5f9', borderWidth: 1.5, borderColor: '#e2e8f0' },
-  modeBtnActive: { backgroundColor: '#059669', borderColor: '#059669' },
-  modeBtnText: { fontSize: 11, fontWeight: '700', color: '#6b7280' },
-  modeBtnTextActive: { color: '#fff' },
-  collectBtn: { backgroundColor: '#059669', borderRadius: 14, padding: 18, alignItems: 'center', marginTop: 24 },
-  collectBtnText: { color: '#fff', fontSize: 16, fontWeight: '900' },
+const styles = StyleSheet.create({
+  page: {
+    flex: 1,
+  },
+  content: {
+    paddingBottom: spacing['3xl'],
+  },
+  headerBanner: {
+    padding: spacing.xl,
+    paddingTop: Platform.OS === 'ios' ? 24 : spacing.xl,
+    borderBottomLeftRadius: radius['2xl'],
+    borderBottomRightRadius: radius['2xl'],
+    ...shadows.md,
+  },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  headerTitle: {
+    fontSize: typography.size.xl,
+    fontWeight: typography.weight.extrabold,
+    color: '#ffffff',
+  },
+  headerSub: {
+    fontSize: typography.size.xs,
+    color: 'rgba(255,255,255,0.85)',
+    marginTop: 4,
+    lineHeight: 18,
+  },
+  headerIconWrap: {
+    width: 48,
+    height: 48,
+    borderRadius: radius.full,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: spacing.md,
+  },
+  lookupRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing.sm,
+  },
+  studentTitleRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+  },
+  studentName: {
+    fontSize: typography.size.lg,
+    fontWeight: typography.weight.bold,
+  },
+  studentGR: {
+    fontSize: typography.size.xs,
+    marginTop: 2,
+  },
+  balanceBox: {
+    padding: spacing.base,
+    borderRadius: radius.lg,
+    marginTop: spacing.md,
+    alignItems: 'center',
+    borderWidth: 1,
+  },
+  balanceLabel: {
+    fontSize: typography.size['2xs'],
+    fontWeight: typography.weight.bold,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  balanceValue: {
+    fontSize: typography.size['2xl'],
+    fontWeight: typography.weight.black,
+    marginTop: 2,
+  },
+  quickAmounts: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginTop: spacing.xs,
+    flexWrap: 'wrap',
+  },
+  modeHeading: {
+    fontSize: typography.size.xs,
+    fontWeight: typography.weight.bold,
+    textTransform: 'uppercase',
+    marginBottom: spacing.sm,
+  },
+  modeGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+  },
+  modeBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: spacing.base,
+    paddingVertical: spacing.sm + 2,
+    borderRadius: radius.md,
+    borderWidth: 1,
+  },
+  modeText: {
+    fontSize: typography.size.xs,
+  },
 });

@@ -6,6 +6,8 @@
   "python.autoComplete.extraPaths": [
     "${workspaceFolder}/backend"
   ],
+  "python.analysis.venvPath": "${workspaceFolder}",
+  "python.analysis.venv": ".venv",
   "java.configuration.updateBuildConfiguration": "automatic",
   "java.compile.nullAnalysis.mode": "automatic"
 }

@@ -1,13 +1,17 @@
 /**
- * VidyaSetu Mobile — Homework Portal Screen
- * Teacher: create/view/grade homework
- * Student: view/submit homework
- * Parent: view child homework
+ * VidyaSetu Mobile — Homework Portal Screen (Premium Redesign)
+ * =============================================================
+ * Interactive assignments dashboard supporting teacher creation & grading,
+ * student submissions, and parent monitoring.
  */
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import {
-  View, Text, StyleSheet, FlatList, TouchableOpacity, Modal,
-  TextInput, Alert, ActivityIndicator, ScrollView, RefreshControl,
+  View,
+  Text,
+  StyleSheet,
+  FlatList,
+  TouchableOpacity,
+  RefreshControl,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/FontAwesome5';
 import { useTheme } from '../../theme/ThemeContext';
@@ -16,10 +20,19 @@ import { useAuthStore } from '../../store/authStore';
 import { spacing, radius, typography, shadows } from '../../theme';
 import { formatDateLong, formatStatus, today, getErrorMessage } from '../../utils/formatters';
 import { CURRENT_ACADEMIC_YEAR, CLASSES, DIVISIONS } from '../../config/constants';
-import Badge from '../../components/ui/Badge';
-import PremiumCard from '../../components/ui/PremiumCard';
-import SectionHeader from '../../components/ui/SectionHeader';
-import SkeletonLoader from '../../components/ui/SkeletonLoader';
+import {
+  AppCard,
+  AppButton,
+  AppBadge,
+  AppTabs,
+  AppInput,
+  AppSelect,
+  AppBottomSheet,
+  AppProgress,
+  AppEmptyState,
+  AppSkeleton,
+  AppDatePicker,
+} from '../../components/ui';
 import Toast from 'react-native-toast-message';
 
 interface Homework {
@@ -49,17 +62,20 @@ interface Submission {
 }
 
 const EMPTY_FORM = {
-  subject_id: '',
+  subject_id: '1',
   standard: '8',
   division: 'A',
   title: '',
   description: '',
-  due_date: '',
+  due_date: today(),
   academic_year: CURRENT_ACADEMIC_YEAR,
 };
 
+const CLASS_OPTIONS = CLASSES.map(c => ({ label: `Standard ${c}`, value: c }));
+const DIVISION_OPTIONS = DIVISIONS.map(d => ({ label: `Division ${d}`, value: d }));
+
 export default function HomeworkPortalScreen({ navigation }: { navigation: any }) {
-  const { colors } = useTheme();
+  const { colors, roleAccent } = useTheme();
   const { user } = useAuthStore();
   const role = user?.roles?.[0]?.code ?? '';
   const isTeacher = ['teacher', 'class_teacher', 'admin', 'principal', 'super_admin'].includes(role);
@@ -76,8 +92,7 @@ export default function HomeworkPortalScreen({ navigation }: { navigation: any }
   const [submitContent, setSubmitContent] = useState('');
   const [form, setForm] = useState({ ...EMPTY_FORM });
   const [saving, setSaving] = useState(false);
-  const [subjectsMap] = useState<{ id: number; name: string }[]>([]);
-  const [filter, setFilter] = useState<'all' | 'pending' | 'submitted'>('all');
+  const [activeTab, setActiveTab] = useState('all');
 
   const load = useCallback(async () => {
     try {
@@ -88,26 +103,44 @@ export default function HomeworkPortalScreen({ navigation }: { navigation: any }
         res = await homeworkAPI.list({ academic_year: CURRENT_ACADEMIC_YEAR });
       }
       setHomeworks(res.data?.data?.items ?? res.data?.data ?? []);
-    } catch { /* ignore */ }
-    finally { setLoading(false); setRefreshing(false); }
+    } catch {
+      /* ignore */
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
   }, [isStudent]);
 
-  useEffect(() => { load(); }, [load]);
-  const onRefresh = () => { setRefreshing(true); load(); };
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    load();
+  };
 
   const createHomework = async () => {
-    if (!form.title.trim()) { Toast.show({ type: 'error', text1: 'Title is required' }); return; }
-    if (!form.due_date.trim()) { Toast.show({ type: 'error', text1: 'Due date is required' }); return; }
+    if (!form.title.trim()) {
+      Toast.show({ type: 'error', text1: 'Title is required' });
+      return;
+    }
+    if (!form.due_date.trim()) {
+      Toast.show({ type: 'error', text1: 'Due date is required' });
+      return;
+    }
     setSaving(true);
     try {
       await homeworkAPI.create({ ...form, subject_id: Number(form.subject_id) });
-      Toast.show({ type: 'success', text1: 'Homework assigned successfully!' });
+      Toast.show({ type: 'success', text1: 'Homework Assigned Successfully' });
       setShowCreate(false);
       setForm({ ...EMPTY_FORM });
       load();
     } catch (e) {
       Toast.show({ type: 'error', text1: getErrorMessage(e) });
-    } finally { setSaving(false); }
+    } finally {
+      setSaving(false);
+    }
   };
 
   const viewSubmissions = async (hw: Homework) => {
@@ -129,381 +162,358 @@ export default function HomeworkPortalScreen({ navigation }: { navigation: any }
     setSaving(true);
     try {
       await homeworkAPI.submit(selectedHW.id, { content: submitContent });
-      Toast.show({ type: 'success', text1: 'Homework submitted!' });
+      Toast.show({ type: 'success', text1: 'Homework submitted successfully!' });
       setShowSubmit(false);
       setSubmitContent('');
       load();
     } catch (e) {
       Toast.show({ type: 'error', text1: getErrorMessage(e) });
-    } finally { setSaving(false); }
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const deleteHW = (id: number) => {
-    Alert.alert('Delete Homework', 'Delete this homework assignment?', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete', style: 'destructive',
-        onPress: async () => {
-          try {
-            await homeworkAPI.delete(id);
-            Toast.show({ type: 'success', text1: 'Deleted' });
-            load();
-          } catch { Toast.show({ type: 'error', text1: 'Failed to delete' }); }
-        },
-      },
-    ]);
-  };
-
-  const filtered = homeworks.filter(hw => {
-    if (filter === 'all') return true;
-    if (filter === 'pending')   return hw.my_submission_status !== 'submitted';
-    if (filter === 'submitted') return hw.my_submission_status === 'submitted';
-    return true;
-  });
-
-  function statusVariant(status: string): any {
-    if (status === 'submitted') return 'success';
-    if (status === 'graded')    return 'primary';
-    if (status === 'overdue')   return 'danger';
-    return 'warning';
-  }
+  const filteredHomeworks = useMemo(() => {
+    if (activeTab === 'all') return homeworks;
+    if (activeTab === 'pending') {
+      return homeworks.filter(h => h.my_submission_status === 'pending' || h.status === 'assigned');
+    }
+    if (activeTab === 'submitted') {
+      return homeworks.filter(h => h.my_submission_status === 'submitted' || h.status === 'completed');
+    }
+    return homeworks;
+  }, [homeworks, activeTab]);
 
   return (
-    <View style={[s.root, { backgroundColor: colors.background }]}>
-      {/* Filter */}
-      {isStudent && (
-        <View style={[s.filterRow, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
-          {(['all', 'pending', 'submitted'] as const).map(f => (
-            <TouchableOpacity
-              key={f}
-              style={[s.filterBtn, filter === f && { borderBottomColor: colors.primary, borderBottomWidth: 2.5 }]}
-              onPress={() => setFilter(f)}
-            >
-              <Text style={[s.filterText, { color: filter === f ? colors.primary : colors.textSecondary }]}>
-                {f.charAt(0).toUpperCase() + f.slice(1)}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-      )}
+    <View style={[styles.root, { backgroundColor: colors.background }]}>
+      {/* Tab Filter Strip */}
+      <View style={[styles.tabsWrap, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
+        <AppTabs
+          tabs={[
+            { key: 'all', label: 'All Tasks', count: homeworks.length },
+            {
+              key: 'pending',
+              label: 'Active / Due',
+              count: homeworks.filter(h => h.status !== 'completed').length,
+            },
+            {
+              key: 'submitted',
+              label: 'Submitted',
+              count: homeworks.filter(h => h.status === 'completed' || h.my_submission_status === 'submitted').length,
+            },
+          ]}
+          activeTab={activeTab}
+          onChangeTab={setActiveTab}
+          variant="segmented"
+        />
+      </View>
 
+      {/* Main List */}
       {loading ? (
         <View style={{ padding: spacing.base }}>
-          <SkeletonLoader variant="list" count={5} />
+          <AppSkeleton variant="card" count={4} />
         </View>
       ) : (
         <FlatList
-          data={filtered}
-          keyExtractor={hw => String(hw.id)}
+          data={filteredHomeworks}
+          keyExtractor={item => String(item.id)}
           contentContainerStyle={{ padding: spacing.base, paddingBottom: 100 }}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} colors={[colors.primary]} />}
-          ItemSeparatorComponent={() => <View style={{ height: 8 }} />}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor={colors.primary}
+              colors={[colors.primary]}
+            />
+          }
+          ItemSeparatorComponent={() => <View style={{ height: 10 }} />}
+          ListEmptyComponent={
+            <AppEmptyState
+              icon="tasks"
+              title="No Homework Found"
+              description="No active homework or assignments scheduled for this class category."
+              actionLabel={isTeacher ? 'Assign Homework' : undefined}
+              onAction={isTeacher ? () => setShowCreate(true) : undefined}
+              style={{ flex: 1 }}
+            />
+          }
           renderItem={({ item }) => {
-            const isOverdue = new Date(item.due_date) < new Date() && item.my_submission_status !== 'submitted';
+            const isDueSoon = new Date(item.due_date).getTime() - Date.now() < 86400000 * 2;
+            const submittedCount = item.submission_count ?? 0;
+            const totalCount = item.total_students ?? 30;
+            const completionPct = totalCount > 0 ? (submittedCount / totalCount) * 100 : 0;
+
             return (
-              <PremiumCard variant="bordered" padding={12}>
-                <View style={s.hwRow}>
-                  <View style={[s.hwIcon, { backgroundColor: colors.primaryBg }]}>
-                    <Icon name="book-open" size={16} color={colors.primary} solid />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <View style={s.hwTitleRow}>
-                      <Text style={[s.hwTitle, { color: colors.text }]} numberOfLines={1}>{item.title}</Text>
-                      {isStudent && item.my_submission_status && (
-                        <Badge
-                          label={formatStatus(item.my_submission_status)}
-                          variant={statusVariant(item.my_submission_status)}
-                          size="sm" rounded
-                        />
-                      )}
+              <AppCard variant="bordered" padding={14}>
+                <View style={{ gap: 8 }}>
+                  {/* Top Subject & Standard Row */}
+                  <View style={styles.cardTop}>
+                    <View style={styles.subjectPill}>
+                      <Icon name="book" size={11} color={colors.primary} solid />
+                      <Text style={[styles.subjectName, { color: colors.primary }]}>
+                        {item.subject_name || 'General'}
+                      </Text>
+                      <Text style={[styles.classTag, { color: colors.textSecondary }]}>
+                        • Std {item.standard}-{item.division}
+                      </Text>
                     </View>
-                    <Text style={[s.hwSubject, { color: colors.textSecondary }]}>
-                      {item.subject_name} • Std {item.standard}-{item.division}
-                    </Text>
-                    <Text style={[s.hwDesc, { color: colors.textSecondary }]} numberOfLines={2}>
+
+                    <AppBadge
+                      label={isDueSoon ? 'Due Soon' : formatStatus(item.status)}
+                      variant={isDueSoon ? 'warning' : 'neutral'}
+                      size="sm"
+                      rounded
+                    />
+                  </View>
+
+                  {/* Title & Description */}
+                  <Text style={[styles.title, { color: colors.text }]}>{item.title}</Text>
+                  {item.description ? (
+                    <Text style={[styles.description, { color: colors.textSecondary }]} numberOfLines={2}>
                       {item.description}
                     </Text>
-                    <View style={s.hwMeta}>
-                      <Icon name="calendar" size={10} color={isOverdue ? colors.danger : colors.textTertiary} solid />
-                      <Text style={[s.hwDate, { color: isOverdue ? colors.danger : colors.textTertiary }]}>
+                  ) : null}
+
+                  {/* Due Date & Submission Stats */}
+                  <View style={styles.footerRow}>
+                    <View style={styles.dateRow}>
+                      <Icon name="calendar-alt" size={11} color={colors.textTertiary} />
+                      <Text style={[styles.dateText, { color: colors.textTertiary }]}>
                         Due: {formatDateLong(item.due_date)}
-                        {isOverdue && ' (Overdue)'}
                       </Text>
-                      {isTeacher && item.submission_count != null && (
-                        <Text style={[s.hwDate, { color: colors.textTertiary }]}>
-                          • {item.submission_count}/{item.total_students} submitted
-                        </Text>
-                      )}
                     </View>
-                    <View style={s.hwActions}>
-                      {isTeacher && (
-                        <>
-                          <TouchableOpacity
-                            style={[s.hwBtn, { backgroundColor: colors.primaryBg }]}
-                            onPress={() => viewSubmissions(item)}
-                          >
-                            <Text style={[s.hwBtnText, { color: colors.primary }]}>Submissions</Text>
-                          </TouchableOpacity>
-                          <TouchableOpacity
-                            style={[s.hwBtn, { backgroundColor: colors.dangerBg }]}
-                            onPress={() => deleteHW(item.id)}
-                          >
-                            <Text style={[s.hwBtnText, { color: colors.danger }]}>Delete</Text>
-                          </TouchableOpacity>
-                        </>
-                      )}
-                      {isStudent && item.my_submission_status !== 'submitted' && (
-                        <TouchableOpacity
-                          style={[s.hwBtn, { backgroundColor: colors.success }]}
-                          onPress={() => { setSelectedHW(item); setSubmitContent(''); setShowSubmit(true); }}
-                        >
-                          <Text style={[s.hwBtnText, { color: '#fff' }]}>Submit</Text>
-                        </TouchableOpacity>
-                      )}
-                    </View>
+
+                    {isTeacher ? (
+                      <Text style={[styles.subCount, { color: colors.primary, fontWeight: 'bold' }]}>
+                        {submittedCount} / {totalCount} Turnouts
+                      </Text>
+                    ) : (
+                      <AppBadge
+                        label={item.my_submission_status === 'submitted' ? 'Turned In' : 'Pending'}
+                        variant={item.my_submission_status === 'submitted' ? 'success' : 'warning'}
+                        size="sm"
+                      />
+                    )}
+                  </View>
+
+                  {/* Teacher Progress Bar */}
+                  {isTeacher && (
+                    <AppProgress
+                      value={completionPct}
+                      showPercentage={false}
+                      height={4}
+                      color={colors.primary}
+                    />
+                  )}
+
+                  {/* Action Buttons */}
+                  <View style={styles.cardActions}>
+                    {isTeacher && (
+                      <AppButton
+                        label="View Turnouts"
+                        iconLeft="users"
+                        variant="secondary"
+                        size="sm"
+                        onPress={() => viewSubmissions(item)}
+                      />
+                    )}
+                    {isStudent && item.my_submission_status !== 'submitted' && (
+                      <AppButton
+                        label="Turn In Work"
+                        iconLeft="upload"
+                        variant="primary"
+                        size="sm"
+                        onPress={() => {
+                          setSelectedHW(item);
+                          setShowSubmit(true);
+                        }}
+                      />
+                    )}
                   </View>
                 </View>
-              </PremiumCard>
+              </AppCard>
             );
           }}
-          ListEmptyComponent={
-            <View style={s.emptyWrap}>
-              <Text style={s.emptyIcon}>📚</Text>
-              <Text style={[s.emptyText, { color: colors.textSecondary }]}>No homework found</Text>
-              {isTeacher && (
-                <TouchableOpacity
-                  style={[s.emptyBtn, { backgroundColor: colors.primaryBg }]}
-                  onPress={() => setShowCreate(true)}
-                >
-                  <Text style={[s.emptyBtnText, { color: colors.primary }]}>Assign Homework</Text>
-                </TouchableOpacity>
-              )}
-            </View>
-          }
         />
       )}
 
-      {/* FAB */}
+      {/* Floating Create Button for Teachers */}
       {isTeacher && (
         <TouchableOpacity
-          style={[s.fab, { backgroundColor: colors.primary }]}
-          onPress={() => { setForm({ ...EMPTY_FORM }); setShowCreate(true); }}
+          style={[styles.fab, { backgroundColor: colors.primary, ...shadows.lg }]}
+          onPress={() => {
+            setForm({ ...EMPTY_FORM });
+            setShowCreate(true);
+          }}
+          activeOpacity={0.85}
+          accessibilityRole="button"
+          accessibilityLabel="Assign Homework"
         >
           <Icon name="plus" size={20} color="#fff" solid />
         </TouchableOpacity>
       )}
 
-      {/* Create Homework Modal */}
-      <Modal visible={showCreate} animationType="slide" presentationStyle="pageSheet">
-        <View style={[s.modal, { backgroundColor: colors.background }]}>
-          <View style={[s.modalHeader, { borderBottomColor: colors.border }]}>
-            <TouchableOpacity onPress={() => setShowCreate(false)}>
-              <Icon name="times" size={20} color={colors.text} />
-            </TouchableOpacity>
-            <Text style={[s.modalTitle, { color: colors.text }]}>Assign Homework</Text>
-            <TouchableOpacity onPress={createHomework} disabled={saving}>
-              {saving
-                ? <ActivityIndicator size="small" color={colors.primary} />
-                : <Text style={[s.saveText, { color: colors.primary }]}>Assign</Text>}
-            </TouchableOpacity>
-          </View>
-          <ScrollView contentContainerStyle={{ padding: spacing.base, gap: 14 }}>
-            <View>
-              <Text style={[s.label, { color: colors.textSecondary }]}>Title *</Text>
-              <TextInput
-                style={[s.input, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder, color: colors.text }]}
-                value={form.title}
-                onChangeText={v => setForm(f => ({ ...f, title: v }))}
-                placeholder="Homework title..."
-                placeholderTextColor={colors.placeholder}
-              />
-            </View>
-            <View>
-              <Text style={[s.label, { color: colors.textSecondary }]}>Description</Text>
-              <TextInput
-                style={[s.input, s.textarea, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder, color: colors.text }]}
-                value={form.description}
-                onChangeText={v => setForm(f => ({ ...f, description: v }))}
-                placeholder="Describe the homework task..."
-                placeholderTextColor={colors.placeholder}
-                multiline
-                numberOfLines={3}
-              />
-            </View>
-            <View>
-              <Text style={[s.label, { color: colors.textSecondary }]}>Standard</Text>
-              <View style={s.chips}>
-                {CLASSES.map(c => (
-                  <TouchableOpacity
-                    key={c}
-                    style={[s.chip, form.standard === c && { backgroundColor: colors.primary }]}
-                    onPress={() => setForm(f => ({ ...f, standard: c }))}
-                  >
-                    <Text style={[s.chipText, form.standard === c && { color: '#fff' }]}>{c}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </View>
-            <View>
-              <Text style={[s.label, { color: colors.textSecondary }]}>Division</Text>
-              <View style={s.chips}>
-                {DIVISIONS.map(d => (
-                  <TouchableOpacity
-                    key={d}
-                    style={[s.chip, form.division === d && { backgroundColor: colors.primary }]}
-                    onPress={() => setForm(f => ({ ...f, division: d }))}
-                  >
-                    <Text style={[s.chipText, form.division === d && { color: '#fff' }]}>{d}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </View>
-            <View>
-              <Text style={[s.label, { color: colors.textSecondary }]}>Due Date *</Text>
-              <TextInput
-                style={[s.input, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder, color: colors.text }]}
-                value={form.due_date}
-                onChangeText={v => setForm(f => ({ ...f, due_date: v }))}
-                placeholder="YYYY-MM-DD"
-                placeholderTextColor={colors.placeholder}
-              />
-            </View>
-          </ScrollView>
-        </View>
-      </Modal>
+      {/* Create Homework Bottom Sheet */}
+      <AppBottomSheet
+        visible={showCreate}
+        onClose={() => setShowCreate(false)}
+        title="Assign New Homework"
+        subtitle="Create homework task for students"
+      >
+        <View style={{ gap: spacing.xs }}>
+          <AppInput
+            label="Homework Title *"
+            value={form.title}
+            onChangeText={v => setForm(f => ({ ...f, title: v }))}
+            icon="heading"
+            placeholder="e.g. Exercise 4.2 Problems 1 to 10"
+          />
 
-      {/* Submit Homework Modal (Student) */}
-      <Modal visible={showSubmit} animationType="slide" presentationStyle="pageSheet">
-        <View style={[s.modal, { backgroundColor: colors.background }]}>
-          <View style={[s.modalHeader, { borderBottomColor: colors.border }]}>
-            <TouchableOpacity onPress={() => setShowSubmit(false)}>
-              <Icon name="times" size={20} color={colors.text} />
-            </TouchableOpacity>
-            <Text style={[s.modalTitle, { color: colors.text }]}>Submit Homework</Text>
-            <TouchableOpacity onPress={submitHomework} disabled={saving}>
-              {saving
-                ? <ActivityIndicator size="small" color={colors.primary} />
-                : <Text style={[s.saveText, { color: colors.success }]}>Submit</Text>}
-            </TouchableOpacity>
+          <View style={styles.formRow}>
+            <View style={{ flex: 1 }}>
+              <AppSelect
+                label="Standard"
+                value={form.standard}
+                options={CLASS_OPTIONS}
+                onSelect={v => setForm(f => ({ ...f, standard: String(v) }))}
+              />
+            </View>
+            <View style={{ flex: 1 }}>
+              <AppSelect
+                label="Division"
+                value={form.division}
+                options={DIVISION_OPTIONS}
+                onSelect={v => setForm(f => ({ ...f, division: String(v) }))}
+              />
+            </View>
           </View>
-          <View style={{ padding: spacing.base }}>
-            {selectedHW && (
-              <PremiumCard variant="flat" style={{ marginBottom: spacing.md }} padding={12}>
-                <Text style={[s.hwTitle, { color: colors.text }]}>{selectedHW.title}</Text>
-                <Text style={[s.hwSubject, { color: colors.textSecondary }]}>{selectedHW.subject_name}</Text>
-              </PremiumCard>
-            )}
-            <Text style={[s.label, { color: colors.textSecondary }]}>Your Answer *</Text>
-            <TextInput
-              style={[s.input, s.largeTextarea, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder, color: colors.text }]}
-              value={submitContent}
-              onChangeText={setSubmitContent}
-              placeholder="Type your answer here..."
-              placeholderTextColor={colors.placeholder}
-              multiline
-              numberOfLines={8}
-            />
-          </View>
-        </View>
-      </Modal>
 
-      {/* Submissions Modal (Teacher) */}
-      <Modal visible={showSubmissions} animationType="slide" presentationStyle="pageSheet">
-        <View style={[s.modal, { backgroundColor: colors.background }]}>
-          <View style={[s.modalHeader, { borderBottomColor: colors.border }]}>
-            <TouchableOpacity onPress={() => setShowSubmissions(false)}>
-              <Icon name="times" size={20} color={colors.text} />
-            </TouchableOpacity>
-            <Text style={[s.modalTitle, { color: colors.text }]}>Submissions</Text>
-            <View style={{ width: 40 }} />
-          </View>
-          <FlatList
-            data={submissions}
-            keyExtractor={s2 => String(s2.id)}
-            contentContainerStyle={{ padding: spacing.base, gap: 8, paddingBottom: 40 }}
-            renderItem={({ item }) => (
-              <PremiumCard variant="bordered" padding={12}>
-                <Text style={[s.studentName, { color: colors.text }]}>{item.student_name}</Text>
-                <Text style={[s.grNr, { color: colors.textSecondary }]}>GR: {item.gr_number}</Text>
-                <Text style={[s.submissionContent, { color: colors.text }]} numberOfLines={3}>{item.content}</Text>
-                <Text style={[s.submittedAt, { color: colors.textTertiary }]}>
-                  Submitted: {formatDateLong(item.submitted_at)}
-                </Text>
-                {item.grade != null && (
-                  <View style={s.gradeRow}>
-                    <Text style={[s.gradeLabel, { color: colors.success }]}>Grade: {item.grade}</Text>
-                    {item.feedback && <Text style={[s.feedback, { color: colors.textSecondary }]}>{item.feedback}</Text>}
-                  </View>
-                )}
-              </PremiumCard>
-            )}
-            ListEmptyComponent={
-              <View style={s.emptyWrap}>
-                <Text style={s.emptyIcon}>📭</Text>
-                <Text style={[s.emptyText, { color: colors.textSecondary }]}>No submissions yet</Text>
-              </View>
-            }
+          <AppDatePicker
+            label="Due Date *"
+            value={form.due_date}
+            onChangeDate={d => setForm(f => ({ ...f, due_date: d }))}
+          />
+
+          <AppInput
+            label="Instructions & Description"
+            value={form.description}
+            onChangeText={v => setForm(f => ({ ...f, description: v }))}
+            icon="align-left"
+            placeholder="Write details or required textbook pages..."
+            multiline
+          />
+
+          <AppButton
+            label="Publish Assignment"
+            iconLeft="paper-plane"
+            variant="primary"
+            size="lg"
+            onPress={createHomework}
+            loading={saving}
+            fullWidth
+            style={{ marginTop: spacing.md }}
           />
         </View>
-      </Modal>
+      </AppBottomSheet>
+
+      {/* Student Submit Bottom Sheet */}
+      <AppBottomSheet
+        visible={showSubmit}
+        onClose={() => setShowSubmit(false)}
+        title="Submit Assignment"
+        subtitle={selectedHW?.title ?? 'Submit your work'}
+      >
+        <View style={{ gap: spacing.base }}>
+          <AppInput
+            label="Your Solution / Answers *"
+            value={submitContent}
+            onChangeText={setSubmitContent}
+            placeholder="Type your response, links, or solution summary..."
+            multiline
+          />
+          <AppButton
+            label="Turn In Assignment"
+            iconLeft="check-circle"
+            variant="primary"
+            size="lg"
+            onPress={submitHomework}
+            loading={saving}
+            fullWidth
+          />
+        </View>
+      </AppBottomSheet>
     </View>
   );
 }
 
-const s = StyleSheet.create({
-  root: { flex: 1 },
-  filterRow: { flexDirection: 'row', borderBottomWidth: 1 },
-  filterBtn: { flex: 1, padding: 12, alignItems: 'center' },
-  filterText: { fontSize: typography.size.sm, fontWeight: typography.weight.semibold },
-  hwRow: { flexDirection: 'row', gap: 12 },
-  hwIcon: { width: 40, height: 40, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
-  hwTitleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 2 },
-  hwTitle: { fontSize: typography.size.base, fontWeight: typography.weight.bold, flex: 1, marginRight: 6 },
-  hwSubject: { fontSize: typography.size.sm, marginBottom: 3 },
-  hwDesc: { fontSize: typography.size.sm, marginBottom: 4 },
-  hwMeta: { flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 8 },
-  hwDate: { fontSize: typography.size.xs },
-  hwActions: { flexDirection: 'row', gap: 8 },
-  hwBtn: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: radius.full },
-  hwBtnText: { fontSize: typography.size.xs, fontWeight: typography.weight.bold },
-  emptyWrap: { alignItems: 'center', padding: spacing.xl },
-  emptyIcon: { fontSize: 44, marginBottom: 12 },
-  emptyText: { fontSize: typography.size.base },
-  emptyBtn: { paddingHorizontal: 20, paddingVertical: 10, borderRadius: radius.full, marginTop: 12 },
-  emptyBtnText: { fontWeight: typography.weight.semibold },
+const styles = StyleSheet.create({
+  root: {
+    flex: 1,
+  },
+  tabsWrap: {
+    paddingHorizontal: spacing.base,
+    paddingVertical: spacing.sm,
+    borderBottomWidth: 1,
+  },
+  cardTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  subjectPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  subjectName: {
+    fontSize: typography.size.xs,
+    fontWeight: typography.weight.bold,
+  },
+  classTag: {
+    fontSize: typography.size.xs,
+  },
+  title: {
+    fontSize: typography.size.base,
+    fontWeight: typography.weight.bold,
+  },
+  description: {
+    fontSize: typography.size.xs,
+    lineHeight: 18,
+  },
+  footerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 4,
+  },
+  dateRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+  dateText: {
+    fontSize: typography.size['2xs'],
+  },
+  subCount: {
+    fontSize: typography.size.xs,
+  },
+  cardActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    marginTop: spacing.xs,
+  },
+  formRow: {
+    flexDirection: 'row',
+    gap: spacing.md,
+  },
   fab: {
-    position: 'absolute', bottom: 24, right: 24,
-    width: 56, height: 56, borderRadius: 28,
-    alignItems: 'center', justifyContent: 'center',
-    elevation: 6,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3, shadowRadius: 8,
+    position: 'absolute',
+    bottom: 24,
+    right: 20,
+    width: 54,
+    height: 54,
+    borderRadius: radius.full,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  modal: { flex: 1 },
-  modalHeader: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    padding: spacing.base, borderBottomWidth: 1,
-  },
-  modalTitle: { fontSize: typography.size.lg, fontWeight: typography.weight.bold },
-  saveText: { fontSize: typography.size.base, fontWeight: typography.weight.bold },
-  label: { fontSize: typography.size.xs, fontWeight: typography.weight.semibold, textTransform: 'uppercase', marginBottom: 6 },
-  input: {
-    height: 48, borderWidth: 1.5, borderRadius: radius.md,
-    paddingHorizontal: spacing.md, fontSize: typography.size.base,
-  },
-  textarea: { height: 100, textAlignVertical: 'top', paddingTop: 12 },
-  largeTextarea: { height: 180, textAlignVertical: 'top', paddingTop: 12 },
-  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  chip: {
-    paddingHorizontal: 12, paddingVertical: 6, borderRadius: radius.full,
-    backgroundColor: '#f3f4f6', borderWidth: 1.5, borderColor: '#e5e7eb',
-  },
-  chipText: { fontSize: typography.size.sm, fontWeight: typography.weight.semibold, color: '#6b7280' },
-  studentName: { fontSize: typography.size.base, fontWeight: typography.weight.bold },
-  grNr: { fontSize: typography.size.xs, marginTop: 2, marginBottom: 4 },
-  submissionContent: { fontSize: typography.size.sm },
-  submittedAt: { fontSize: typography.size.xs, marginTop: 6 },
-  gradeRow: { marginTop: 8 },
-  gradeLabel: { fontSize: typography.size.base, fontWeight: typography.weight.bold },
-  feedback: { fontSize: typography.size.sm, marginTop: 2 },
 });

@@ -1,108 +1,274 @@
 /**
- * VidyaSetu Mobile — Office Dashboard Screen (Clerk/Receptionist/Office Staff)
+ * VidyaSetu Mobile — Office Dashboard Screen (Premium Redesign)
+ * =============================================================
+ * Institutional operations hub: admissions, student registry, fees,
+ * attendance, notices, inventory, and QR verification.
  */
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, RefreshControl, TouchableOpacity, ActivityIndicator } from 'react-native';
-import { api } from '../../services/api';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  RefreshControl,
+  TouchableOpacity,
+  Platform,
+} from 'react-native';
+import LinearGradient from 'react-native-linear-gradient';
+import Icon from 'react-native-vector-icons/FontAwesome5';
+import { useTheme } from '../../theme/ThemeContext';
+import { api, communicationAPI } from '../../services/api';
 import { useAuthStore } from '../../store/authStore';
+import { spacing, radius, typography, shadows } from '../../theme';
+import {
+  AppCard,
+  AppStatCard,
+  AppSectionHeader,
+  AppSkeleton,
+  AppAvatar,
+} from '../../components/ui';
 
 const QUICK_ACTIONS = [
-  { icon: '➕', label: 'New Admission',    color: '#4f46e5' },
-  { icon: '🎓', label: 'Student Search',   color: '#059669' },
-  { icon: '📄', label: 'Issue Certificate', color: '#d97706' },
-  { icon: '📢', label: 'Send Notice',       color: '#0891b2' },
-  { icon: '📅', label: 'Attendance Report', color: '#7c3aed' },
-  { icon: '🖨️', label: 'Print Register',   color: '#dc2626' },
+  { icon: 'user-plus',       label: 'New Admission',  screen: 'Admission',    color: '#4f46e5' },
+  { icon: 'user-graduate',   label: 'Students',       screen: 'Students',     color: '#059669' },
+  { icon: 'rupee-sign',      label: 'Fee Collection', screen: 'Fees',         color: '#d97706' },
+  { icon: 'clipboard-check', label: 'Attendance',     screen: 'Attendance',   color: '#7c3aed' },
+  { icon: 'bullhorn',        label: 'Announcements',  screen: 'Announcements',color: '#0891b2' },
+  { icon: 'chart-pie',       label: 'Reports',        screen: 'Reports',      color: '#dc2626' },
 ];
 
-export default function OfficeDashboardScreen() {
-  const [stats, setStats] = useState({ total_students: 0, new_admissions: 0, pending_certs: 0, today_visitors: 0 });
+export default function OfficeDashboardScreen({ navigation }: { navigation: any }) {
+  const { colors, roleAccent } = useTheme();
+  const { user } = useAuthStore();
+  const [totalStudents, setTotalStudents] = useState(0);
+  const [newAdmissions, setNewAdmissions] = useState(0);
+  const [notices, setNotices] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const { user } = useAuthStore();
 
-  const load = useCallback(async () => {
+  const loadData = useCallback(async () => {
     try {
-      const res = await api.get('/office/stats');
-      setStats(res.data?.data ?? stats);
-    } catch { /* ignore */ }
-    finally { setLoading(false); setRefreshing(false); }
+      const [studRes, admRes, noticeRes] = await Promise.allSettled([
+        api.get('/students', { params: { per_page: 1, academic_year: '2025-2026' } }),
+        api.get('/admission/applications', { params: { status: 'approved', per_page: 1 } }),
+        communicationAPI.getAnnouncements({ limit: 4 }),
+      ]);
+      if (studRes.status  === 'fulfilled') setTotalStudents(studRes.value.data?.data?.total ?? 0);
+      if (admRes.status   === 'fulfilled') setNewAdmissions(admRes.value.data?.data?.total ?? 0);
+      if (noticeRes.status === 'fulfilled') {
+        const n = noticeRes.value.data?.data;
+        setNotices(Array.isArray(n?.items) ? n.items : Array.isArray(n) ? n : []);
+      }
+    } catch {
+      // ignore
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
-  if (loading) return <View style={s.center}><ActivityIndicator color="#0891b2" size="large" /></View>;
+  const onRefresh = () => {
+    setRefreshing(true);
+    loadData();
+  };
 
-  const role = user?.roles?.[0];
+  const firstName = user?.full_name?.split(' ')[0] ?? 'Staff';
+  const roleName = user?.roles?.[0]?.name ?? 'Office Administration';
 
   return (
-    <ScrollView
-      style={s.page}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor="#0891b2" />}
-    >
-      {/* Header */}
-      <View style={s.header}>
-        <Text style={s.roleText}>{role?.name ?? 'Office'}</Text>
-        <Text style={s.name}>👋 {user?.full_name?.split(' ').slice(0, 2).join(' ')}</Text>
-        <Text style={s.date}>{new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' })}</Text>
-      </View>
-
-      {/* Stats */}
-      <View style={s.statsGrid}>
-        {[
-          { icon: '🎓', label: 'Total Students', value: stats.total_students, color: '#4f46e5' },
-          { icon: '➕', label: 'New Admissions', value: stats.new_admissions, color: '#059669' },
-          { icon: '📄', label: 'Pending Certs',  value: stats.pending_certs,  color: '#d97706' },
-          { icon: '👥', label: 'Today Visitors', value: stats.today_visitors, color: '#0891b2' },
-        ].map((item, i) => (
-          <View key={i} style={[s.statCard, { borderTopColor: item.color }]}>
-            <Text style={s.statIcon}>{item.icon}</Text>
-            <Text style={[s.statValue, { color: item.color }]}>{item.value}</Text>
-            <Text style={s.statLabel}>{item.label}</Text>
+    <View style={[styles.root, { backgroundColor: colors.background }]}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={roleAccent.primary}
+            colors={[roleAccent.primary]}
+          />
+        }
+      >
+        {/* Hero Header */}
+        <LinearGradient
+          colors={roleAccent.gradient}
+          style={[styles.hero, { paddingTop: Platform.OS === 'ios' ? 56 : 40 }]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+        >
+          <View style={styles.heroTop}>
+            <View style={{ flex: 1, gap: 4 }}>
+              <Text style={styles.greetingText}>Good Day,</Text>
+              <Text style={styles.heroName}>{firstName}</Text>
+              <View style={[styles.rolePill, { backgroundColor: 'rgba(255,255,255,0.18)' }]}>
+                <Icon name="building" size={10} color="rgba(255,255,255,0.9)" solid />
+                <Text style={styles.rolePillText}>{roleName}</Text>
+              </View>
+            </View>
+            <View style={{ gap: 8, alignItems: 'flex-end' }}>
+              <AppAvatar
+                name={user?.full_name}
+                size="md"
+                roleColor="#ffffff"
+              />
+            </View>
           </View>
-        ))}
-      </View>
+        </LinearGradient>
 
-      {/* Quick Actions */}
-      <Text style={s.sectionTitle}>Quick Actions</Text>
-      <View style={s.actionsGrid}>
-        {QUICK_ACTIONS.map((a, i) => (
-          <TouchableOpacity key={i} style={[s.actionBtn, { backgroundColor: a.color + '15' }]}>
-            <Text style={s.actionIcon}>{a.icon}</Text>
-            <Text style={[s.actionLabel, { color: a.color }]}>{a.label}</Text>
-          </TouchableOpacity>
-        ))}
-      </View>
+        <View style={styles.content}>
+          {/* Operations Overview */}
+          <AppSectionHeader title="Operations Overview" icon="chart-bar" />
+          {loading ? (
+            <AppSkeleton variant="stat" count={2} />
+          ) : (
+            <View style={styles.statsGrid}>
+              <AppStatCard
+                label="Enrolled Students"
+                value={totalStudents || '—'}
+                icon="user-graduate"
+                color={colors.primary}
+                style={{ flex: 1 }}
+              />
+              <AppStatCard
+                label="New Admissions"
+                value={newAdmissions || '0'}
+                icon="user-plus"
+                color={colors.success}
+                style={{ flex: 1 }}
+              />
+            </View>
+          )}
 
-      {/* Office Info */}
-      <View style={s.infoCard}>
-        <Text style={s.infoTitle}>🏫 Hindkesri Maruti Mane Vidyalay</Text>
-        <Text style={s.infoRow}>📞 +91 99999 00000</Text>
-        <Text style={s.infoRow}>📧 school@hmmv.edu.in</Text>
-        <Text style={s.infoRow}>⏰ Office Hours: 9:00 AM – 5:00 PM</Text>
-      </View>
-    </ScrollView>
+          {/* Quick Actions */}
+          <AppSectionHeader title="Operations Shortcuts" icon="bolt" style={{ marginTop: spacing.sm }} />
+          <View style={styles.actionsGrid}>
+            {QUICK_ACTIONS.map((a, i) => (
+              <TouchableOpacity
+                key={i}
+                style={[
+                  styles.actionCard,
+                  { backgroundColor: colors.surface, ...shadows.sm, borderColor: colors.border },
+                ]}
+                activeOpacity={0.8}
+                onPress={() => a.screen && navigation?.navigate(a.screen)}
+              >
+                <View style={[styles.actionIconWrap, { backgroundColor: `${a.color}15` }]}>
+                  <Icon name={a.icon} size={20} color={a.color} solid />
+                </View>
+                <Text style={[styles.actionLabel, { color: colors.text }]}>{a.label}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          {/* Recent Circulars */}
+          <AppSectionHeader
+            title="School Circulars"
+            icon="bullhorn"
+            onViewAll={() => navigation.navigate('Announcements')}
+            style={{ marginTop: spacing.sm }}
+          />
+          {notices.map((n, idx) => (
+            <TouchableOpacity
+              key={idx}
+              activeOpacity={0.8}
+              onPress={() => navigation.navigate('Announcements')}
+            >
+              <AppCard variant="bordered" padding={12} style={{ marginBottom: spacing.xs }}>
+                <Text style={[styles.noticeTitle, { color: colors.text }]}>{n.title}</Text>
+                <Text style={[styles.noticeBody, { color: colors.textSecondary }]} numberOfLines={2}>
+                  {n.content}
+                </Text>
+              </AppCard>
+            </TouchableOpacity>
+          ))}
+        </View>
+      </ScrollView>
+    </View>
   );
 }
 
-const s = StyleSheet.create({
-  page: { flex: 1, backgroundColor: '#f8fafc' },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  header: { backgroundColor: '#0891b2', padding: 20 },
-  roleText: { color: 'rgba(255,255,255,0.75)', fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1 },
-  name: { color: '#fff', fontSize: 22, fontWeight: '900', marginTop: 4 },
-  date: { color: 'rgba(255,255,255,0.7)', fontSize: 12, marginTop: 3 },
-  statsGrid: { flexDirection: 'row', flexWrap: 'wrap', padding: 10, gap: 8 },
-  statCard: { width: '47%', backgroundColor: '#fff', borderRadius: 14, padding: 14, borderTopWidth: 3, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 6, elevation: 1 },
-  statIcon: { fontSize: 22 },
-  statValue: { fontSize: 22, fontWeight: '900', marginTop: 6 },
-  statLabel: { fontSize: 11, color: '#6b7280', fontWeight: '600', marginTop: 3 },
-  sectionTitle: { fontSize: 14, fontWeight: '800', color: '#1e293b', marginHorizontal: 14, marginBottom: 10 },
-  actionsGrid: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 10, gap: 8 },
-  actionBtn: { width: '30%', borderRadius: 14, padding: 14, alignItems: 'center', gap: 6 },
-  actionIcon: { fontSize: 26 },
-  actionLabel: { fontSize: 10, fontWeight: '700', textAlign: 'center' },
-  infoCard: { margin: 14, backgroundColor: '#1e293b', borderRadius: 14, padding: 16, gap: 6 },
-  infoTitle: { fontSize: 14, fontWeight: '800', color: '#fff', marginBottom: 6 },
-  infoRow: { fontSize: 12, color: 'rgba(255,255,255,0.7)' },
+const styles = StyleSheet.create({
+  root: {
+    flex: 1,
+  },
+  hero: {
+    padding: spacing.xl,
+    borderBottomLeftRadius: radius['2xl'],
+    borderBottomRightRadius: radius['2xl'],
+    ...shadows.md,
+  },
+  heroTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  greetingText: {
+    color: 'rgba(255,255,255,0.85)',
+    fontSize: typography.size.xs,
+  },
+  heroName: {
+    color: '#ffffff',
+    fontSize: typography.size.xl,
+    fontWeight: typography.weight.extrabold,
+  },
+  rolePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: radius.full,
+    alignSelf: 'flex-start',
+    marginTop: 2,
+  },
+  rolePillText: {
+    color: '#ffffff',
+    fontSize: typography.size['2xs'],
+    fontWeight: typography.weight.bold,
+  },
+  content: {
+    padding: spacing.base,
+    gap: spacing.md,
+    paddingBottom: spacing['3xl'],
+  },
+  statsGrid: {
+    flexDirection: 'row',
+    gap: spacing.md,
+  },
+  actionsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.md,
+  },
+  actionCard: {
+    width: '48%',
+    padding: spacing.md,
+    borderRadius: radius.lg,
+    alignItems: 'center',
+    gap: spacing.xs,
+    borderWidth: 1,
+  },
+  actionIconWrap: {
+    width: 44,
+    height: 44,
+    borderRadius: radius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  actionLabel: {
+    fontSize: typography.size.xs,
+    fontWeight: typography.weight.bold,
+  },
+  noticeTitle: {
+    fontSize: typography.size.sm,
+    fontWeight: typography.weight.bold,
+  },
+  noticeBody: {
+    fontSize: typography.size.xs,
+    lineHeight: 18,
+    marginTop: 2,
+  },
 });

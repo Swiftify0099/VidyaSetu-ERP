@@ -5,9 +5,11 @@
 FROM node:20-alpine AS builder
 WORKDIR /app
 
-# Copy dependencies first (better layer caching)
-COPY package*.json ./
-RUN npm ci --prefer-offline
+RUN corepack enable && corepack prepare pnpm@latest --activate
+
+# Copy package definitions
+COPY package.json pnpm-lock.yaml* ./
+RUN pnpm install --no-frozen-lockfile
 
 # Copy source and build
 COPY . .
@@ -18,7 +20,7 @@ ENV VITE_API_URL=$VITE_API_URL
 ENV VITE_APP_NAME=$VITE_APP_NAME
 ENV VITE_STORAGE_URL=$VITE_STORAGE_URL
 
-RUN npm run build
+RUN pnpm run build
 
 # Stage 2: Serve with Nginx
 FROM nginx:1.27-alpine AS production

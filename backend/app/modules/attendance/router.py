@@ -43,9 +43,36 @@ async def list_holidays(current_user: AuthUser, db: DBSession,
 
 
 # ── Student Attendance ────────────────────────────────────────
+# ── Student Attendance ────────────────────────────────────
 @router.post("/student/bulk", response_model=APIResponse,
              dependencies=[Depends(require_permission("attendance.mark"))])
 async def mark_student_attendance(body: BulkAttendanceRequest, current_user: AuthUser, db: DBSession):
+    """
+    Mark bulk student attendance.
+    For teachers (non-admin): validates they are assigned to the target class.
+    Super admins and principals bypass this check.
+    """
+    # ── Teacher class authorization ──────────────────────────────
+    if not current_user.is_super_admin():
+        from app.modules.teacher.models import Teacher
+        from sqlalchemy import select as _select
+        teacher = db.scalar(
+            _select(Teacher).where(
+                Teacher.user_id == current_user.user_id,
+                Teacher.is_deleted == False,
+            )
+        )
+        if teacher:
+            assigned = [c.strip() for c in (teacher.classes_assigned or "").split(",") if c.strip()]
+            # Only enforce if teacher has explicit assignments
+            if assigned and body.standard not in assigned:
+                from fastapi import HTTPException
+                raise HTTPException(
+                    status_code=403,
+                    detail=f"You are not authorized to mark attendance for Standard {body.standard}. "
+                           f"Your assigned classes: {', '.join(assigned)}."
+                )
+
     count = StudentAttendanceService.mark_bulk(db, body, current_user.user_id)
     return APIResponse.ok(data={"saved": count}, message=f"{count} attendance records saved.")
 

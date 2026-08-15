@@ -22,10 +22,10 @@ const { width } = Dimensions.get('window');
 const CUR_YEAR = '2025-2026';
 
 const QUICK_ACTIONS = [
-  { icon: 'clipboard-check', label: 'Attendance', screen: 'Attendance', color: '#6366f1' },
-  { icon: 'pen',             label: 'Marks',      screen: 'Marks',      color: '#10b981' },
-  { icon: 'book-open',       label: 'Lesson Plans', screen: 'Plans',    color: '#3b82f6' },
-  { icon: 'calendar-alt',    label: 'Timetable',  screen: 'Timetable',  color: '#f59e0b' },
+  { icon: 'clipboard-check', label: 'Attendance',   screen: 'Attendance',  color: '#6366f1' },
+  { icon: 'pen',             label: 'Marks',        screen: 'ExamMarks',   color: '#10b981' },
+  { icon: 'book-open',       label: 'Lesson Plans', screen: 'Plans',       color: '#3b82f6' },
+  { icon: 'calendar-alt',    label: 'Timetable',    screen: 'Timetable',   color: '#f59e0b' },
 ];
 
 function getGreeting() {

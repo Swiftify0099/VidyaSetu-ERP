@@ -1,19 +1,34 @@
 /**
- * VidyaSetu Mobile — Marks Entry Screen
- * Teacher enters marks for a given exam schedule.
- * Accessible to: teacher, class_teacher, admin, principal
+ * VidyaSetu Mobile — Marks Entry Screen (Premium Redesign)
+ * ==========================================================
+ * Interactive assessment score entry with realtime grade computation,
+ * absent toggling, score validation against max limits, and bulk saving.
  */
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import {
-  View, Text, StyleSheet, FlatList, TextInput,
-  TouchableOpacity, ActivityIndicator, Alert,
+  View,
+  Text,
+  StyleSheet,
+  FlatList,
+  TextInput,
+  TouchableOpacity,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/FontAwesome5';
 import { useTheme } from '../../theme/ThemeContext';
 import { examAPI } from '../../services/api';
 import { spacing, radius, typography, shadows } from '../../theme';
-import { getGrade, GRADES } from '../../config/constants';
+import { getGrade } from '../../config/constants';
+import {
+  AppCard,
+  AppButton,
+  AppBadge,
+  AppProgress,
+  AppEmptyState,
+  AppSkeleton,
+  AppSearchBar,
+} from '../../components/ui';
 import Toast from 'react-native-toast-message';
+import { getErrorMessage } from '../../utils/formatters';
 
 interface StudentMark {
   student_id: number;
@@ -24,15 +39,28 @@ interface StudentMark {
   is_absent: boolean;
 }
 
-export default function MarksEntryScreen({ route, navigation }: { route: any; navigation: any }) {
+export default function MarksEntryScreen({
+  route,
+  navigation,
+}: {
+  route: any;
+  navigation: any;
+}) {
   const { colors } = useTheme();
   const { examId, exam } = route.params ?? {};
   const [students, setStudents] = useState<StudentMark[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [search, setSearch] = useState('');
+
+  const maxMarks = exam?.total_marks ?? 100;
+  const passingMarks = exam?.passing_marks ?? 35;
 
   const fetchMarks = useCallback(async () => {
-    if (!examId) { setLoading(false); return; }
+    if (!examId) {
+      setLoading(false);
+      return;
+    }
     try {
       const res = await examAPI.getMarks(examId, {});
       const data = res.data?.data ?? [];
@@ -43,219 +71,397 @@ export default function MarksEntryScreen({ route, navigation }: { route: any; na
           is_absent: s.is_absent ?? false,
         }))
       );
-    } catch {
-      Toast.show({ type: 'error', text1: 'Failed to load student marks' });
+    } catch (e) {
+      Toast.show({ type: 'error', text1: 'Failed to load student marks', text2: getErrorMessage(e) });
     } finally {
       setLoading(false);
     }
   }, [examId]);
 
-  useEffect(() => { fetchMarks(); }, [fetchMarks]);
+  useEffect(() => {
+    fetchMarks();
+  }, [fetchMarks]);
 
   const updateMark = (studentId: number, value: string) => {
-    setStudents(prev => prev.map(s =>
-      s.student_id === studentId ? { ...s, marks_obtained: value } : s
-    ));
+    // Only allow numbers and decimal
+    const clean = value.replace(/[^0-9.]/g, '');
+    setStudents(prev =>
+      prev.map(s =>
+        s.student_id === studentId ? { ...s, marks_obtained: clean, is_absent: false } : s
+      )
+    );
   };
 
   const toggleAbsent = (studentId: number) => {
-    setStudents(prev => prev.map(s =>
-      s.student_id === studentId ? { ...s, is_absent: !s.is_absent, marks_obtained: !s.is_absent ? '' : s.marks_obtained } : s
-    ));
+    setStudents(prev =>
+      prev.map(s =>
+        s.student_id === studentId
+          ? {
+              ...s,
+              is_absent: !s.is_absent,
+              marks_obtained: !s.is_absent ? '' : s.marks_obtained,
+            }
+          : s
+      )
+    );
   };
 
   const saveMarks = async () => {
-    const maxMarks = exam?.total_marks ?? 100;
-    const invalids = students.filter(s =>
-      !s.is_absent && s.marks_obtained !== '' && (isNaN(Number(s.marks_obtained)) || Number(s.marks_obtained) < 0 || Number(s.marks_obtained) > maxMarks)
+    const invalids = students.filter(
+      s =>
+        !s.is_absent &&
+        s.marks_obtained !== '' &&
+        (isNaN(Number(s.marks_obtained)) ||
+          Number(s.marks_obtained) < 0 ||
+          Number(s.marks_obtained) > maxMarks)
     );
     if (invalids.length > 0) {
-      Alert.alert('Validation Error', `Marks must be between 0 and ${maxMarks}. Check: ${invalids.map(s => s.full_name).join(', ')}`);
+      Toast.show({
+        type: 'error',
+        text1: 'Validation Error',
+        text2: `Scores must be between 0 and ${maxMarks}. Check highlighted rows.`,
+      });
       return;
     }
     setSaving(true);
     try {
       const records = students.map(s => ({
-        student_id:     s.student_id,
-        marks_obtained: s.is_absent ? null : (s.marks_obtained === '' ? null : Number(s.marks_obtained)),
-        is_absent:      s.is_absent,
+        student_id: s.student_id,
+        marks_obtained: s.is_absent
+          ? null
+          : s.marks_obtained === ''
+          ? null
+          : Number(s.marks_obtained),
+        is_absent: s.is_absent,
       }));
       await examAPI.submitMarks(examId, { marks: records });
-      Toast.show({ type: 'success', text1: 'Marks saved successfully!', text2: `${students.length} records updated` });
+      Toast.show({
+        type: 'success',
+        text1: 'Marks Recorded Successfully!',
+        text2: `${students.length} student scores synchronized`,
+      });
       navigation.goBack();
     } catch (e: any) {
-      Toast.show({ type: 'error', text1: e?.response?.data?.detail ?? 'Failed to save marks' });
+      Toast.show({ type: 'error', text1: 'Failed to save marks', text2: getErrorMessage(e) });
     } finally {
       setSaving(false);
     }
   };
 
-  const maxMarks = exam?.total_marks ?? 100;
-  const passingMarks = exam?.passing_marks ?? 35;
+  const filteredStudents = useMemo(() => {
+    if (!search.trim()) return students;
+    const q = search.toLowerCase();
+    return students.filter(
+      s =>
+        s.full_name.toLowerCase().includes(q) ||
+        s.gr_number.includes(q) ||
+        String(s.roll_number).includes(q)
+    );
+  }, [students, search]);
+
+  const enteredCount = students.filter(s => !s.is_absent && s.marks_obtained !== '').length;
+  const absentCount  = students.filter(s => s.is_absent).length;
+  const completionPct = students.length > 0 ? ((enteredCount + absentCount) / students.length) * 100 : 0;
 
   if (loading) {
     return (
-      <View style={[s.center, { backgroundColor: colors.background }]}>
-        <ActivityIndicator size="large" color={colors.primary} />
-        <Text style={[s.loadingText, { color: colors.textSecondary }]}>Loading students...</Text>
+      <View style={[styles.root, { backgroundColor: colors.background, padding: spacing.base }]}>
+        <AppSkeleton variant="list" count={6} />
       </View>
     );
   }
 
   if (!examId) {
     return (
-      <View style={[s.center, { backgroundColor: colors.background }]}>
-        <Text style={s.emptyIcon}>📋</Text>
-        <Text style={[s.emptyText, { color: colors.textSecondary }]}>No exam selected</Text>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={[s.backBtn, { backgroundColor: colors.primaryBg }]}>
-          <Text style={[s.backBtnText, { color: colors.primary }]}>Go Back</Text>
-        </TouchableOpacity>
+      <View style={[styles.root, { backgroundColor: colors.background }]}>
+        <AppEmptyState
+          icon="clipboard-list"
+          title="No Exam Selected"
+          description="Please navigate from an active exam schedule to enter student marks."
+          actionLabel="Go Back"
+          onAction={() => navigation.goBack()}
+          style={{ flex: 1 }}
+        />
       </View>
     );
   }
 
-  const entered = students.filter(s => !s.is_absent && s.marks_obtained !== '').length;
-  const absent  = students.filter(s => s.is_absent).length;
-
   return (
-    <View style={[s.root, { backgroundColor: colors.background }]}>
-      {/* Header Info */}
+    <View style={[styles.root, { backgroundColor: colors.background }]}>
+      {/* Exam Header Information Card */}
       {exam && (
-        <View style={[s.examInfo, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
-          <Text style={[s.examTitle, { color: colors.text }]}>{exam.subject_name}</Text>
-          <Text style={[s.examMeta, { color: colors.textSecondary }]}>
-            {exam.exam_type_name} • Std {exam.standard}-{exam.division} • Max: {maxMarks} • Pass: {passingMarks}
-          </Text>
-          <View style={s.statsRow}>
-            <Text style={[s.stat, { color: colors.success }]}>✅ Entered: {entered}</Text>
-            <Text style={[s.stat, { color: colors.danger }]}>❌ Absent: {absent}</Text>
-            <Text style={[s.stat, { color: colors.textSecondary }]}>📋 Total: {students.length}</Text>
+        <View style={[styles.examHeader, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
+          <View style={styles.examTopRow}>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.examTitle, { color: colors.text }]}>{exam.subject_name}</Text>
+              <Text style={[styles.examMeta, { color: colors.textSecondary }]}>
+                {exam.exam_type_name} • Std {exam.standard}-{exam.division}
+              </Text>
+            </View>
+            <View style={styles.marksCapsule}>
+              <Text style={[styles.capsuleLabel, { color: colors.textSecondary }]}>Max: {maxMarks}</Text>
+              <Text style={[styles.capsuleLabel, { color: colors.success }]}>Pass: {passingMarks}</Text>
+            </View>
           </View>
+
+          <View style={styles.metricsRow}>
+            <View style={styles.metricItem}>
+              <Icon name="check" size={10} color={colors.success} solid />
+              <Text style={[styles.metricText, { color: colors.success }]}>Entered: {enteredCount}</Text>
+            </View>
+            <View style={styles.metricItem}>
+              <Icon name="user-slash" size={10} color={colors.danger} solid />
+              <Text style={[styles.metricText, { color: colors.danger }]}>Absent: {absentCount}</Text>
+            </View>
+            <View style={styles.metricItem}>
+              <Icon name="users" size={10} color={colors.textSecondary} solid />
+              <Text style={[styles.metricText, { color: colors.textSecondary }]}>Total: {students.length}</Text>
+            </View>
+          </View>
+
+          <AppProgress
+            value={completionPct}
+            showPercentage={false}
+            height={4}
+            color={colors.primary}
+            style={{ marginTop: spacing.xs }}
+          />
+
+          <AppSearchBar
+            value={search}
+            onChangeText={setSearch}
+            placeholder="Filter roster by student name or roll..."
+            style={{ marginVertical: 0, marginTop: spacing.sm }}
+          />
         </View>
       )}
 
+      {/* Marks Entry Roster */}
       <FlatList
-        data={students}
+        data={filteredStudents}
         keyExtractor={item => String(item.student_id)}
-        contentContainerStyle={{ padding: 12, paddingBottom: 100 }}
-        ItemSeparatorComponent={() => <View style={{ height: 6 }} />}
+        contentContainerStyle={styles.list}
+        ItemSeparatorComponent={() => <View style={{ height: 8 }} />}
         renderItem={({ item }) => {
-          const numMark = Number(item.marks_obtained);
-          const grade = !item.is_absent && item.marks_obtained !== '' ? getGrade((numMark / maxMarks) * 100) : null;
-          const gradeInfo = grade ? GRADES[grade] : null;
-          const isPassing = grade ? (numMark >= passingMarks) : null;
+          const valNum = Number(item.marks_obtained);
+          const hasScore = !item.is_absent && item.marks_obtained !== '' && !isNaN(valNum);
+          const isInvalid = hasScore && (valNum < 0 || valNum > maxMarks);
+          const isPass = hasScore && valNum >= passingMarks;
+          const letterGrade = hasScore && !isInvalid ? getGrade((valNum / maxMarks) * 100) : null;
 
           return (
-            <View style={[
-              s.studentCard,
-              { backgroundColor: colors.surface, ...shadows.sm },
-              item.is_absent && { opacity: 0.65 },
-            ]}>
-              <View style={[s.rollBadge, { backgroundColor: colors.primaryBg }]}>
-                <Text style={[s.rollText, { color: colors.primary }]}>{item.roll_number}</Text>
-              </View>
-              <View style={s.studentInfo}>
-                <Text style={[s.studentName, { color: colors.text }]}>{item.full_name}</Text>
-                <Text style={[s.studentGr, { color: colors.textSecondary }]}>GR: {item.gr_number}</Text>
-              </View>
-              {item.is_absent ? (
-                <View style={[s.absentTag, { backgroundColor: colors.dangerBg }]}>
-                  <Text style={[s.absentText, { color: colors.danger }]}>ABSENT</Text>
+            <AppCard
+              variant="bordered"
+              padding={12}
+              style={[
+                isInvalid && { borderColor: colors.danger, borderWidth: 1.5 },
+              ]}
+            >
+              <View style={styles.row}>
+                {/* Roll Number Circle */}
+                <View style={[styles.rollCircle, { backgroundColor: colors.primaryBg }]}>
+                  <Text style={[styles.rollNum, { color: colors.primary }]}>{item.roll_number}</Text>
                 </View>
-              ) : (
-                <View style={s.marksInputWrap}>
+
+                {/* Student Identity */}
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.name, { color: colors.text }]} numberOfLines={1}>
+                    {item.full_name}
+                  </Text>
+                  <Text style={[styles.gr, { color: colors.textSecondary }]}>GR: {item.gr_number}</Text>
+                </View>
+
+                {/* Grade Preview Badge */}
+                {letterGrade && (
+                  <AppBadge
+                    label={letterGrade}
+                    variant={isPass ? 'success' : 'danger'}
+                    size="sm"
+                    rounded
+                    style={{ marginRight: spacing.xs }}
+                  />
+                )}
+
+                {/* Absent Pill Toggle */}
+                <TouchableOpacity
+                  style={[
+                    styles.absentBtn,
+                    item.is_absent
+                      ? { backgroundColor: colors.dangerBg, borderColor: colors.danger }
+                      : { backgroundColor: colors.surfaceAlt, borderColor: colors.border },
+                  ]}
+                  onPress={() => toggleAbsent(item.student_id)}
+                  activeOpacity={0.75}
+                >
+                  <Text
+                    style={[
+                      styles.absentText,
+                      { color: item.is_absent ? colors.danger : colors.textSecondary },
+                    ]}
+                  >
+                    AB
+                  </Text>
+                </TouchableOpacity>
+
+                {/* Score Input */}
+                <View
+                  style={[
+                    styles.inputWrap,
+                    {
+                      backgroundColor: item.is_absent ? colors.surfaceAlt : colors.inputBg,
+                      borderColor: isInvalid ? colors.danger : colors.inputBorder,
+                    },
+                  ]}
+                >
                   <TextInput
                     style={[
-                      s.marksInput,
-                      { backgroundColor: colors.inputBg, borderColor: colors.inputBorder, color: colors.text },
-                      gradeInfo && { borderColor: gradeInfo.color },
+                      styles.scoreInput,
+                      { color: item.is_absent ? colors.textTertiary : colors.text },
                     ]}
-                    value={item.marks_obtained}
+                    value={item.is_absent ? '—' : item.marks_obtained}
                     onChangeText={v => updateMark(item.student_id, v)}
-                    keyboardType="numeric"
-                    placeholder={`/${maxMarks}`}
+                    placeholder="0"
                     placeholderTextColor={colors.placeholder}
-                    maxLength={4}
+                    keyboardType="numeric"
+                    editable={!item.is_absent}
+                    maxLength={5}
                   />
-                  {gradeInfo && (
-                    <Text style={[s.gradeLabel, { color: gradeInfo.color }]}>{grade}</Text>
-                  )}
                 </View>
-              )}
-              <TouchableOpacity
-                style={[s.absentBtn, { backgroundColor: item.is_absent ? colors.danger : colors.surfaceAlt }]}
-                onPress={() => toggleAbsent(item.student_id)}
-              >
-                <Icon name={item.is_absent ? 'undo' : 'user-times'} size={14} color={item.is_absent ? '#fff' : colors.textSecondary} solid />
-              </TouchableOpacity>
-            </View>
+              </View>
+            </AppCard>
           );
         }}
       />
 
-      {/* Save Button */}
-      <View style={[s.saveWrap, { backgroundColor: colors.surface, borderTopColor: colors.border }]}>
-        <TouchableOpacity
-          style={[s.saveBtn, { backgroundColor: colors.primary }, saving && { opacity: 0.7 }]}
+      {/* Floating Save Footer */}
+      <View
+        style={[
+          styles.saveWrap,
+          {
+            backgroundColor: colors.surface,
+            borderTopColor: colors.border,
+            ...shadows.lg,
+          },
+        ]}
+      >
+        <AppButton
+          label={`Save Scores (${enteredCount} Entered)`}
+          iconLeft="save"
+          variant="primary"
+          size="lg"
           onPress={saveMarks}
-          disabled={saving}
-        >
-          {saving
-            ? <ActivityIndicator color="#fff" size="small" />
-            : <Text style={s.saveBtnText}>💾 Save Marks ({students.length} students)</Text>}
-        </TouchableOpacity>
+          loading={saving}
+          fullWidth
+        />
       </View>
     </View>
   );
 }
 
-const s = StyleSheet.create({
-  root: { flex: 1 },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
-  loadingText: { fontSize: typography.size.base },
-  emptyIcon: { fontSize: 48 },
-  emptyText: { fontSize: typography.size.base },
-  backBtn: { paddingHorizontal: 20, paddingVertical: 10, borderRadius: radius.full, marginTop: 8 },
-  backBtnText: { fontWeight: typography.weight.semibold },
-  examInfo: {
-    padding: spacing.base, borderBottomWidth: 1,
+const styles = StyleSheet.create({
+  root: {
+    flex: 1,
   },
-  examTitle: { fontSize: typography.size.lg, fontWeight: typography.weight.bold },
-  examMeta: { fontSize: typography.size.sm, marginTop: 2 },
-  statsRow: { flexDirection: 'row', gap: spacing.base, marginTop: 8 },
-  stat: { fontSize: typography.size.sm, fontWeight: typography.weight.semibold },
-  studentCard: {
-    flexDirection: 'row', alignItems: 'center', gap: 10,
-    borderRadius: radius.md, padding: 10,
+  examHeader: {
+    padding: spacing.base,
+    borderBottomWidth: 1,
+    gap: spacing.xs,
   },
-  rollBadge: {
-    width: 36, height: 36, borderRadius: 18,
-    alignItems: 'center', justifyContent: 'center',
+  examTopRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
   },
-  rollText: { fontSize: typography.size.sm, fontWeight: typography.weight.bold },
-  studentInfo: { flex: 1 },
-  studentName: { fontSize: typography.size.base, fontWeight: typography.weight.semibold },
-  studentGr: { fontSize: typography.size.xs, marginTop: 1 },
-  marksInputWrap: { alignItems: 'center', gap: 2 },
-  marksInput: {
-    width: 64, height: 40, borderWidth: 1.5,
-    borderRadius: radius.sm, textAlign: 'center',
-    fontSize: typography.size.base, fontWeight: typography.weight.bold,
+  examTitle: {
+    fontSize: typography.size.base,
+    fontWeight: typography.weight.extrabold,
   },
-  gradeLabel: { fontSize: typography.size.xs, fontWeight: typography.weight.bold },
-  absentTag: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: radius.sm },
-  absentText: { fontSize: typography.size.xs, fontWeight: typography.weight.bold },
+  examMeta: {
+    fontSize: typography.size.xs,
+    marginTop: 2,
+  },
+  marksCapsule: {
+    alignItems: 'flex-end',
+  },
+  capsuleLabel: {
+    fontSize: typography.size['2xs'],
+    fontWeight: typography.weight.bold,
+  },
+  metricsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    marginTop: spacing.xs,
+  },
+  metricItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  metricText: {
+    fontSize: typography.size.xs,
+    fontWeight: typography.weight.semibold,
+  },
+  list: {
+    padding: spacing.base,
+    paddingBottom: 100,
+  },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  rollCircle: {
+    width: 34,
+    height: 34,
+    borderRadius: radius.full,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  rollNum: {
+    fontSize: typography.size.xs,
+    fontWeight: typography.weight.bold,
+  },
+  name: {
+    fontSize: typography.size.sm,
+    fontWeight: typography.weight.bold,
+  },
+  gr: {
+    fontSize: typography.size['2xs'],
+    marginTop: 1,
+  },
   absentBtn: {
-    width: 34, height: 34, borderRadius: 17,
-    alignItems: 'center', justifyContent: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderRadius: radius.md,
+    borderWidth: 1,
+  },
+  absentText: {
+    fontSize: typography.size.xs,
+    fontWeight: typography.weight.extrabold,
+  },
+  inputWrap: {
+    width: 64,
+    height: 40,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  scoreInput: {
+    width: '100%',
+    height: '100%',
+    textAlign: 'center',
+    fontSize: typography.size.base,
+    fontWeight: typography.weight.bold,
+    padding: 0,
   },
   saveWrap: {
-    position: 'absolute', bottom: 0, left: 0, right: 0,
-    padding: 16, borderTopWidth: 1,
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    padding: spacing.base,
+    borderTopWidth: 1,
   },
-  saveBtn: {
-    borderRadius: radius.md, paddingVertical: 14,
-    alignItems: 'center',
-  },
-  saveBtnText: { color: '#fff', fontSize: typography.size.base, fontWeight: typography.weight.bold },
 });

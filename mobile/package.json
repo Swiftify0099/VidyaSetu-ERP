@@ -8,7 +8,8 @@
     "ios": "react-native run-ios",
     "start": "react-native start",
     "test": "jest",
-    "lint": "eslint . --ext .js,.jsx,.ts,.tsx"
+    "lint": "eslint . --ext .js,.jsx,.ts,.tsx",
+    "postinstall": "node scripts/patch-gradle-plugin.js && node scripts/patch-reanimated-cmake.js"
   },
   "dependencies": {
     "@react-native-async-storage/async-storage": "1.23.1",

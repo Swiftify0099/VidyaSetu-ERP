@@ -30,17 +30,6 @@ class AcademicYearCreateRequest(BaseModel):
     end_date: date
 
 
-# ── Health Check (Public) ─────────────────────────────────────
-@router.get("/health", include_in_schema=True)
-async def health_check():
-    """System health check endpoint."""
-    return {
-        "status": "healthy",
-        "service": "VidyaSetu ERP API",
-        "version": "1.0.0",
-    }
-
-
 # ── System Settings ───────────────────────────────────────────
 @router.get("/settings", response_model=APIResponse)
 async def get_all_settings(

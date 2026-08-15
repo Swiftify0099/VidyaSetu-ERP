@@ -7,7 +7,7 @@ Provides standard audit fields on every table.
 import uuid as uuid_module
 from datetime import datetime, timezone
 
-from sqlalchemy import BigInteger, Boolean, Column, DateTime, String, Text
+from sqlalchemy import BigInteger, Boolean, Column, DateTime, Integer, String, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
@@ -30,7 +30,7 @@ class BaseModel(Base):
 
     # ── Primary Identity ──────────────────────────────────────
     id: Mapped[int] = mapped_column(
-        BigInteger, primary_key=True, autoincrement=True, index=True
+        BigInteger().with_variant(Integer, "sqlite"), primary_key=True, autoincrement=True, index=True
     )
     uuid: Mapped[str] = mapped_column(
         String(36),

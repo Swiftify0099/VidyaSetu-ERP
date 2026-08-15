@@ -37,53 +37,7 @@ from app.modules.device_security.service import (
     DeviceService, VerificationService, LoginEventService, DeviceSecurityOrchestrator
 )
 
-# ── Test Database Setup ───────────────────────────────────────
 
-SQLALCHEMY_DATABASE_URL = "sqlite:///./test_device_security.db"
-
-engine = create_engine(
-    SQLALCHEMY_DATABASE_URL,
-    connect_args={"check_same_thread": False},
-)
-TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-
-
-@pytest.fixture(scope="session", autouse=True)
-def create_tables():
-    """Create all tables once for the test session."""
-    # Import all models to register them
-    import app.modules.auth.models
-    import app.modules.device_security.models
-    import app.shared.audit
-    Base.metadata.create_all(bind=engine)
-    yield
-    Base.metadata.drop_all(bind=engine)
-
-
-@pytest.fixture
-def db() -> Generator[Session, None, None]:
-    """Fresh database transaction for each test (rolled back after)."""
-    connection = engine.connect()
-    transaction = connection.begin()
-    session = TestingSessionLocal(bind=connection)
-    try:
-        yield session
-    finally:
-        session.close()
-        transaction.rollback()
-        connection.close()
-
-
-@pytest.fixture
-def client(db: Session) -> TestClient:
-    """Test client with database override."""
-    def override_get_db():
-        yield db
-
-    app.dependency_overrides[get_db] = override_get_db
-    with TestClient(app, raise_server_exceptions=False) as c:
-        yield c
-    app.dependency_overrides.clear()
 
 
 # ── Test Fixtures ─────────────────────────────────────────────
@@ -91,7 +45,7 @@ def client(db: Session) -> TestClient:
 @pytest.fixture
 def test_user(db: Session) -> User:
     """Create a test user with a hashed password."""
-    role = Role(name="teacher", display_name="Teacher")
+    role = Role(name="Teacher", code="teacher", description="Teacher")
     db.add(role)
     db.flush()
 
@@ -394,51 +348,46 @@ class TestScenario8_AlreadyUsedToken:
 
 
 # ═══════════════════════════════════════════════════════════════
-# SCENARIO 9: Max 3 device limit enforcement
+# SCENARIO 9: Single device limit enforcement (Max 1 device)
 # ═══════════════════════════════════════════════════════════════
 
 class TestScenario9_MaxDeviceLimit:
-    def test_fourth_device_evicts_oldest_non_primary(self, db: Session, test_user: User):
+    def test_new_device_evicts_previous_devices(self, db: Session, test_user: User):
         """
-        S9: User has 3 devices (1 primary + 2 others).
-        Adding a 4th → oldest non-primary is automatically evicted.
+        S9: User has an active device.
+        Adding a new device at limit=1 → previous device is revoked.
         """
-        primary = make_device(db, test_user.id, "primary-dev", is_primary=True, is_trusted=True)
-        dev2 = make_device(db, test_user.id, "second-dev", is_primary=False, is_trusted=True)
-        dev3 = make_device(db, test_user.id, "third-dev", is_primary=False, is_trusted=True)
-        new_dev = make_device(db, test_user.id, "fourth-dev", is_primary=False, is_trusted=True)
+        dev1 = make_device(db, test_user.id, "first-dev", is_primary=True, is_trusted=True)
+        new_dev = make_device(db, test_user.id, "new-dev", is_primary=False, is_trusted=True)
         db.flush()
 
-        count_before = DeviceService.count_active_devices(db, test_user.id)
-        assert count_before == 4
-
-        # This should evict the oldest non-primary (dev2, since it was created first)
+        # Enforce device limit should evict dev1
         evicted = DeviceService.enforce_device_limit(db, test_user.id, new_dev.id)
         db.flush()
 
         assert evicted is not None
-        assert evicted.status == DeviceStatus.REVOKED
-        assert evicted.is_primary is False
-        # Primary must NOT be evicted
-        assert primary.status != DeviceStatus.REVOKED
+        assert dev1.status == DeviceStatus.REVOKED
+        assert dev1.is_trusted is False
 
-    def test_primary_device_is_never_evicted(self, db: Session, test_user: User):
-        """S9b: Primary device is protected from eviction."""
-        primary = make_device(db, test_user.id, "protected-primary", is_primary=True, is_trusted=True)
-        new_dev = make_device(db, test_user.id, "new-dev", is_primary=False, is_trusted=True)
+    def test_revoke_all_other_devices_and_sessions(self, db: Session, test_user: User):
+        """S9b: revoke_all_other_devices revokes all other devices when new device is verified."""
+        dev1 = make_device(db, test_user.id, "old-dev-1", is_primary=True, is_trusted=True)
+        dev2 = make_device(db, test_user.id, "old-dev-2", is_primary=False, is_trusted=True)
+        new_dev = make_device(db, test_user.id, "new-verified-dev", is_primary=False, is_trusted=True)
         db.flush()
 
-        # Only 2 devices — no eviction needed yet
-        evicted = DeviceService.enforce_device_limit(db, test_user.id, new_dev.id)
-        assert evicted is None  # No eviction with only 2 devices
+        revoked_list = DeviceService.revoke_all_other_devices(db, test_user.id, new_dev.id)
+        db.flush()
+
+        assert len(revoked_list) == 2
+        assert all(d.status == DeviceStatus.REVOKED for d in revoked_list)
+        assert new_dev.status != DeviceStatus.REVOKED
 
     def test_max_devices_count_is_correct(self, db: Session, test_user: User):
         """S9c: count_active_devices returns correct count."""
         make_device(db, test_user.id, "d1")
-        make_device(db, test_user.id, "d2")
-        make_device(db, test_user.id, "d3")
         db.flush()
-        assert DeviceService.count_active_devices(db, test_user.id) == 3
+        assert DeviceService.count_active_devices(db, test_user.id) == 1
 
 
 # ═══════════════════════════════════════════════════════════════

@@ -141,7 +141,7 @@ class DeviceService:
     to prevent race conditions from concurrent logins.
     """
 
-    MAX_ACTIVE_DEVICES = 3  # Override via settings.MAX_TRUSTED_DEVICES
+    MAX_ACTIVE_DEVICES = 1  # Override via settings.MAX_TRUSTED_DEVICES
 
     @classmethod
     def _max_devices(cls) -> int:
@@ -316,16 +316,15 @@ class DeviceService:
         cls, db: Session, user_id: int, new_device_id: int
     ) -> Optional[UserDevice]:
         """
-        Enforce the maximum-3 device rule.
-        
-        If adding a new device would exceed the limit:
+        Enforce the maximum device rule (default: 1 device per user).
+
+        When a new device joins and we are at or over the limit:
           1. Lock all device rows for this user (SELECT FOR UPDATE)
-          2. Find the oldest non-primary active device
-          3. Revoke it atomically
-          4. Return the revoked device (for logging)
-        
+          2. Revoke ALL other active/pending devices (not just the oldest)
+          3. Return the last revoked device (for logging)
+
         This is called INSIDE a transaction, before commit.
-        The FOR UPDATE lock prevents concurrent logins from creating > 3 devices.
+        The FOR UPDATE lock prevents concurrent logins from creating > limit devices.
         """
         # Lock all active device rows for this user
         active_devices = list(db.scalars(
@@ -339,36 +338,69 @@ class DeviceService:
             .with_for_update()  # Row-level lock — prevents race conditions
         ).all())
 
-        # +1 for the device being added
-        total_after_add = len(active_devices) + 1
+        existing_ids = {dev.id for dev in active_devices}
+        total_after_add = len(active_devices) if new_device_id in existing_ids else len(active_devices) + 1
 
         if total_after_add <= cls._max_devices():
             return None  # No eviction needed
 
-        # Find the oldest non-primary device to evict
-        evict_candidate = None
+        last_evicted = None
         for dev in active_devices:
-            if not dev.is_primary and dev.id != new_device_id:
-                evict_candidate = dev
-                break
+            if dev.id != new_device_id:
+                cls._revoke_device_internal(db, dev)
+                logger.info(
+                    f"[DeviceSecurity] Evicted device id={dev.id} "
+                    f"for user_id={user_id} (device limit enforcement)"
+                )
+                last_evicted = dev
 
-        if evict_candidate is None:
-            # All devices are primary (shouldn't happen, but be safe)
-            # Evict the oldest non-new device
-            for dev in active_devices:
-                if dev.id != new_device_id:
-                    evict_candidate = dev
-                    break
+        return last_evicted
 
-        if evict_candidate:
-            cls._revoke_device_internal(db, evict_candidate)
-            logger.info(
-                f"[DeviceSecurity] Evicted device id={evict_candidate.id} "
-                f"for user_id={user_id} (device limit enforcement)"
+    @classmethod
+    def revoke_all_other_devices(
+        cls, db: Session, user_id: int, keep_device_id: int
+    ) -> list[UserDevice]:
+        """
+        Revoke ALL active/trusted/pending devices for a user EXCEPT the given one.
+        Called after a new device is verified to enforce single-device policy.
+        Returns list of revoked devices.
+        """
+        devices_to_revoke = list(db.scalars(
+            select(UserDevice)
+            .where(
+                UserDevice.user_id == user_id,
+                UserDevice.id != keep_device_id,
+                UserDevice.status != DeviceStatus.REVOKED,
+                UserDevice.is_deleted == False,
             )
-            return evict_candidate
+            .with_for_update()
+        ).all())
 
-        return None
+        for dev in devices_to_revoke:
+            cls._revoke_device_internal(db, dev)
+            logger.info(
+                f"[DeviceSecurity] Revoked old device id={dev.id} for user_id={user_id} "
+                f"(single-device policy: new primary device id={keep_device_id})"
+            )
+
+        return devices_to_revoke
+
+    @classmethod
+    def invalidate_all_sessions(
+        cls, db: Session, user_id: int
+    ) -> None:
+        """
+        Invalidate (soft-delete) all active UserSession rows for a user.
+        Called when a new device takes over as primary, so old sessions are kicked.
+        """
+        from sqlalchemy import update as sa_update
+        from app.modules.auth.models import UserSession
+        db.execute(
+            sa_update(UserSession)
+            .where(UserSession.user_id == user_id, UserSession.is_active == True)
+            .values(is_active=False, is_deleted=True)
+        )
+        logger.info(f"[DeviceSecurity] Invalidated all sessions for user_id={user_id} (new primary device)")
 
     @classmethod
     def _revoke_device_internal(cls, db: Session, device: UserDevice) -> None:
@@ -750,18 +782,22 @@ class DeviceSecurityOrchestrator:
     ) -> DeviceCheckResult:
         """
         No device ID sent (legacy client or first login without device ID support).
-        If user has no registered devices, treat this as their primary device setup.
+        If user has no registered devices or user has no email configured,
+        auto-register and trust this device up to the active device limit.
         """
+        from app.modules.auth.models import User
+        user = db.get(User, user_id)
+        user_has_email = bool(user and user.email and user.email.strip())
         has_devices = DeviceService.has_any_device(db, user_id)
 
-        if not has_devices:
-            # First login ever for this user — register this as primary device
-            # Use a generated installation ID since client didn't send one
+        if not has_devices or not user_has_email:
+            # First login ever or user has no email for verification — trust device
             generated_id = f"legacy-{uuid.uuid4()}"
             device = DeviceService.register_new_device(
                 db, user_id, generated_id, device_meta,
-                make_primary=True, make_trusted=True
+                make_primary=not has_devices, make_trusted=True
             )
+            DeviceService.enforce_device_limit(db, user_id, device.id)
             LoginEventService.record(
                 db,
                 event_type=LoginEventType.DEVICE_REGISTERED,
@@ -780,7 +816,7 @@ class DeviceSecurityOrchestrator:
                 risk_score=0,
             )
         else:
-            # User has devices but didn't send a device ID — require verification
+            # User has devices and has email — require verification
             return cls._create_verification(
                 db, user_id, device_id=None, login_attempt_id=login_attempt_id,
                 failed_attempts=failed_attempts, device_meta=device_meta,
@@ -850,7 +886,33 @@ class DeviceSecurityOrchestrator:
                 risk_score=risk,
             )
 
-        # Known but pending/untrusted — require verification
+        # Known but pending/untrusted — check if user has email
+        from app.modules.auth.models import User
+        user = db.get(User, user_id)
+        user_has_email = bool(user and user.email and user.email.strip())
+
+        if not user_has_email:
+            # Auto-trust since user has no email for verification
+            DeviceService.trust_device(db, device)
+            LoginEventService.record(
+                db, event_type=LoginEventType.LOGIN_SUCCESS,
+                user_id=user_id, device_id=device.id,
+                login_attempt_id=login_attempt_id,
+                ip_address=ip, user_agent=ua,
+                device_type=device_meta.get("device_type"),
+                platform=device_meta.get("platform"),
+                browser=device_meta.get("browser_name"),
+                os=device_meta.get("os_version"),
+                risk_score=0,
+                status="SUCCESS",
+            )
+            return DeviceCheckResult(
+                is_trusted=True, requires_verification=False,
+                device=device, login_attempt_id=login_attempt_id,
+                verification_token=None, verification_request=None,
+                risk_score=0,
+            )
+
         return cls._create_verification(
             db, user_id, device_id=device.id,
             login_attempt_id=login_attempt_id,
@@ -864,15 +926,18 @@ class DeviceSecurityOrchestrator:
         failed_attempts, device_meta, ip, ua
     ) -> DeviceCheckResult:
         """Handle a login from a completely new (unregistered) device."""
-
+        from app.modules.auth.models import User
+        user = db.get(User, user_id)
+        user_has_email = bool(user and user.email and user.email.strip())
         has_devices = DeviceService.has_any_device(db, user_id)
 
-        if not has_devices:
-            # First device ever — register as primary and trust immediately
+        if not has_devices or not user_has_email:
+            # First device ever OR user has no registered email — register & trust immediately
             device = DeviceService.register_new_device(
                 db, user_id, device_installation_id, device_meta,
-                make_primary=True, make_trusted=True
+                make_primary=not has_devices, make_trusted=True
             )
+            DeviceService.enforce_device_limit(db, user_id, device.id)
             LoginEventService.record(
                 db,
                 event_type=LoginEventType.DEVICE_REGISTERED,
@@ -891,7 +956,7 @@ class DeviceSecurityOrchestrator:
                 risk_score=0,
             )
 
-        # User has existing devices — new device needs verification
+        # User has existing devices AND has email — new device needs verification
         # Register the device as PENDING (don't trust yet)
         device = DeviceService.register_new_device(
             db, user_id, device_installation_id, device_meta,

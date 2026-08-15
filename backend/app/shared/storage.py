@@ -198,3 +198,20 @@ class StorageService:
         """Create all storage directories on startup."""
         for key, path in cls.DIRECTORIES.items():
             (cls.BASE_DIR / path).mkdir(parents=True, exist_ok=True)
+
+    @classmethod
+    def storage_url(cls, relative_path: str | None) -> str | None:
+        """
+        Convert a relative storage path (as stored in DB) to a fully-qualified
+        absolute URL that works cross-domain.
+
+        Uses BACKEND_URL from settings so the frontend at pages.dev can load
+        files served from onrender.com.
+
+        Returns None if relative_path is empty/None.
+        """
+        if not relative_path:
+            return None
+        base = settings.BACKEND_URL.rstrip("/")
+        clean_path = relative_path.replace("\\", "/").lstrip("/")
+        return f"{base}/storage/{clean_path}"

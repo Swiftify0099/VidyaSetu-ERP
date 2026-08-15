@@ -18,8 +18,12 @@ export const STORAGE_KEYS = {
 
 // ── Base URLs ────────────────────────────────────────────
 // Priority 1: Local machine backend (dev only)
-let LOCAL_BASE_URL = 'http://localhost:8000/api/v1';
-const EMULATOR_BASE_URL = 'http://10.0.2.2:8000/api/v1';
+const LOCAL_HOST_URL    = 'http://localhost:8000/api/v1';
+const EMULATOR_HOST_URL = 'http://10.0.2.2:8000/api/v1';
+
+// Default local URL for platform: Android emulator uses 10.0.2.2 to reach host PC
+let LOCAL_BASE_URL = Platform.OS === 'android' ? EMULATOR_HOST_URL : LOCAL_HOST_URL;
+
 // Priority 2: Render cloud backend (production — always available)
 const RENDER_BASE_URL = 'https://vidyasetu-erp.onrender.com/api/v1';
 // Production URL (used in release builds)
@@ -39,28 +43,20 @@ let fallbackCheckInProgress = false;
 
 /** Silently probe local backend; returns true if reachable */
 async function isLocalReachable(): Promise<boolean> {
-  // Try localhost:8000 first (works on iOS, Web, and Android with ADB reverse)
-  try {
-    const res = await axios.get(`${LOCAL_BASE_URL}/health`, { timeout: 2500 });
-    if (res.data?.status === 'healthy' || res.status === 200) {
-      setBaseURL(LOCAL_BASE_URL);
-      return true;
-    }
-  } catch {
-    /* try emulator IP */
-  }
+  const probeUrls = Platform.OS === 'android'
+    ? [EMULATOR_HOST_URL, LOCAL_HOST_URL]
+    : [LOCAL_HOST_URL, EMULATOR_HOST_URL];
 
-  // Try 10.0.2.2:8000 (Android Emulator fallback)
-  if (Platform.OS === 'android') {
+  for (const baseUrl of probeUrls) {
     try {
-      const res = await axios.get(`${EMULATOR_BASE_URL}/health`, { timeout: 2500 });
+      const res = await axios.get(`${baseUrl}/health`, { timeout: 3000 });
       if (res.data?.status === 'healthy' || res.status === 200) {
-        LOCAL_BASE_URL = EMULATOR_BASE_URL;
-        setBaseURL(EMULATOR_BASE_URL);
+        LOCAL_BASE_URL = baseUrl;
+        setBaseURL(baseUrl);
         return true;
       }
     } catch {
-      /* both failed */
+      /* continue to next candidate */
     }
   }
 
@@ -76,7 +72,7 @@ function setBaseURL(url: string) {
 // ── Axios Instance ────────────────────────────────────────
 export const api: AxiosInstance = axios.create({
   baseURL: INITIAL_BASE_URL,
-  timeout: 15000,
+  timeout: 30000,
   headers: {
     'Content-Type': 'application/json',
     Accept: 'application/json',
@@ -229,6 +225,32 @@ export const authAPI = {
 };
 
 // ─────────────────────────────────────────────────────────
+// PROFILE API (current user self-service)
+// ─────────────────────────────────────────────────────────
+export const profileAPI = {
+  /** GET /auth/me — fetch current user profile */
+  getMyProfile: () => api.get('/auth/me'),
+
+  /** PATCH /auth/me — update full_name, mobile, email */
+  updateProfile: (data: { full_name?: string; mobile?: string; email?: string }) =>
+    api.patch('/auth/me', data),
+
+  /** PATCH /auth/change-password — change own password */
+  changePassword: (current_password: string, new_password: string) =>
+    api.patch('/auth/change-password', {
+      current_password,
+      new_password,
+      confirm_password: new_password,
+    }),
+
+  /** POST /auth/profile/photo — upload profile picture */
+  uploadPhoto: (formData: FormData) =>
+    api.post('/auth/profile/photo', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    }),
+};
+
+// ─────────────────────────────────────────────────────────
 // STUDENTS API
 // ─────────────────────────────────────────────────────────
 export const studentsAPI = {
@@ -249,19 +271,33 @@ export const studentsAPI = {
 // ATTENDANCE API
 // ─────────────────────────────────────────────────────────
 export const attendanceAPI = {
-  getClassAttendance: (standard: string, division: string, date: string) =>
-    api.get('/attendance/class', { params: { standard, division, date } }),
-  markAttendance: (records: object[]) =>
-    api.post('/attendance/mark', { records }),
-  getStudentSummary: (studentId: number, academic_year: string) =>
-    api.get(`/attendance/student/${studentId}/summary`, { params: { academic_year } }),
-  getMonthlyReport: (standard: string, division: string, month: string, year: string) =>
-    api.get('/attendance/monthly-report', { params: { standard, division, month, year } }),
-  getMyAttendance: (params?: Record<string, any>) =>
-    api.get('/attendance/my-attendance', { params }),
-  getClassesList: () => api.get('/attendance/classes'),
-  updateRecord: (recordId: number, data: object) =>
-    api.patch(`/attendance/${recordId}`, data),
+  // GET /attendance/student/roster (att_date, standard, division, academic_year_id, period)
+  getClassAttendance: (standard: string, division: string, att_date: string, academic_year_id = 1) =>
+    api.get('/attendance/student/roster', { params: { standard, division, att_date, academic_year_id } }),
+  // POST /attendance/student/bulk
+  markAttendance: (data: object) =>
+    api.post('/attendance/student/bulk', data),
+  // GET /attendance/student/{id}/month (year, month)
+  getStudentMonthAttendance: (studentId: number, year: number, month: number) =>
+    api.get(`/attendance/student/${studentId}/month`, { params: { year, month } }),
+  // GET /attendance/teacher/day (att_date, academic_year_id)
+  getTeacherDay: (att_date: string, academic_year_id = 1) =>
+    api.get('/attendance/teacher/day', { params: { att_date, academic_year_id } }),
+  // POST /attendance/teacher/bulk
+  markTeacherAttendance: (data: object) =>
+    api.post('/attendance/teacher/bulk', data),
+  // GET /attendance/class/sessions
+  getClassSessions: (standard: string, academic_year_id: number, year: number, month: number) =>
+    api.get('/attendance/class/sessions', { params: { standard, academic_year_id, year, month } }),
+  // GET /attendance/defaulters
+  getDefaulters: (academic_year_id: number, year: number, month: number, standard?: string) =>
+    api.get('/attendance/defaulters', { params: { academic_year_id, year, month, standard } }),
+  // GET /attendance/holidays (year, month)
+  getHolidays: (year: number, month: number) =>
+    api.get('/attendance/holidays', { params: { year, month } }),
+  // GET /attendance/stats
+  getStats: (academic_year_id: number) =>
+    api.get('/attendance/stats', { params: { academic_year_id } }),
 };
 
 // ─────────────────────────────────────────────────────────
@@ -535,19 +571,70 @@ export const admissionAPI = {
 };
 
 // ─────────────────────────────────────────────────────────
-// ANALYTICS API
+// ANALYTICS API — Real-data analytics endpoints
 // ─────────────────────────────────────────────────────────
 export const analyticsAPI = {
+  // Backward-compat alias used by DashboardScreen
   getSummary: (params?: Record<string, any>) =>
     api.get('/analytics/summary', { params }),
-  getAttendanceTrend: (params?: Record<string, any>) =>
-    api.get('/analytics/attendance-trend', { params }),
-  getFinanceTrend: (params?: Record<string, any>) =>
-    api.get('/analytics/finance-trend', { params }),
+
+  // Full dashboard KPIs
+  getDashboard: (params?: { academic_year_id?: number }) =>
+    api.get('/analytics/dashboard', { params }),
+
+  // Student analytics
+  getStudents: (params?: { academic_year_id?: number }) =>
+    api.get('/analytics/students', { params }),
+
+  // Attendance analytics
+  getAttendance: (params?: { academic_year_id?: number; standard?: string; division?: string }) =>
+    api.get('/analytics/attendance', { params }),
+  getAttendanceTrend: (params?: { academic_year_id?: number; standard?: string; division?: string }) =>
+    api.get('/analytics/attendance/trend', { params }),
+  getLowAttendance: (params?: { academic_year_id?: number; threshold_pct?: number; standard?: string; limit?: number }) =>
+    api.get('/analytics/attendance/low', { params }),
+
+  // Fee analytics
+  getFees: (params?: { academic_year_id?: number }) =>
+    api.get('/analytics/fees', { params }),
+  getFeeClasses: (params?: { academic_year_id?: number; standard?: string }) =>
+    api.get('/analytics/fees/classes', { params }),
+  getFeeOutstanding: (params?: { academic_year_id?: number; standard?: string; limit?: number }) =>
+    api.get('/analytics/fees/outstanding', { params }),
+  getPaymentModes: (params?: { academic_year_id?: number }) =>
+    api.get('/analytics/fees/payment-modes', { params }),
+
+  // Academic analytics
+  getAcademic: (params?: { academic_year_id?: number; standard?: string; exam_type_id?: number }) =>
+    api.get('/analytics/academic', { params }),
+
+  // Class analytics
+  getClasses: (params?: { academic_year_id?: number; standard?: string; division?: string }) =>
+    api.get('/analytics/classes', { params }),
+
+  // Teacher/staff analytics
+  getTeachers: (params?: { academic_year_id?: number }) =>
+    api.get('/analytics/teachers', { params }),
+
+  // Risk indicators
+  getRisk: (params?: { academic_year_id?: number; standard?: string }) =>
+    api.get('/analytics/risk', { params }),
+
+  // NLG insights
+  getInsights: (params?: { academic_year_id?: number }) =>
+    api.get('/analytics/insights', { params }),
+
+  // Library
+  getLibrary: () => api.get('/analytics/library'),
+
+  // Inventory
+  getInventory: () => api.get('/analytics/inventory'),
+
+  // Additional legacy endpoints
   getExamPerformance: (params?: Record<string, any>) =>
-    api.get('/analytics/exam-performance', { params }),
+    api.get('/analytics/academic', { params }),
   getEnrollmentStats: (params?: Record<string, any>) =>
-    api.get('/analytics/enrollment', { params }),
+    api.get('/analytics/students', { params }),
   exportReport: (type: string, params?: Record<string, any>) =>
     api.get(`/analytics/export/${type}`, { params, responseType: 'blob' }),
 };
@@ -670,20 +757,6 @@ export const notificationAPI = {
   markAllRead: () => api.patch('/notifications/read-all'),
   delete: (id: number) => api.delete(`/notifications/${id}`),
   getUnreadCount: () => api.get('/notifications/unread-count'),
-};
-
-// ─────────────────────────────────────────────────────────
-// PROFILE API
-// ─────────────────────────────────────────────────────────
-export const profileAPI = {
-  getMyProfile: () => api.get('/auth/me'),
-  updateProfile: (data: object) => api.patch('/auth/profile', data),
-  uploadPhoto: (formData: FormData) =>
-    api.post('/auth/profile/photo', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    }),
-  changePassword: (old_password: string, new_password: string) =>
-    api.post('/auth/change-password', { old_password, new_password }),
 };
 
 // ─────────────────────────────────────────────────────────

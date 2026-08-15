@@ -1,7 +1,13 @@
 import axios from 'axios';
 import authService from './authService';
 
-export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL || '/api/v1';
+// IMPORTANT: Never use a relative path here — relative paths break when the
+// frontend is hosted on a different domain (e.g. Cloudflare Workers/Pages) from
+// the backend (Render). A relative /api/v1 would hit Cloudflare, not Render.
+export const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL ||
+  import.meta.env.VITE_API_URL ||
+  'https://vidyasetu-erp.onrender.com/api/v1';  // absolute fallback — never relative
 export const STORAGE_BASE_URL = import.meta.env.VITE_STORAGE_URL || '/storage';
 
 const api = axios.create({

@@ -46,11 +46,11 @@ export const ATTENDANCE_STATUS = {
 } as const;
 
 export const PAYMENT_MODES = [
-  { value: 'cash',          label: 'Cash',          icon: '💵' },
-  { value: 'upi',           label: 'UPI',            icon: '📱' },
-  { value: 'cheque',        label: 'Cheque',         icon: '🏦' },
-  { value: 'bank_transfer', label: 'Bank Transfer',  icon: '🔄' },
-  { value: 'dd',            label: 'DD',             icon: '📄' },
+  { value: 'cash',          label: 'Cash',          icon: 'money-bill-wave' },
+  { value: 'upi',           label: 'UPI',            icon: 'mobile-alt' },
+  { value: 'cheque',        label: 'Cheque',         icon: 'money-check' },
+  { value: 'bank_transfer', label: 'Bank Transfer',  icon: 'university' },
+  { value: 'dd',            label: 'DD',             icon: 'file-invoice' },
 ];
 
 export const ANNOUNCEMENT_PRIORITY = {

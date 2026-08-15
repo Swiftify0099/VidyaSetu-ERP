@@ -1,12 +1,17 @@
 /**
- * VidyaSetu Mobile — Exam Results Screen
- * View results with grade calculations.
- * Accessible to: admin, principal, teacher, student (own), parent (child)
+ * VidyaSetu Mobile — Exam Results Screen (Premium Redesign)
+ * ==========================================================
+ * Assessment scorecards with letter grades, percentage indicators,
+ * filter chips, and search filtering.
  */
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import {
-  View, Text, StyleSheet, FlatList, TouchableOpacity,
-  TextInput, RefreshControl, ActivityIndicator,
+  View,
+  Text,
+  StyleSheet,
+  FlatList,
+  ScrollView,
+  RefreshControl,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/FontAwesome5';
 import { useTheme } from '../../theme/ThemeContext';
@@ -14,10 +19,14 @@ import { examAPI } from '../../services/api';
 import { spacing, radius, typography, shadows } from '../../theme';
 import { getGrade, GRADES, CURRENT_ACADEMIC_YEAR } from '../../config/constants';
 import { formatDateLong, formatPercentage } from '../../utils/formatters';
-import Badge from '../../components/ui/Badge';
-import SectionHeader from '../../components/ui/SectionHeader';
-import SkeletonLoader from '../../components/ui/SkeletonLoader';
-import PremiumCard from '../../components/ui/PremiumCard';
+import {
+  AppCard,
+  AppBadge,
+  AppChip,
+  AppSearchBar,
+  AppEmptyState,
+  AppSkeleton,
+} from '../../components/ui';
 
 interface Result {
   id: number;
@@ -46,166 +55,220 @@ export default function ExamResultsScreen({ navigation }: { navigation: any }) {
     try {
       const res = await examAPI.getResults({ academic_year: CURRENT_ACADEMIC_YEAR });
       setResults(res.data?.data?.items ?? res.data?.data ?? []);
-    } catch { /* ignore */ }
-    finally { setLoading(false); setRefreshing(false); }
+    } catch {
+      /* ignore */
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    load();
+  }, [load]);
 
-  const filtered = results.filter(r => {
-    const matchSearch = !search || r.student_name.toLowerCase().includes(search.toLowerCase()) ||
-      r.gr_number.includes(search) || r.subject_name.toLowerCase().includes(search.toLowerCase());
-    const matchGrade = !filterGrade || r.grade === filterGrade;
-    return matchSearch && matchGrade;
-  });
-
-  function badgeVariant(grade: string | null): any {
-    if (!grade) return 'default';
-    if (['A+', 'A'].includes(grade)) return 'success';
-    if (['B+', 'B'].includes(grade)) return 'primary';
-    if (grade === 'C') return 'warning';
-    return 'danger';
-  }
+  const filtered = useMemo(() => {
+    return results.filter(r => {
+      const matchSearch =
+        !search ||
+        r.student_name.toLowerCase().includes(search.toLowerCase()) ||
+        r.gr_number.includes(search) ||
+        r.subject_name.toLowerCase().includes(search.toLowerCase());
+      const matchGrade = !filterGrade || r.grade === filterGrade;
+      return matchSearch && matchGrade;
+    });
+  }, [results, search, filterGrade]);
 
   return (
-    <View style={[s.root, { backgroundColor: colors.background }]}>
-      {/* Search */}
-      <View style={[s.searchWrap, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
-        <View style={[s.searchBox, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder }]}>
-          <Icon name="search" size={14} color={colors.textTertiary} />
-          <TextInput
-            style={[s.searchInput, { color: colors.text }]}
-            value={search}
-            onChangeText={setSearch}
-            placeholder="Search by student, GR or subject..."
-            placeholderTextColor={colors.placeholder}
-          />
-        </View>
-      </View>
+    <View style={[styles.root, { backgroundColor: colors.background }]}>
+      {/* Top Search & Grade Filters */}
+      <View style={[styles.topBar, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
+        <AppSearchBar
+          value={search}
+          onChangeText={setSearch}
+          placeholder="Search by student, GR or subject..."
+          style={{ marginVertical: 0 }}
+        />
 
-      {/* Grade Filter */}
-      <View style={[s.gradeFilter, { borderBottomColor: colors.border }]}>
-        <TouchableOpacity
-          style={[s.gradeChip, !filterGrade && { backgroundColor: colors.primary }]}
-          onPress={() => setFilterGrade(null)}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{ gap: spacing.xs, paddingTop: spacing.xs }}
         >
-          <Text style={[s.gradeChipText, !filterGrade && { color: '#fff' }]}>All</Text>
-        </TouchableOpacity>
-        {Object.keys(GRADES).map(g => (
-          <TouchableOpacity
-            key={g}
-            style={[s.gradeChip, filterGrade === g && { backgroundColor: GRADES[g as keyof typeof GRADES].color }]}
-            onPress={() => setFilterGrade(filterGrade === g ? null : g)}
-          >
-            <Text style={[s.gradeChipText, filterGrade === g && { color: '#fff' }]}>{g}</Text>
-          </TouchableOpacity>
-        ))}
+          <AppChip
+            label="All Grades"
+            selected={filterGrade === null}
+            onPress={() => setFilterGrade(null)}
+          />
+          {Object.keys(GRADES).map(g => (
+            <AppChip
+              key={g}
+              label={g}
+              selected={filterGrade === g}
+              onPress={() => setFilterGrade(filterGrade === g ? null : g)}
+            />
+          ))}
+        </ScrollView>
       </View>
 
+      {/* Main Results List */}
       {loading ? (
         <View style={{ padding: spacing.base }}>
-          <SkeletonLoader variant="list" count={6} />
+          <AppSkeleton variant="list" count={6} />
         </View>
       ) : (
         <FlatList
           data={filtered}
           keyExtractor={r => String(r.id)}
-          contentContainerStyle={{ padding: spacing.base, paddingBottom: 30 }}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor={colors.primary} colors={[colors.primary]} />}
+          contentContainerStyle={{ padding: spacing.base, paddingBottom: 40 }}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={() => {
+                setRefreshing(true);
+                load();
+              }}
+              tintColor={colors.primary}
+              colors={[colors.primary]}
+            />
+          }
           ItemSeparatorComponent={() => <View style={{ height: 8 }} />}
+          ListEmptyComponent={
+            <AppEmptyState
+              icon="award"
+              title="No Results Found"
+              description="No assessment results matching your current filters."
+              style={{ flex: 1 }}
+            />
+          }
           renderItem={({ item }) => {
-            const pct = item.percentage ?? (item.marks_obtained != null ? (item.marks_obtained / item.total_marks) * 100 : null);
+            const pct =
+              item.percentage ??
+              (item.marks_obtained != null ? (item.marks_obtained / item.total_marks) * 100 : null);
             const grade = item.grade ?? (pct != null ? getGrade(pct) : null);
-            const passed = item.marks_obtained != null ? item.marks_obtained >= item.passing_marks : false;
+            const passed =
+              item.marks_obtained != null ? item.marks_obtained >= item.passing_marks : false;
+
+            const gradeColor =
+              grade && GRADES[grade as keyof typeof GRADES]?.color
+                ? GRADES[grade as keyof typeof GRADES].color
+                : colors.primary;
 
             return (
-              <PremiumCard variant="bordered" padding={12}>
-                <View style={s.resultRow}>
-                  <View style={[
-                    s.gradeBadge,
-                    { backgroundColor: grade ? GRADES[grade as keyof typeof GRADES]?.color ?? colors.primaryBg : colors.surfaceAlt },
-                  ]}>
-                    <Text style={s.gradeLetter}>{item.is_absent ? 'AB' : grade ?? '—'}</Text>
+              <AppCard variant="bordered" padding={12}>
+                <View style={styles.resultRow}>
+                  {/* Grade Pill Badge */}
+                  <View
+                    style={[
+                      styles.gradeBadge,
+                      {
+                        backgroundColor: item.is_absent ? colors.dangerBg : `${gradeColor}18`,
+                        borderColor: item.is_absent ? colors.danger : gradeColor,
+                      },
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.gradeLetter,
+                        { color: item.is_absent ? colors.danger : gradeColor },
+                      ]}
+                    >
+                      {item.is_absent ? 'AB' : grade ?? '—'}
+                    </Text>
                   </View>
+
+                  {/* Student & Subject Details */}
                   <View style={{ flex: 1 }}>
-                    <Text style={[s.studentName, { color: colors.text }]} numberOfLines={1}>
+                    <Text style={[styles.studentName, { color: colors.text }]} numberOfLines={1}>
                       {item.student_name}
                     </Text>
-                    <Text style={[s.subjectName, { color: colors.textSecondary }]}>
+                    <Text style={[styles.subjectName, { color: colors.textSecondary }]}>
                       {item.subject_name} • {item.exam_type_name}
                     </Text>
-                    <Text style={[s.examDate, { color: colors.textTertiary }]}>
+                    <Text style={[styles.examDate, { color: colors.textTertiary }]}>
                       {formatDateLong(item.exam_date)}
                     </Text>
                   </View>
-                  <View style={s.rightCol}>
+
+                  {/* Marks & Status */}
+                  <View style={styles.scoreCol}>
                     {item.is_absent ? (
-                      <Text style={[s.marksText, { color: colors.danger }]}>Absent</Text>
+                      <AppBadge label="Absent" variant="danger" size="sm" rounded />
                     ) : (
                       <>
-                        <Text style={[s.marksText, { color: passed ? colors.success : colors.danger }]}>
-                          {item.marks_obtained ?? '—'}/{item.total_marks}
-                        </Text>
-                        {pct != null && (
-                          <Text style={[s.pct, { color: colors.textSecondary }]}>
-                            {formatPercentage(pct)}
+                        <Text style={[styles.scoreValue, { color: passed ? colors.success : colors.danger }]}>
+                          {item.marks_obtained ?? '—'}
+                          <Text style={[styles.scoreMax, { color: colors.textTertiary }]}>
+                            /{item.total_marks}
                           </Text>
-                        )}
-                        <Badge
-                          label={passed ? 'Pass' : 'Fail'}
-                          variant={passed ? 'success' : 'danger'}
-                          size="sm"
-                          rounded
-                        />
+                        </Text>
+                        <Text style={[styles.pctText, { color: colors.textSecondary }]}>
+                          {pct != null ? formatPercentage(pct) : '—'}
+                        </Text>
                       </>
                     )}
                   </View>
                 </View>
-              </PremiumCard>
+              </AppCard>
             );
           }}
-          ListEmptyComponent={
-            <View style={s.empty}>
-              <Text style={s.emptyIcon}>📊</Text>
-              <Text style={[s.emptyText, { color: colors.textSecondary }]}>No results found</Text>
-            </View>
-          }
         />
       )}
     </View>
   );
 }
 
-const s = StyleSheet.create({
-  root: { flex: 1 },
-  searchWrap: { padding: spacing.sm, borderBottomWidth: 1 },
-  searchBox: {
-    flexDirection: 'row', alignItems: 'center', gap: 8,
-    borderWidth: 1.5, borderRadius: radius.md, paddingHorizontal: 12, height: 40,
+const styles = StyleSheet.create({
+  root: {
+    flex: 1,
   },
-  searchInput: { flex: 1, fontSize: typography.size.base },
-  gradeFilter: {
-    flexDirection: 'row', paddingHorizontal: spacing.sm, paddingVertical: 8,
-    gap: 6, borderBottomWidth: 1,
+  topBar: {
+    padding: spacing.base,
+    borderBottomWidth: 1,
+    gap: spacing.sm,
   },
-  gradeChip: {
-    paddingHorizontal: 12, paddingVertical: 5, borderRadius: radius.full,
-    backgroundColor: '#f3f4f6', borderWidth: 1, borderColor: '#e5e7eb',
+  resultRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
   },
-  gradeChipText: { fontSize: typography.size.xs, fontWeight: typography.weight.bold, color: '#6b7280' },
-  resultRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   gradeBadge: {
-    width: 44, height: 44, borderRadius: 22,
-    alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+    width: 44,
+    height: 44,
+    borderRadius: radius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
   },
-  gradeLetter: { color: '#fff', fontSize: typography.size.sm, fontWeight: typography.weight.black },
-  studentName: { fontSize: typography.size.base, fontWeight: typography.weight.bold },
-  subjectName: { fontSize: typography.size.sm, marginTop: 1 },
-  examDate: { fontSize: typography.size.xs, marginTop: 2 },
-  rightCol: { alignItems: 'flex-end', gap: 3 },
-  marksText: { fontSize: typography.size.md, fontWeight: typography.weight.bold },
-  pct: { fontSize: typography.size.xs },
-  empty: { alignItems: 'center', padding: spacing.xl },
-  emptyIcon: { fontSize: 44, marginBottom: 12 },
-  emptyText: { fontSize: typography.size.base },
+  gradeLetter: {
+    fontSize: typography.size.base,
+    fontWeight: typography.weight.extrabold,
+  },
+  studentName: {
+    fontSize: typography.size.base,
+    fontWeight: typography.weight.bold,
+  },
+  subjectName: {
+    fontSize: typography.size.xs,
+    marginTop: 2,
+  },
+  examDate: {
+    fontSize: typography.size['2xs'],
+    marginTop: 2,
+  },
+  scoreCol: {
+    alignItems: 'flex-end',
+  },
+  scoreValue: {
+    fontSize: typography.size.base,
+    fontWeight: typography.weight.extrabold,
+  },
+  scoreMax: {
+    fontSize: typography.size.xs,
+    fontWeight: typography.weight.medium,
+  },
+  pctText: {
+    fontSize: typography.size['2xs'],
+    marginTop: 2,
+  },
 });
