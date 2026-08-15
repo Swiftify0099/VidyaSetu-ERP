@@ -52,7 +52,10 @@ jobs:
           CURRENT_ACADEMIC_YEAR=2025-2026
           UPLOAD_BASE_DIR=./storage
           DEVICE_SECURITY_ENABLED=true
-          MAX_TRUSTED_DEVICES=1
+          MAX_TRUSTED_DEVICES=3
+          MAX_PRIMARY_DEVICES=1
+          MAX_TEMPORARY_DEVICES=2
+          TEMPORARY_DEVICE_DURATION_HOURS=24
           EOF
 
       - name: Run pytest

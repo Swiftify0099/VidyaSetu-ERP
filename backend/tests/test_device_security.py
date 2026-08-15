@@ -361,9 +361,10 @@ class TestScenario9_MaxDeviceLimit:
         new_dev = make_device(db, test_user.id, "new-dev", is_primary=False, is_trusted=True)
         db.flush()
 
-        # Enforce device limit should evict dev1
-        evicted = DeviceService.enforce_device_limit(db, test_user.id, new_dev.id)
-        db.flush()
+        with patch.object(DeviceService, "_max_devices", return_value=1):
+            # Enforce device limit should evict dev1
+            evicted = DeviceService.enforce_device_limit(db, test_user.id, new_dev.id)
+            db.flush()
 
         assert evicted is not None
         assert dev1.status == DeviceStatus.REVOKED
